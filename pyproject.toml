@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "plasrisk"
+version = "1.0.0"
+description = "PlasRisk: ten-dimension data-driven weighted risk assessment for bacterial plasmids from FASTA sequences"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "PlasRisk Team"},
+]
+maintainers = [
+    {name = "PlasRisk Team"},
+]
+keywords = [
+    "bioinformatics",
+    "plasmid",
+    "antimicrobial resistance",
+    "AMR",
+    "risk assessment",
+    "microbial genomics",
+    "One Health",
+    "biocide resistance",
+    "co-selection",
+    "horizontal gene transfer",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
+]
+dependencies = [
+    "pandas>=1.3",
+    "numpy>=1.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "build",
+    "twine",
+]
+full = [
+    "biopython>=1.79",
+]
+
+[project.scripts]
+plasrisk = "plasrisk.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/plasrisk"
+Repository = "https://github.com/yourusername/plasrisk"
+Issues = "https://github.com/yourusername/plasrisk/issues"
+Documentation = "https://github.com/yourusername/plasrisk#readme"
+Changelog = "https://github.com/yourusername/plasrisk/releases"
+
+[tool.setuptools.packages.find]
+include = ["plasrisk*"]
+
+[tool.setuptools.package-data]
+plasrisk = ["data/*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

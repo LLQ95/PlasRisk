@@ -1,0 +1,11 @@
+include README.md
+include LICENSE
+include pyproject.toml
+include setup.py
+include MANIFEST.in
+recursive-include plasrisk/data *.csv
+recursive-include tests *.py *.fasta
+recursive-include docs *.html *.svg *.png
+prune .github
+prune bioconda
+prune conda
