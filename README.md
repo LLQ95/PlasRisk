@@ -1,12 +1,12 @@
 # PlasRisk
 
-**10-dimension weighted risk assessment for bacterial plasmids from FASTA sequences**
+**10-dimension data-driven weighted risk assessment for bacterial plasmids from FASTA sequences**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://python.org)
 
 PlasRisk computes a composite risk score for bacterial plasmids based on ten
-biologically motivated dimensions: antimicrobial resistance gene (ARG) burden,
+data-driven weighted dimensions: antimicrobial resistance gene (ARG) burden,
 virulence factors (VFs), mobility/conjugation potential, host range, replicon
 type, plasmid size, biocide/metal resistance (BMRG), geographic spread, habitat
 breadth, and temporal growth rate. It accepts plasmid FASTA sequences and
@@ -34,17 +34,20 @@ Risk grades: **A** (Very High, S >= 0.60), **B** (High, >= 0.45),
 # Create a dedicated environment
 conda create -n plasrisk -c bioconda -c conda-forge plasrisk
 conda activate plasrisk
+
+# Optional: install abricate and blast for full annotation capability
+conda install -c bioconda -c conda-forge abricate blast
 ```
 
-This installs PlasRisk together with `abricate` and `blast` for full
-annotation capability.
+PlasRisk can run without abricate in sequence-only mode (`--no-abricate`),
+scoring based on plasmid length and replicon lookup priors.
 
 ### Option 2: pip + manual abricate
 
 ```bash
 pip install plasrisk
 
-# Install abricate separately for annotation
+# Install abricate separately for full annotation
 conda install -c bioconda abricate
 # or on Debian/Ubuntu: apt-get install abricate
 ```
@@ -52,11 +55,11 @@ conda install -c bioconda abricate
 ### Option 3: from source
 
 ```bash
-git clone https://github.com/yourusername/plasrisk.git
-cd plasrisk
+git clone https://github.com/LLQ95/PlasRisk.git
+cd PlasRisk
 pip install .
 
-# Install annotation dependencies
+# Install annotation dependencies (optional)
 conda install -c bioconda abricate blast
 ```
 
@@ -209,8 +212,8 @@ The PlasRisk model was developed and validated using 792,964 plasmid sequence
 clusters from PIPdb (Zhu et al., *Nucleic Acids Res.*, 2025). Validation
 included:
 
-- **Quartile stratification**: Q1 (highest risk) plasmids had 65.6% ARG prevalence,
-  12.2% high-risk ARG rate, 13.3% conjugative rate (vs. 0% in Q4).
+- **Quartile stratification**: Q1 (highest risk) plasmids had 92.3% ARG prevalence,
+  28.2% high-risk ARG rate, 17.5% conjugative rate (vs. 0% in Q4).
 - **Data-driven weights**: RF-MDG, LASSO, and grid-search optimization across four
   outcomes (high-risk ARG, MDR-VF fusion, conjugative capacity, BMRG carriage)
   converged on S_ARG (0.245), S_BM (0.211), S_MOB (0.204), and S_SIZE (0.181)
@@ -296,7 +299,7 @@ test:
     - plasrisk --version
 
 about:
-  home: https://github.com/yourusername/plasrisk
+  home: https://github.com/LLQ95/PlasRisk
   license: MIT
   license_file: LICENSE
   summary: "Ten-dimension data-driven weighted risk assessment for bacterial plasmids"
@@ -346,7 +349,7 @@ conda install --use-local plasrisk
 ## Running tests
 
 ```bash
-cd plasrisk_py
+cd PlasRisk
 python -m pytest tests/ -v
 # or
 python tests/test_scoring.py
@@ -358,8 +361,8 @@ python tests/test_scoring.py
 
 If you use PlasRisk, please cite:
 
-> [Authors]. PlasRisk: a ten-dimension weighted risk assessment framework for
-> bacterial plasmids. *Journal*, 2025. doi: [to be added]
+> [Authors]. PlasRisk: a ten-dimension data-driven weighted risk assessment
+> framework for bacterial plasmids. *Journal*, 2025. doi: [to be added]
 
 The model is based on data from:
 > Zhu Q, Chen Q, Lu X, et al. PIPdb: a comprehensive plasmid sequence resource
