@@ -7,7 +7,7 @@ name = "plasrisk"
 version = "1.0.0"
 description = "PlasRisk: ten-dimension data-driven weighted risk assessment for bacterial plasmids from FASTA sequences"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 requires-python = ">=3.8"
 authors = [
     {name = "PlasRisk Team"},
@@ -31,7 +31,6 @@ classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -61,11 +60,11 @@ full = [
 plasrisk = "plasrisk.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/yourusername/plasrisk"
-Repository = "https://github.com/yourusername/plasrisk"
-Issues = "https://github.com/yourusername/plasrisk/issues"
-Documentation = "https://github.com/yourusername/plasrisk#readme"
-Changelog = "https://github.com/yourusername/plasrisk/releases"
+Homepage = "https://github.com/LLQ95/PlasRisk"
+Repository = "https://github.com/LLQ95/PlasRisk"
+Issues = "https://github.com/LLQ95/PlasRisk/issues"
+Documentation = "https://github.com/LLQ95/PlasRisk#readme"
+Changelog = "https://github.com/LLQ95/PlasRisk/releases"
 
 [tool.setuptools.packages.find]
 include = ["plasrisk*"]

@@ -5,7 +5,7 @@ include setup.py
 include MANIFEST.in
 recursive-include plasrisk/data *.csv
 recursive-include tests *.py *.fasta
-recursive-include docs *.html *.svg *.png
+recursive-include docs *.html *.svg
 prune .github
 prune bioconda
 prune conda

@@ -40,9 +40,10 @@ test:
     - python -c "from plasrisk import PlasRiskScorer; s=PlasRiskScorer(); print('OK')"
 
 about:
-  home: https://github.com/yourusername/plasrisk
+  home: https://github.com/LLQ95/PlasRisk
   license: MIT
   license_family: MIT
+  license_file: LICENSE
   summary: "Ten-dimension data-driven weighted risk assessment for bacterial plasmids"
   description: |
     PlasRisk computes a composite risk score for bacterial plasmids based on
@@ -54,9 +55,9 @@ about:
     consensus (Random Forest MDG, LASSO, grid-search optimization) on
     792,964 PIPdb plasmid sequence clusters. Accepts FASTA input and uses
     abricate for annotation when available.
-  doc_url: https://github.com/yourusername/plasrisk#readme
-  dev_url: https://github.com/yourusername/plasrisk
+  doc_url: https://github.com/LLQ95/PlasRisk#readme
+  dev_url: https://github.com/LLQ95/PlasRisk
 
 extra:
   recipe-maintainers:
-    - yourusername
+    - LLQ95
