@@ -1,0 +1,11 @@
+# conda_build_config.yaml - Build configuration for plasrisk
+# Python versions to build for (noarch: python means one build covers all)
+python:
+  - 3.8
+  - 3.9
+  - 3.10
+  - 3.11
+  - 3.12
+
+# Build platforms (noarch: python is platform-independent)
+# No need to specify platform-specific configs
