@@ -17,8 +17,7 @@ args <- commandArgs(trailingOnly=TRUE)
 res_dir <- if (length(args)>=1) args[1] else "results"
 fig_dir <- file.path(res_dir, "figures", "descriptive")
 tab_dir <- file.path(res_dir, "tables")
-dir.create(fig_dir, recursive=TRUE, showWarnings=FALSE)
-dir.create(tab_dir, recursive=TRUE, showWarnings=FALSE)
+dir.create(fig_dir, recursive=TRUE, showWarnings=FALSE); dir.create(tab_dir, recursive=TRUE, showWarnings=FALSE)
 save_plot <- function(plot, name, w=10, h=8) {
   ggsave(file.path(fig_dir, paste0(name,".pdf")), plot, width=w, height=h, limitsize=FALSE)
   ggsave(file.path(fig_dir, paste0(name,".png")), plot, width=w, height=h, dpi=300, limitsize=FALSE)
@@ -100,7 +99,7 @@ rep_table[, (num_cols) := lapply(.SD, function(x) round(x, 4)), .SDcols=num_cols
 fwrite(rep_table, file.path(tab_dir,"tab_replicon_risk_weight_table.csv"))
 cat(sprintf("  Table saved: %d replicons (%d major)\n", nrow(rep_table), sum(rep_table$major)))
 
-# Save per-PSC final scores (for use by other scripts)
+# Save per-PSC final scores
 fwrite(d[, .(id, S_total_raw, S_total_norm)], file.path(tab_dir,"tab_psc_final_scores.csv"))
 
 # Visualization
@@ -108,8 +107,7 @@ top30 <- rep_table[major==TRUE]$replicon_primary[1:min(30,sum(rep_table$major))]
 heat_dt <- melt(rep_table[replicon_primary %in% top30], id.vars="replicon_primary", measure.vars=comp_cols, variable.name="component", value.name="score")
 heat_dt[, replicon_primary := factor(replicon_primary, levels=rev(top30))]
 heat_dt[, component := factor(component, levels=comp_cols)]
-heat_dt[, weight := W[as.character(component)]]
-heat_dt[, contribution := score * weight]
+heat_dt[, weight := W[as.character(component)]]; heat_dt[, contribution := score * weight]
 p21a <- ggplot(heat_dt, aes(x=component, y=replicon_primary, fill=score)) +
   geom_tile(colour="white", linewidth=0.3) + geom_text(aes(label=sprintf("%.2f",score)), size=2.2) +
   scale_fill_gradientn(colours=c("#f7fcf5","#c7e9c0","#74c476","#238b45","#00441b"), limits=c(0,1), name="Score") +
@@ -127,23 +125,22 @@ ml_dt <- dt[!is.na(S_ARG), .(S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE, S_BM, S_
   n_high_risk_arg, n_arg, n_vf, mobility_class,
   highrisk=factor(ifelse(n_high_risk_arg>0, "Yes", "No")), mdr_vf=factor(ifelse(n_arg>0 & n_vf>0, "Yes", "No")))]
 ml_dt <- ml_dt[complete.cases(ml_dt)]
-set.seed(42)
-ml_sample <- ml_dt[sample(.N, min(100000, .N))]
+set.seed(42); ml_sample <- ml_dt[sample(.N, min(100000, .N))]
 cat("  Training RF (high-risk ARG)...\n")
 rf1 <- randomForest(highrisk ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BM + S_GEO + S_HAB + S_GROW,
                     data=ml_sample, ntree=300, importance=TRUE)
-rf1_auc <- as.numeric(auc(roc(ml_sample$highrisk, predict(rf1, type="prob")[,", quiet=TRUE)))
+rf1_auc <- as.numeric(auc(roc(ml_sample$highrisk, predict(rf1, type="prob")[, 2], quiet=TRUE)))
 cat(sprintf("  RF high-risk ARG AUC = %.3f\n", rf1_auc))
 cat("  Training RF (MDR-VF)...\n")
 rf2 <- randomForest(mdr_vf ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BM + S_GEO + S_HAB + S_GROW,
                     data=ml_sample, ntree=300, importance=TRUE)
-rf2_auc <- as.numeric(auc(roc(ml_sample$mdr_vf, predict(rf2, type="prob")[,", quiet=TRUE)))
+rf2_auc <- as.numeric(auc(roc(ml_sample$mdr_vf, predict(rf2, type="prob")[, 2], quiet=TRUE)))
 cat(sprintf("  RF MDR-VF AUC = %.3f\n", rf2_auc))
 ml_sample[, conj := factor(ifelse(mobility_class %in% c("conjugative_complete","conjugative_likely"),"Yes","No"))]
 cat("  Training RF (conjugative)...\n")
 rf3 <- randomForest(conj ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BM + S_GEO + S_HAB + S_GROW,
                     data=ml_sample, ntree=300, importance=TRUE)
-rf3_auc <- as.numeric(auc(roc(ml_sample$conj, predict(rf3, type="prob")[,", quiet=TRUE)))
+rf3_auc <- as.numeric(auc(roc(ml_sample$conj, predict(rf3, type="prob")[, 2], quiet=TRUE)))
 cat(sprintf("  RF conjugative AUC = %.3f\n", rf3_auc))
 imp1 <- as.data.table(importance(rf1), keep.rownames="feature"); setnames(imp1, "MeanDecreaseGini", "MDG_highrisk")
 imp2 <- as.data.table(importance(rf2), keep.rownames="feature"); setnames(imp2, "MeanDecreaseGini", "MDG_mdrvf")
