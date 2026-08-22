@@ -13,6 +13,7 @@ Options:
     --min-id FLOAT       Minimum abricate identity % (default: 75)
     --min-cov FLOAT      Minimum abricate coverage % (default: 50)
     --no-abricate        Skip abricate; sequence-only scoring
+    --mode {full,lite}   Scoring mode: full (10-dim, default) or lite (4-dim core)
     --db LIST            Comma-separated abricate databases to use
                          (default: auto-detect)
     --json               Also write JSON summary
@@ -43,7 +44,7 @@ from .annotate import (
     annotate_fasta,
 )
 from .lookup import load_replicon_lookup
-from .scoring import PlasRiskScorer, RISK_WEIGHTS, WEIGHT_SUM
+from .scoring import PlasRiskScorer, RISK_WEIGHTS, RISK_WEIGHTS_LITE, WEIGHT_SUM
 
 
 def parse_args(argv=None):
@@ -58,6 +59,7 @@ Examples:
   plasrisk /data/plasmids/
   plasrisk --db card,vfdb,plasmidfinder plasmid.fasta
   plasrisk --no-abricate contigs.fasta
+  plasrisk --mode lite *.fasta
         """,
     )
     parser.add_argument("inputs", nargs="+", metavar="FASTA",
@@ -65,13 +67,16 @@ Examples:
     parser.add_argument("-o", "--output", default="plasrisk_output",
                         help="Output directory (default: ./plasrisk_output)")
     parser.add_argument("-t", "--threads", type=int, default=4,
-                        help="Number of threads (default: 4)")
+                        help="Number of abricate threads (default: 4)")
     parser.add_argument("--min-id", type=float, default=75.0,
                         help="Minimum abricate identity %% (default: 75)")
     parser.add_argument("--min-cov", type=float, default=50.0,
                         help="Minimum abricate coverage %% (default: 50)")
     parser.add_argument("--no-abricate", action="store_true",
                         help="Skip abricate annotation; sequence-only scoring")
+    parser.add_argument("--mode", choices=["full", "lite"], default="full",
+                        help="Scoring mode: 'full' (10-dim, default) or 'lite' "
+                             "(4-dim core: ARG+MOB+SIZE+BM; 99.8%% of full AUC)")
     parser.add_argument("--db", default=None,
                         help="Comma-separated abricate databases (default: auto)")
     parser.add_argument("--json", action="store_true",
@@ -92,7 +97,6 @@ def collect_fasta_files(inputs: List[str]) -> List[str]:
     fasta_files = []
     fasta_exts = {".fasta", ".fa", ".fna", ".ffn", ".fsa", ".fas"}
     for inp in inputs:
-        # Expand glob patterns
         matches = glob.glob(inp)
         if not matches and os.path.exists(inp):
             matches = [inp]
@@ -105,7 +109,6 @@ def collect_fasta_files(inputs: List[str]) -> List[str]:
                             fasta_files.append(os.path.join(root, f))
             elif os.path.isfile(match):
                 fasta_files.append(match)
-    # Deduplicate while preserving order
     seen = set()
     unique = []
     for f in fasta_files:
@@ -117,14 +120,17 @@ def collect_fasta_files(inputs: List[str]) -> List[str]:
 
 
 def print_banner(args):
+    mode_str = "LITE (4-dim core)" if args.mode == "lite" else "FULL (10-dim)"
     print("=" * 68)
     print("  PlasRisk v%s - Plasmid Risk Assessment" % __version__)
-    print("  10-dimension weighted risk model")
+    print("  Model: %s" % mode_str)
     print("=" * 68)
     if not args.quiet:
+        w = RISK_WEIGHTS_LITE if args.mode == "lite" else RISK_WEIGHTS
+        ws = sum(w.values())
         print("  Weights: %s" % ", ".join(
-            "%s=%.2f" % (k, v) for k, v in RISK_WEIGHTS.items()))
-        print("  Weight sum: %.2f (normalized scores = S/%.2f)" % (WEIGHT_SUM, WEIGHT_SUM))
+            "%s=%.3f" % (k, v) for k, v in w.items()))
+        print("  Weight sum: %.4f" % ws)
         if not args.no_abricate:
             if abricate_available():
                 dbs = abricate_databases()
@@ -142,7 +148,6 @@ def main(argv=None):
     args = parse_args(argv)
     print_banner(args)
 
-    # Collect input files
     fasta_files = collect_fasta_files(args.inputs)
     if not fasta_files:
         print("ERROR: No FASTA files found.", file=sys.stderr)
@@ -151,19 +156,15 @@ def main(argv=None):
     if not args.quiet:
         print("  Found %d FASTA file(s)" % len(fasta_files))
 
-    # Create output directory
     os.makedirs(args.output, exist_ok=True)
 
-    # Load replicon lookup
     lookup = load_replicon_lookup()
-    scorer = PlasRiskScorer(replicon_lookup=lookup)
+    scorer = PlasRiskScorer(replicon_lookup=lookup, mode=args.mode)
 
-    # Determine abricate databases
     abricate_dbs = None
     if args.db:
         abricate_dbs = [d.strip() for d in args.db.split(",")]
 
-    # Process each file
     all_results = []
     file_summaries = []
     total_seqs = 0
@@ -195,13 +196,11 @@ def main(argv=None):
             print("    No sequences processed.")
             continue
 
-        # Score
         df = scorer.score_dataframe(ann.features)
         df.insert(0, "file", os.path.basename(fasta_path))
         all_results.append(df)
         total_seqs += len(df)
 
-        # Per-file summary
         if len(df) > 0:
             file_summaries.append({
                 "file": os.path.basename(fasta_path),
@@ -229,10 +228,8 @@ def main(argv=None):
         print("\nERROR: No results generated.", file=sys.stderr)
         sys.exit(1)
 
-    # Combine all results
     combined = pd.concat(all_results, ignore_index=True)
 
-    # Write outputs
     tsv_path = os.path.join(args.output, "plasrisk_results.tsv")
     combined.to_csv(tsv_path, sep="\t", index=False, float_format="%.4f")
     if not args.quiet:
@@ -253,7 +250,6 @@ def main(argv=None):
         if not args.quiet:
             print("  JSON written to: %s" % json_path)
 
-    # Print final summary table
     elapsed = time.time() - t0
     print("\n" + "=" * 68)
     print("  SUMMARY")
@@ -263,7 +259,6 @@ def main(argv=None):
     print("  Time elapsed:       %.1f sec" % elapsed)
     print("-" * 68)
 
-    # Grade distribution
     grade_counts = combined["grade"].value_counts().sort_index()
     for grade in ["A", "B", "C", "D", "E"]:
         n = grade_counts.get(grade, 0)
@@ -272,7 +267,6 @@ def main(argv=None):
         print("  Grade %s: %6d (%5.1f%%) %s" % (grade, n, pct, bar))
     print("-" * 68)
 
-    # Top 10 highest risk
     if len(combined) > 0:
         print("\n  Top 10 highest-risk plasmids:")
         top10 = combined.nsmallest(10, "rank") if "rank" in combined.columns else combined.head(10)

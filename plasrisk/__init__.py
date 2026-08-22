@@ -10,13 +10,17 @@ S = 0.245*S_ARG + 0.110*S_VF + 0.204*S_MOB + 0.028*S_HOST
   + 0.003*S_REP + 0.181*S_SIZE + 0.211*S_BM
   + 0.002*S_GEO + 0.002*S_HAB + 0.015*S_GROW
 
+Also provides a 4-dimension lite mode (S_ARG+S_MOB+S_SIZE+S_BM) that
+achieves 99.8% of full-model mean AUC.
+
 Reference: [to be updated upon publication]
 """
 
 __version__ = "1.0.0"
 __author__ = "PlasRisk Team"
 
-from .scoring import PlasRiskScorer, PlasmidFeatures, RISK_WEIGHTS, RISK_GRADES, WEIGHT_SUM
+from .scoring import (PlasRiskScorer, PlasmidFeatures, RISK_WEIGHTS,
+                      RISK_WEIGHTS_LITE, RISK_GRADES, WEIGHT_SUM)
 from .annotate import annotate_fasta, AnnotationResult
 from .lookup import load_replicon_lookup
 
@@ -24,6 +28,7 @@ __all__ = [
     "PlasRiskScorer",
     "PlasmidFeatures",
     "RISK_WEIGHTS",
+    "RISK_WEIGHTS_LITE",
     "RISK_GRADES",
     "WEIGHT_SUM",
     "annotate_fasta",
