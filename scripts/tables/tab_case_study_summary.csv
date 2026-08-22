@@ -1,0 +1,4 @@
+seq_id,S_norm,grade,percentile,high_risk,replicon,length_kb,label
+pNDM-1,0.7178,A,99.9,blaNDM,IncN,50,S=0.718  Grade A  Pctl=100%
+pHNSHP45,0.496,B,96.9,mcr-1,IncX4,33,S=0.496  Grade B  Pctl=97%
+pColE1-like,0.1563,D,37.3,,Col(MG828),6.5,S=0.156  Grade D  Pctl=37%
