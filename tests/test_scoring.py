@@ -12,18 +12,17 @@ from plasrisk.scoring import (
     PlasRiskScorer,
     PlasmidFeatures,
     RISK_WEIGHTS,
+    RISK_WEIGHTS_LITE,
     WEIGHT_SUM,
 )
 
 
 def test_weight_sum():
-    """Weights should sum to ~1.0."""
     assert abs(sum(RISK_WEIGHTS.values()) - 1.0) < 0.01
     assert abs(WEIGHT_SUM - 1.0) < 0.01
 
 
 def test_empty_plasmid():
-    """Plasmid with no genes should score very low."""
     scorer = PlasRiskScorer()
     feat = PlasmidFeatures(seq_id="test", length_bp=5000)
     result = scorer.score(feat)
@@ -35,7 +34,6 @@ def test_empty_plasmid():
 
 
 def test_high_risk_plasmid():
-    """Plasmid with NDM, mcr, VFs, and conjugation should score high."""
     scorer = PlasRiskScorer()
     feat = PlasmidFeatures(
         seq_id="pHighRisk",
@@ -45,10 +43,7 @@ def test_high_risk_plasmid():
         vf_categories=["Exotoxin", "Nutritional/Metabolic factor"],
         bm_gene_names=["merA", "merR", "qacEdelta1", "arsC"],
         replicon="IncX3",
-        has_t4cp=True,
-        has_relaxase=True,
-        has_oriT=True,
-        has_auxiliary=True,
+        has_t4cp=True, has_relaxase=True, has_oriT=True, has_auxiliary=True,
     )
     result = scorer.score(feat)
     assert result["S_ARG"] > 0.7
@@ -63,7 +58,6 @@ def test_high_risk_plasmid():
 
 
 def test_size_sigmoid():
-    """S_SIZE should be monotonic and sigmoidal."""
     scorer = PlasRiskScorer()
     s_small = scorer.score_size(1000)
     s_med = scorer.score_size(30000)
@@ -75,7 +69,6 @@ def test_size_sigmoid():
 
 
 def test_mobility_classes():
-    """S_MOB should distinguish complete conjugative from non-mobilizable."""
     scorer = PlasRiskScorer()
     complete = PlasmidFeatures(
         length_bp=50000,
@@ -90,7 +83,6 @@ def test_mobility_classes():
 
 
 def test_bm_scoring():
-    """S_BM should detect mer and qac bonuses."""
     scorer = PlasRiskScorer()
     no_bm = PlasmidFeatures(length_bp=5000, bm_gene_names=[])
     mer_only = PlasmidFeatures(length_bp=5000, bm_gene_names=["merA", "merR", "merD"])
@@ -99,7 +91,6 @@ def test_bm_scoring():
 
 
 def test_grade_thresholds():
-    """Grade assignment should follow thresholds."""
     scorer = PlasRiskScorer()
     assert scorer._grade(0.70) == ("A", "Very High")
     assert scorer._grade(0.50) == ("B", "High")
@@ -109,7 +100,6 @@ def test_grade_thresholds():
 
 
 def test_dataframe_output():
-    """score_dataframe should return sorted DataFrame with rank."""
     import pandas as pd
     scorer = PlasRiskScorer()
     feats = [
@@ -120,8 +110,57 @@ def test_dataframe_output():
     df = scorer.score_dataframe(feats)
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 2
-    assert df.iloc[0]["seq_id"] == "high"  # highest risk first
+    assert df.iloc[0]["seq_id"] == "high"
     assert "rank" in df.columns
+
+
+def test_lite_weights():
+    assert abs(sum(RISK_WEIGHTS_LITE.values()) - 1.0) < 0.001
+    assert set(RISK_WEIGHTS_LITE.keys()) == {"S_ARG", "S_MOB", "S_SIZE", "S_BM"}
+
+
+def test_lite_mode_scoring():
+    scorer = PlasRiskScorer(mode="lite")
+    feat = PlasmidFeatures(
+        seq_id="pLite",
+        length_bp=80000,
+        arg_names=["NDM-1", "CTX-M-15"],
+        bm_gene_names=["merA", "qacEdelta1"],
+        has_t4cp=True, has_relaxase=True, has_oriT=True, has_auxiliary=True,
+    )
+    result = scorer.score(feat)
+    assert result["model_mode"] == "lite"
+    assert result["S_ARG"] is not None
+    assert result["S_MOB"] is not None
+    assert result["S_SIZE"] is not None
+    assert result["S_BM"] is not None
+    assert result["S_VF"] is None
+    assert result["S_HOST"] is None
+    assert result["grade"] in ("A", "B", "C")
+
+
+def test_lite_vs_full_correlation():
+    scorer_full = PlasRiskScorer(mode="full")
+    scorer_lite = PlasRiskScorer(mode="lite")
+    feats = [
+        PlasmidFeatures(seq_id="low", length_bp=3000),
+        PlasmidFeatures(seq_id="mid", length_bp=50000,
+                        arg_names=["TEM-1"], bm_gene_names=["merA"]),
+        PlasmidFeatures(seq_id="high", length_bp=120000,
+                        arg_names=["NDM-1", "mcr-1", "CTX-M-15"],
+                        bm_gene_names=["merA", "qacEdelta1", "arsC"],
+                        has_t4cp=True, has_relaxase=True),
+    ]
+    full_scores = [scorer_full.score(f)["S_norm"] for f in feats]
+    lite_scores = [scorer_lite.score(f)["S_norm"] for f in feats]
+    assert full_scores[2] > full_scores[1] > full_scores[0]
+    assert lite_scores[2] > lite_scores[1] > lite_scores[0]
+
+
+def test_invalid_mode():
+    import pytest
+    with pytest.raises(ValueError):
+        PlasRiskScorer(mode="ultra")
 
 
 if __name__ == "__main__":
@@ -133,4 +172,7 @@ if __name__ == "__main__":
     test_bm_scoring()
     test_grade_thresholds()
     test_dataframe_output()
+    test_lite_weights()
+    test_lite_mode_scoring()
+    test_lite_vs_full_correlation()
     print("All tests passed.")

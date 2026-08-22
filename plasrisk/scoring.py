@@ -3,6 +3,7 @@ scoring.py - Ten-dimension plasmid risk scoring model.
 
 Each component S_i is normalized to [0, 1].
 Composite score:  S = sum(w_i * S_i), normalized by sum(w_i).
+Supports full (10-dim) and lite (4-dim core) modes.
 """
 
 from __future__ import annotations
@@ -35,6 +36,19 @@ RISK_WEIGHTS: Dict[str, float] = {
 WEIGHT_SUM = sum(RISK_WEIGHTS.values())  # 1.0001 ~ 1.0
 
 # ---------------------------------------------------------------------------
+# Lite mode: 4-dimension core (S_ARG + S_MOB + S_SIZE + S_BM)
+# Renormalized from the full consensus weights; captures 99.8% of mean AUC.
+# Derived from all-subsets dimensionality analysis (pipdb_20, 5-fold CV).
+# ---------------------------------------------------------------------------
+LITE_DIMENSIONS = ("S_ARG", "S_MOB", "S_SIZE", "S_BM")
+LITE_WEIGHTS_RAW = {k: RISK_WEIGHTS[k] for k in LITE_DIMENSIONS}
+LITE_WEIGHT_SUM = sum(LITE_WEIGHTS_RAW.values())  # 0.8409
+RISK_WEIGHTS_LITE: Dict[str, float] = {
+    k: v / LITE_WEIGHT_SUM for k, v in LITE_WEIGHTS_RAW.items()
+}
+# S_ARG=0.2911, S_MOB=0.2427, S_SIZE=0.2150, S_BM=0.2512
+
+# ---------------------------------------------------------------------------
 # Risk grade thresholds (on normalized S_norm in [0, 1])
 # ---------------------------------------------------------------------------
 RISK_GRADES = [
@@ -64,7 +78,6 @@ HIGH_RISK_ARG_PATTERNS = {
     "rmt":       re.compile(r"rmt[A-H]", re.I),
 }
 
-# WHO-priority ARG indicator (broad set of clinically important families)
 WHO_ARG_PATTERNS = re.compile(
     r"mcr|NDM|KPC|OXA-?48|CTX-M|CMY|DHA|VIM|IMP|tet\(?X\)?|van|"
     r"cfr|optrA|poxtA|qnr|aac.6.-Ib-cr|rmt|fos[A-Z]|SHV|TEM|PER|VEB|GES",
@@ -72,7 +85,7 @@ WHO_ARG_PATTERNS = re.compile(
 )
 
 # ---------------------------------------------------------------------------
-# Mobility gene markers (keyword-based detection in annotation)
+# Mobility gene markers
 # ---------------------------------------------------------------------------
 T4CP_PATTERN = re.compile(
     r"\b(traD|traG|virD4|trwB|T4CP|coupling)\b", re.I)
@@ -93,7 +106,6 @@ ARS_COP_PATTERN = re.compile(
     re.I,
 )
 
-# VF category bonuses
 EXOTOXIN_PATTERN = re.compile(r"exotoxin|toxin|enterotoxin|hemolysin|cytolysin", re.I)
 EFFECTOR_PATTERN = re.compile(r"effector delivery|type III|type IV|T3SS|T4SS|secretion", re.I)
 
@@ -105,40 +117,33 @@ EFFECTOR_PATTERN = re.compile(r"effector delivery|type III|type IV|T3SS|T4SS|sec
 class PlasmidFeatures:
     """Container for all features needed to score a single plasmid."""
 
-    # Sequence
     seq_id: str = ""
     length_bp: int = 0
 
-    # Annotation counts
     arg_names: List[str] = field(default_factory=list)
     vf_names: List[str] = field(default_factory=list)
     vf_categories: List[str] = field(default_factory=list)
     bm_gene_names: List[str] = field(default_factory=list)
 
-    # Replicon
     replicon: str = ""
 
-    # Mobility elements (booleans)
     has_t4cp: Optional[bool] = None
     has_relaxase: Optional[bool] = None
     has_oriT: Optional[bool] = None
     has_auxiliary: Optional[bool] = None
-    mobility_class: str = ""  # if pre-classified
+    mobility_class: str = ""
 
-    # Host range (if known; otherwise None -> use replicon lookup)
     n_host_genera: Optional[int] = None
     n_countries: Optional[int] = None
     n_habitats: Optional[int] = None
     annual_growth_rate: Optional[float] = None
 
-    # Replicon lookup priors (filled by scorer if not provided)
     s_rep_prior: Optional[float] = None
     s_geo_prior: Optional[float] = None
     s_hab_prior: Optional[float] = None
     s_grow_prior: Optional[float] = None
     s_host_prior: Optional[float] = None
 
-    # Convenience: any extra metadata
     metadata: Dict = field(default_factory=dict)
 
     @property
@@ -176,9 +181,10 @@ class PlasmidFeatures:
 # Scorer
 # ---------------------------------------------------------------------------
 class PlasRiskScorer:
-    """Compute 10-dimension PlasRisk scores for plasmids."""
+    """Compute PlasRisk scores for plasmids (10-dim full or 4-dim lite)."""
 
-    def __init__(self, replicon_lookup: Optional[pd.DataFrame] = None):
+    def __init__(self, replicon_lookup: Optional[pd.DataFrame] = None,
+                 mode: str = "full"):
         """
         Parameters
         ----------
@@ -186,13 +192,23 @@ class PlasRiskScorer:
             Lookup table with columns:
             replicon_primary, S_REP, S_GEO, S_HAB, S_GROW, S_HOST
             If None, built-in defaults are used.
+        mode : str
+            "full" (default): 10-dimension model.
+            "lite": 4-dimension core (S_ARG, S_MOB, S_SIZE, S_BM),
+                    achieving 99.8% of full-model mean AUC.
         """
+        if mode not in ("full", "lite"):
+            raise ValueError("mode must be 'full' or 'lite', got %r" % mode)
+        self.mode = mode
+        self.weights = RISK_WEIGHTS_LITE if mode == "lite" else RISK_WEIGHTS
+        self.weight_sum = sum(self.weights.values())
+        self.active_dims = tuple(self.weights.keys())
+
         if replicon_lookup is not None:
             self.lookup = replicon_lookup.set_index("replicon_primary")
         else:
             self.lookup = None
 
-        # Default priors for unknown replicons (moderate / neutral)
         self.defaults = {
             "S_REP":  0.30,
             "S_GEO":  0.30,
@@ -207,11 +223,6 @@ class PlasRiskScorer:
 
     @staticmethod
     def score_arg(feat: PlasmidFeatures) -> float:
-        """
-        S_ARG: ARG burden.
-        0 if no ARGs.
-        0.25 base + min(n_arg*0.05, 0.35) + 0.20*WHO + 0.20*high-risk, cap 1.0.
-        """
         n = feat.n_arg
         if n == 0:
             return 0.0
@@ -223,11 +234,6 @@ class PlasRiskScorer:
 
     @staticmethod
     def score_vf(feat: PlasmidFeatures) -> float:
-        """
-        S_VF: virulence factor burden.
-        0 if no VFs.
-        0.30 base + min(n_vf*0.03, 0.40) + 0.15*exotoxin + 0.15*effector, cap 1.0.
-        """
         n = feat.n_vf
         if n == 0:
             return 0.0
@@ -242,12 +248,6 @@ class PlasRiskScorer:
 
     @staticmethod
     def score_mob(feat: PlasmidFeatures) -> float:
-        """
-        S_MOB: mobility potential based on conjugation elements.
-        0.10 base if any element + 0.35*T4CP + 0.25*relaxase
-        + 0.15*oriT + 0.15*auxiliary, cap 1.0.
-        """
-        # If mobility_class is pre-classified, use it
         if feat.mobility_class:
             mc = feat.mobility_class.lower()
             if "complete" in mc:
@@ -258,11 +258,10 @@ class PlasRiskScorer:
                 return 0.45
             return 0.10
 
-        # Otherwise infer from element booleans
         elements = [feat.has_t4cp, feat.has_relaxase,
                     feat.has_oriT, feat.has_auxiliary]
         if all(e is None for e in elements):
-            return 0.10  # unknown -> low default
+            return 0.10
 
         has_t4cp = bool(feat.has_t4cp)
         has_rel = bool(feat.has_relaxase)
@@ -285,11 +284,6 @@ class PlasRiskScorer:
 
     @staticmethod
     def score_size(length_bp: int) -> float:
-        """
-        S_SIZE: sigmoidal function of plasmid length.
-        Midpoint at 30 kb, steepness parameter 15 kb.
-        Small plasmids (<10 kb) score low; large (>80 kb) score high.
-        """
         if length_bp <= 0:
             return 0.0
         length_kb = length_bp / 1000.0
@@ -297,11 +291,6 @@ class PlasRiskScorer:
 
     @staticmethod
     def score_bm(feat: PlasmidFeatures) -> float:
-        """
-        S_BM: biocide/metal resistance (co-selection potential).
-        0 if no BMRGs.
-        0.25 base + min(n_bm*0.04, 0.35) + 0.15*mer + 0.15*qac + 0.10*ars/cop/sil.
-        """
         n = feat.n_bm
         if n == 0:
             return 0.0
@@ -314,11 +303,6 @@ class PlasRiskScorer:
         return min(base + count_bonus + mer_bonus + qac_bonus + ars_bonus, 1.0)
 
     def score_host(self, feat: PlasmidFeatures) -> float:
-        """
-        S_HOST: host range breadth.
-        If n_host_genera known, map to [0,1].
-        Otherwise use replicon lookup prior.
-        """
         if feat.n_host_genera is not None:
             n = feat.n_host_genera
             if n <= 1:
@@ -341,7 +325,7 @@ class PlasRiskScorer:
     def score_geo(self, feat: PlasmidFeatures) -> float:
         if feat.n_countries is not None:
             n = feat.n_countries
-            return min(n / 45.0, 1.0)  # 45+ countries -> 1.0
+            return min(n / 45.0, 1.0)
         if feat.s_geo_prior is not None:
             return float(feat.s_geo_prior)
         return self._lookup_prior(feat.replicon, "S_GEO")
@@ -349,7 +333,7 @@ class PlasRiskScorer:
     def score_hab(self, feat: PlasmidFeatures) -> float:
         if feat.n_habitats is not None:
             n = feat.n_habitats
-            return min(n / 8.0, 1.0)  # 8+ habitats -> 1.0
+            return min(n / 8.0, 1.0)
         if feat.s_hab_prior is not None:
             return float(feat.s_hab_prior)
         return self._lookup_prior(feat.replicon, "S_HAB")
@@ -357,8 +341,6 @@ class PlasRiskScorer:
     def score_grow(self, feat: PlasmidFeatures) -> float:
         if feat.annual_growth_rate is not None:
             g = feat.annual_growth_rate
-            # Map growth rate to [0,1]: negative -> 0.1, 0 -> 0.3,
-            # 0.1 -> 0.7, 0.3+ -> 1.0
             return float(np.clip(0.3 + g * 2.0, 0.0, 1.0))
         if feat.s_grow_prior is not None:
             return float(feat.s_grow_prior)
@@ -369,10 +351,8 @@ class PlasRiskScorer:
     # ------------------------------------------------------------------
 
     def _lookup_prior(self, replicon: str, column: str) -> float:
-        """Retrieve a prior from the replicon lookup table."""
         if not replicon or self.lookup is None:
             return self.defaults.get(column, 0.3)
-        # Try exact match first, then prefix match (e.g., "IncFII" for "IncFII(K)")
         if replicon in self.lookup.index:
             val = self.lookup.loc[replicon, column]
             return float(val) if pd.notna(val) else self.defaults[column]
@@ -388,15 +368,13 @@ class PlasRiskScorer:
 
     def score(self, feat: PlasmidFeatures) -> Dict:
         """
-        Compute all 10 component scores and the composite.
+        Compute component scores and the composite.
 
-        Returns
-        -------
-        dict with keys: seq_id, length_bp, replicon, n_ARG, n_VF, n_BM,
-                        S_ARG ... S_GROW, S_total, S_norm, grade, grade_label,
-                        high_risk_genes, mobility_class
+        In full mode, all 10 components are computed.
+        In lite mode, only the 4 core components (S_ARG, S_MOB, S_SIZE, S_BM)
+        are computed; other S_* fields are reported as None.
         """
-        components = {
+        all_components = {
             "S_ARG":  self.score_arg(feat),
             "S_VF":   self.score_vf(feat),
             "S_MOB":  self.score_mob(feat),
@@ -409,13 +387,18 @@ class PlasRiskScorer:
             "S_GROW": self.score_grow(feat),
         }
 
-        s_total = sum(RISK_WEIGHTS[k] * components[k] for k in components)
-        s_norm = s_total / WEIGHT_SUM
+        if self.mode == "lite":
+            components = {k: (all_components[k] if k in self.weights else None)
+                          for k in RISK_WEIGHTS}
+        else:
+            components = all_components
+
+        s_total = sum(self.weights[k] * all_components[k] for k in self.active_dims)
+        s_norm = s_total / self.weight_sum
 
         grade, grade_label = self._grade(s_norm)
 
-        # Determine mobility class if not pre-set
-        mob_class = feat.mobility_class or self._infer_mob_class(components["S_MOB"])
+        mob_class = feat.mobility_class or self._infer_mob_class(all_components["S_MOB"])
 
         result = {
             "seq_id": feat.seq_id,
@@ -427,8 +410,10 @@ class PlasRiskScorer:
             "n_BM": feat.n_bm,
             "high_risk_genes": ";".join(feat.high_risk_args) if feat.high_risk_args else "",
             "mobility_class": mob_class,
+            "model_mode": self.mode,
         }
-        result.update({k: round(v, 4) for k, v in components.items()})
+        for k, v in components.items():
+            result[k] = round(v, 4) if v is not None else None
         result["S_total"] = round(s_total, 4)
         result["S_norm"] = round(s_norm, 4)
         result["grade"] = grade
@@ -436,7 +421,6 @@ class PlasRiskScorer:
         return result
 
     def score_dataframe(self, features: List[PlasmidFeatures]) -> pd.DataFrame:
-        """Score multiple plasmids and return a sorted DataFrame."""
         rows = [self.score(f) for f in features]
         df = pd.DataFrame(rows)
         if not df.empty:
