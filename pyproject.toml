@@ -7,7 +7,7 @@ name = "plasrisk"
 version = "1.0.0"
 description = "PlasRisk: ten-dimension data-driven weighted risk assessment for bacterial plasmids from FASTA sequences"
 readme = "README.md"
-license = "MIT"
+license = {text = "MIT"}
 requires-python = ">=3.8"
 authors = [
     {name = "PlasRisk Team"},
