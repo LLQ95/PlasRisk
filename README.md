@@ -18,7 +18,7 @@ S = 0.245*S_ARG + 0.110*S_VF + 0.204*S_MOB + 0.028*S_HOST
   + 0.002*S_GEO + 0.002*S_HAB + 0.015*S_GROW
 
 Weights derived by data-driven consensus (Random Forest MDG, LASSO, and
-grid-search optimization) on 638,393 PIPdb PSCs; sum = 1.000.
+grid-search optimization) on 792,964 PIPdb PSCs; sum = 1.000.
 ```
 
 Risk grades: **A** (Very High, S >= 0.60), **B** (High, >= 0.45),
@@ -107,7 +107,20 @@ plasrisk --no-abricate contigs.fasta
 
 # JSON output
 plasrisk --json -o results plasmid.fasta
+
+# Lite mode: 4-dimension core (ARG + MOB + SIZE + BM), 99.8% of full-model AUC
+plasrisk --mode lite *.fasta
 ```
+
+### Full vs. Lite mode
+
+| | Full (10-dim) | Lite (4-dim) |
+|---|---|---|
+| Dimensions | S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE, S_BM, S_GEO, S_HAB, S_GROW | S_ARG, S_MOB, S_SIZE, S_BM |
+| Weights | 0.245, 0.110, 0.204, 0.028, 0.003, 0.181, 0.211, 0.002, 0.002, 0.015 | 0.291, 0.243, 0.215, 0.251 |
+| Mean AUC (4 outcomes) | 0.920 | 0.918 |
+| Required annotations | ARG + VF + mobility + replicon + BacMet + metadata | ARG + mobility + length + BacMet |
+| Use case | Comprehensive risk assessment | Rapid screening, resource-limited settings |
 
 ### Example output
 
@@ -128,7 +141,7 @@ plasrisk --json -o results plasmid.fasta
 
 | File | Description |
 |------|-------------|
-| `plasrisk_results.tsv` | Per-sequence scores: all 10 components, S_total, S_norm, grade, gene lists |
+| `plasrisk_results.tsv` | Per-sequence scores: all components, S_total, S_norm, grade, gene lists |
 | `plasrisk_summary.tsv` | Per-file summary: counts, grade distribution, mean/max scores |
 | `plasrisk_results.json` | JSON format (with `--json`) |
 
@@ -142,9 +155,13 @@ from plasrisk import PlasRiskScorer, PlasmidFeatures, annotate_fasta, load_repli
 # Option A: annotate a FASTA file directly
 lookup = load_replicon_lookup()
 result = annotate_fasta("plasmid.fasta", lookup=lookup)
-scorer = PlasRiskScorer(replicon_lookup=lookup)
+scorer = PlasRiskScorer(replicon_lookup=lookup)  # full 10-dim
 df = scorer.score_dataframe(result.features)
 print(df[["seq_id", "S_norm", "grade", "high_risk_genes"]])
+
+# Lite mode (4-dim core)
+scorer_lite = PlasRiskScorer(replicon_lookup=lookup, mode="lite")
+df_lite = scorer_lite.score_dataframe(result.features)
 
 # Option B: construct features manually
 feat = PlasmidFeatures(
@@ -197,6 +214,7 @@ options:
   --min-id FLOAT        Minimum abricate identity % (default: 75)
   --min-cov FLOAT       Minimum abricate coverage % (default: 50)
   --no-abricate         Skip abricate; sequence-only scoring
+  --mode {full,lite}    Scoring mode: full (10-dim, default) or lite (4-dim core)
   --db LIST             Comma-separated abricate databases (default: auto)
   --json                Also write JSON output
   -q, --quiet           Suppress progress messages
@@ -208,7 +226,7 @@ options:
 
 ## Model validation
 
-The PlasRisk model was developed and validated using 638,393 plasmid sequence
+The PlasRisk model was developed and validated using 792,964 plasmid sequence
 clusters (PSCs) from PIPdb (Zhu et al., *Nucleic Acids Res.*, 2025). Validation
 included:
 
@@ -216,8 +234,11 @@ included:
   outcomes (high-risk ARG, MDR-VF fusion, conjugative capacity, BMRG carriage)
   converged on S_ARG (0.245), S_BM (0.211), S_MOB (0.204), and S_SIZE (0.181)
   as dominant predictors (84% of total weight).
-- **AUC validation**: Final weights achieved AUC 0.955 (high-risk ARG), 0.965
-  (MDR-VF fusion), 0.856 (conjugation), 0.902 (BMRG); mean 0.919.
+- **AUC validation**: Final weights achieved AUC 0.958 (high-risk ARG), 0.964
+  (MDR-VF fusion), 0.856 (conjugation), 0.903 (BMRG); mean 0.920.
+- **Dimensionality analysis**: All-subsets evaluation (1,023 subsets, 5-fold CV)
+  showed that 4 core dimensions (ARG+MOB+SIZE+BM) achieve 99.8% of full-model
+  mean AUC (0.918 vs. 0.920), provided as `--mode lite`.
 - **Leave-one-replicon-out CV**: mean AUC = 0.962 (range 0.750–1.000) across 40 replicons.
 - **Weight perturbation sensitivity** (100 iterations, +/-30%): mean Spearman
   rho = 0.995, mean top-10 overlap = 9.5/10.
@@ -231,124 +252,6 @@ included:
   (18/20 high-risk Grade A, 19/20 low-risk Grade D/E).
 - **Case studies**: pNDM-1 (S = 0.718, Grade A), pHNSHP45/mcr-1 (S = 0.496, Grade B),
   ColE1-like (S = 0.156, Grade D).
-
----
-
-## Uploading to conda (bioconda)
-
-To make PlasRisk installable via `conda install -c bioconda plasrisk`:
-
-### Step 1: Upload to PyPI
-
-```bash
-# Install build tools
-pip install build twine
-
-# Build distributions
-python -m build
-
-# Upload to PyPI
-twine upload dist/*
-```
-
-### Step 2: Fork and clone bioconda-recipes
-
-```bash
-git clone https://github.com/bioconda/bioconda-recipes.git
-cd bioconda-recipes
-```
-
-### Step 3: Create the recipe
-
-```bash
-# Create recipe directory
-mkdir -p recipes/plasrisk
-```
-
-Create `recipes/plasrisk/meta.yaml`:
-
-```yaml
-{% set version = "1.0.0" %}
-
-package:
-  name: plasrisk
-  version: {{ version }}
-
-source:
-  url: https://pypi.io/packages/source/p/plasrisk/plasrisk-{{ version }}.tar.gz
-  sha256: 0eb290766eeaa850d3d5ad3cf13f4c8d8a7d5d7bdd6621b6ca14de349251eb8e
-
-build:
-  number: 0
-  noarch: python
-  entry_points:
-    - plasrisk = plasrisk.cli:main
-  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv"
-
-requirements:
-  host:
-    - python >=3.9
-    - pip
-    - setuptools >=61.0
-    - wheel
-  run:
-    - python >=3.9
-    - pandas >=1.3
-    - numpy >=1.20
-    # abricate/blast optional; CLI falls back to --no-abricate mode
-
-test:
-  imports:
-    - plasrisk
-  commands:
-    - plasrisk --help
-    - plasrisk --version
-
-about:
-  home: https://github.com/LLQ95/PlasRisk
-  license: MIT
-  license_file: LICENSE
-  summary: "Ten-dimension data-driven weighted risk assessment for bacterial plasmids"
-```
-
-> **Note:** The complete, ready-to-submit recipe is in the `bioconda/` directory.
-> See `UPLOAD_GUIDE.md` for the full step-by-step release process.
-
-### Step 4: Test locally
-
-```bash
-# Install bioconda-utils
-conda install -c bioconda bioconda-utils
-
-# Test the recipe
-bioconda-utils build recipes/plasrisk --docker
-```
-
-### Step 5: Submit a pull request
-
-```bash
-git checkout -b plasrisk
-git add recipes/plasrisk/
-git commit -m "Add plasrisk recipe"
-git push origin plasrisk
-# Open PR at https://github.com/bioconda/bioconda-recipes
-```
-
-Once the PR is merged and CI passes, PlasRisk will be installable via:
-
-```bash
-conda install -c bioconda plasrisk
-```
-
-### Local conda build (without bioconda)
-
-```bash
-# Build from the conda/ directory in this repo
-conda build conda/
-
-# Install locally
-conda install --use-local plasrisk
-```
 
 ---
 
