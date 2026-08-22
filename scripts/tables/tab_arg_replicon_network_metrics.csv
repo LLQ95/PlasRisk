@@ -1,0 +1,39 @@
+node,type,degree,betweenness,community
+IncQ1,Replicon,7,4,1
+ColRNAI,Replicon,3,7,2
+Col440I,Replicon,4,85,2
+rep7a,Replicon,3,67,3
+IncB/O/K/Z,Replicon,3,50,2
+IncFII,Replicon,10,90,1
+IncR,Replicon,10,166,1
+IncFII(K),Replicon,2,26,2
+IncX1,Replicon,7,160,1
+IncI1,Replicon,12,37,1
+IncFII(pSE11),Replicon,7,0,1
+IncFII(pCoo),Replicon,4,12,2
+IncFIC(FII),Replicon,4,0,2
+IncX4,Replicon,1,0,4
+IncFIA,Replicon,1,0,2
+IncFIB(AP001918),Replicon,1,0,2
+rep16/rep19,Replicon,5,99,3
+AAC/APH,ARG family,11,174,
+Qnr,ARG family,4,46,
+Tet(K),ARG family,1,0,
+TEM,ARG family,13,102,
+Tet(A),ARG family,9,100,
+Sul,ARG family,9,81,
+Aad,ARG family,6,93,
+Dfr,ARG family,6,31,
+KPC,ARG family,2,1,
+Qac,ARG family,5,6,
+Mph,ARG family,4,96,
+Mrx,ARG family,2,1,
+Cat,ARG family,1,0,
+CTX-M,ARG family,2,0,
+Tet(B),ARG family,2,2,
+TetR,ARG family,2,0,
+mcr,ARG family,1,0,
+CMY,ARG family,1,0,
+MsrA,ARG family,1,0,
+PC1 beta-lactamase (blaZ),ARG family,1,0,
+SAT-4,ARG family,1,0,
