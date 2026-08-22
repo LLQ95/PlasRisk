@@ -2,15 +2,18 @@
 # =============================================================================
 # pipdb_20_dimensionality_analysis.R
 #
-# Addresses the question: "9-dim AUC (0.969) > 10-dim AUC (0.955) for
-# high-risk ARG prediction — how many dimensions are optimal?"
+# Addresses the question: "How many dimensions are optimal for PlasRisk?"
+# Compares the parsimonious 5-dim lite model (S_ARG+S_VF+S_MOB+S_SIZE+S_BM)
+# against the full 10-dim model, using all-subsets evaluation.
 #
 # Analyses:
-#   1. All-subsets evaluation (2^10 = 1024 subsets), test + 5-fold CV
+#   1. All-subsets evaluation (2^10 = 1024 subsets), 5-fold CV
+#      - For each subset, renormalize final consensus weights and compute
+#        weighted composite score; evaluate AUC for all 4 outcomes
 #   2. Forward stepwise selection (greedy, by mean AUC across 4 outcomes)
 #   3. Backward elimination
 #   4. Per-outcome optimal k vs multi-objective Pareto optimum
-#   5. DeLong test for 9-dim vs 10-dim AUC difference
+#   5. DeLong test for 5-dim lite vs 10-dim full AUC difference
 #   6. Visualization: AUC vs dimensionality, selection paths, Pareto frontier
 #
 # Usage:
@@ -174,7 +177,7 @@ X_train <- as.matrix(train[, .SD, .SDcols = comp_cols])
 X_test  <- as.matrix(test[, .SD, .SDcols = comp_cols])
 
 # =============================================================================
-# 3. Helper functions
+# 3. Helper: compute AUC for a given subset on test set
 # =============================================================================
 subset_auc <- function(subset, X, y_list, w) {
   w_sub <- w[subset]
@@ -186,11 +189,13 @@ subset_auc <- function(subset, X, y_list, w) {
   return(aucs)
 }
 
+y_train_list <- lapply(outcomes, function(o) train[[o]])
+names(y_train_list) <- outcomes
 y_test_list <- lapply(outcomes, function(o) test[[o]])
 names(y_test_list) <- outcomes
 
 # =============================================================================
-# 4. All-subsets evaluation (2^10 - 1 = 1023 subsets)
+# 4. All-subsets evaluation (2^10 = 1024)
 # =============================================================================
 cat("\n=== All-subsets evaluation (1023 subsets, test set) ===\n")
 
@@ -209,8 +214,7 @@ for (mask in 1:(n_subsets - 1)) {
   )
   idx <- idx + 1
   results_all[[idx]] <- data.table(
-    mask = mask, k = k,
-    subset = paste(subset, collapse = "+"),
+    mask = mask, k = k, subset = paste(subset, collapse = "+"),
     has_ARG = as.integer("S_ARG" %in% subset),
     has_BM  = as.integer("S_BM" %in% subset),
     has_VF  = as.integer("S_VF" %in% subset),
@@ -274,9 +278,8 @@ cat(sprintf("\n  Saved %d subset evaluations\n", nrow(all_sub)))
 # 5. Best subset per dimensionality k
 # =============================================================================
 cat("\n=== Best subset by number of dimensions ===\n")
-
-best_by_k <- all_sub[, .SD[which.max(cv_AUC_mean)], by = k][order(k)]
-cat("\nBest subset per k (by mean CV AUC across 4 outcomes):\n")
+best_by_k <- all_sub[, .SD[which.max(cv_AUC_mean)], by = k]
+best_by_k <- best_by_k[order(k)]
 print(best_by_k[, .(k, subset, cv_AUC_highrisk, cv_AUC_fusion, cv_AUC_conj, cv_AUC_bm, cv_AUC_mean)])
 fwrite(best_by_k, file.path(tab_dir, "tab_best_subset_by_k.csv"))
 
@@ -290,13 +293,14 @@ fwrite(best_by_k_outcome, file.path(tab_dir, "tab_best_subset_by_k_outcome.csv")
 # 6. Forward stepwise selection
 # =============================================================================
 cat("\n=== Forward stepwise selection ===\n")
-
 remaining <- comp_cols
 selected <- c()
 forward_path <- list()
 
 for (step in seq_along(comp_cols)) {
-  best_auc <- -1; best_feat <- NULL; best_aucs <- NULL
+  best_auc <- -1
+  best_feat <- NULL
+  best_aucs <- NULL
   for (feat in remaining) {
     trial <- c(selected, feat)
     w_sub <- W[trial]; w_sub <- w_sub / sum(w_sub)
@@ -308,12 +312,17 @@ for (step in seq_along(comp_cols)) {
       for (j in seq_along(outcomes)) {
         cv_aucs[j] <- cv_aucs[j] + tryCatch(
           as.numeric(auc(roc(te_fold[[outcomes[j]]], sc, quiet = TRUE))),
-          error = function(e) NA_real_)
+          error = function(e) NA_real_
+        )
       }
     }
     cv_aucs <- cv_aucs / 5
     mean_auc <- mean(cv_aucs, na.rm = TRUE)
-    if (mean_auc > best_auc) { best_auc <- mean_auc; best_feat <- feat; best_aucs <- cv_aucs }
+    if (mean_auc > best_auc) {
+      best_auc <- mean_auc
+      best_feat <- feat
+      best_aucs <- cv_aucs
+    }
   }
   selected <- c(selected, best_feat)
   remaining <- setdiff(remaining, best_feat)
@@ -323,7 +332,9 @@ for (step in seq_along(comp_cols)) {
     step = step, added = best_feat, k = step,
     selected = paste(selected, collapse = "+"),
     cv_AUC_highrisk = best_aucs[1], cv_AUC_fusion = best_aucs[2],
-    cv_AUC_conj = best_aucs[3], cv_AUC_bm = best_aucs[4], cv_AUC_mean = best_auc)
+    cv_AUC_conj = best_aucs[3], cv_AUC_bm = best_aucs[4],
+    cv_AUC_mean = best_auc
+  )
 }
 forward_dt <- rbindlist(forward_path)
 fwrite(forward_dt, file.path(tab_dir, "tab_forward_selection.csv"))
@@ -332,12 +343,13 @@ fwrite(forward_dt, file.path(tab_dir, "tab_forward_selection.csv"))
 # 7. Backward elimination
 # =============================================================================
 cat("\n=== Backward elimination ===\n")
-
 selected <- comp_cols
 backward_path <- list()
 
 for (step in seq_len(length(comp_cols) - 1)) {
-  best_auc <- -1; worst_feat <- NULL; best_aucs <- NULL
+  best_auc <- -1
+  worst_feat <- NULL
+  best_aucs <- NULL
   for (feat in selected) {
     trial <- setdiff(selected, feat)
     w_sub <- W[trial]; w_sub <- w_sub / sum(w_sub)
@@ -349,12 +361,17 @@ for (step in seq_len(length(comp_cols) - 1)) {
       for (j in seq_along(outcomes)) {
         cv_aucs[j] <- cv_aucs[j] + tryCatch(
           as.numeric(auc(roc(te_fold[[outcomes[j]]], sc, quiet = TRUE))),
-          error = function(e) NA_real_)
+          error = function(e) NA_real_
+        )
       }
     }
     cv_aucs <- cv_aucs / 5
     mean_auc <- mean(cv_aucs, na.rm = TRUE)
-    if (mean_auc > best_auc) { best_auc <- mean_auc; worst_feat <- feat; best_aucs <- cv_aucs }
+    if (mean_auc > best_auc) {
+      best_auc <- mean_auc
+      worst_feat <- feat
+      best_aucs <- cv_aucs
+    }
   }
   selected <- setdiff(selected, worst_feat)
   cat(sprintf("  Step %d: remove %-8s -> k=%d, mean CV AUC = %.4f  [HR=%.3f, Fus=%.3f, Conj=%.3f, BM=%.3f]\n",
@@ -364,45 +381,55 @@ for (step in seq_len(length(comp_cols) - 1)) {
     step = step, removed = worst_feat, k = length(selected),
     selected = paste(selected, collapse = "+"),
     cv_AUC_highrisk = best_aucs[1], cv_AUC_fusion = best_aucs[2],
-    cv_AUC_conj = best_aucs[3], cv_AUC_bm = best_aucs[4], cv_AUC_mean = best_auc)
+    cv_AUC_conj = best_aucs[3], cv_AUC_bm = best_aucs[4],
+    cv_AUC_mean = best_auc
+  )
 }
 backward_dt <- rbindlist(backward_path)
 fwrite(backward_dt, file.path(tab_dir, "tab_backward_elimination.csv"))
 
 # =============================================================================
-# 8. DeLong test: 9-dim (no S_BM) vs 10-dim
+# 8. DeLong test: 5-dim lite vs 10-dim full
 # =============================================================================
-cat("\n=== DeLong test: 9-dim (no S_BM) vs 10-dim ===\n")
+cat("\n=== DeLong test: 5-dim lite vs 10-dim full ===\n")
 
 w10 <- W / sum(W)
 sc10 <- as.numeric(X_test %*% w10)
-subset9 <- setdiff(comp_cols, "S_BM")
-w9 <- W[subset9]; w9 <- w9 / sum(w9)
-sc9 <- as.numeric(X_test[, subset9] %*% w9)
+
+lite_dims <- c("S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BM")
+w5 <- W[lite_dims]; w5 <- w5 / sum(w5)
+sc5 <- as.numeric(X_test[, lite_dims] %*% w5)
 
 roc10 <- roc(test$y_highrisk, sc10, quiet = TRUE)
-roc9  <- roc(test$y_highrisk, sc9, quiet = TRUE)
+roc5  <- roc(test$y_highrisk, sc5, quiet = TRUE)
 auc10 <- as.numeric(auc(roc10))
-auc9  <- as.numeric(auc(roc9))
+auc5  <- as.numeric(auc(roc5))
+
 cat(sprintf("  10-dim AUC = %.4f\n", auc10))
-cat(sprintf("  9-dim AUC  = %.4f\n", auc9))
-dl_test <- roc.test(roc9, roc10, method = "delong")
+cat(sprintf("  5-dim AUC  = %.4f\n", auc5))
+
+dl_test <- roc.test(roc5, roc10, method = "delong")
 cat(sprintf("  DeLong test: Z = %.3f, p = %.4g\n", dl_test$statistic, dl_test$p.value))
-cat(sprintf("  AUC difference = %.4f (9-dim higher)\n", auc9 - auc10))
+cat(sprintf("  AUC difference = %.4f (%s higher)\n",
+            abs(auc5 - auc10), ifelse(auc5 > auc10, "5-dim", "10-dim")))
 
 delong_results <- data.table()
 for (o in outcomes) {
   r10 <- roc(test[[o]], sc10, quiet = TRUE)
-  r9  <- roc(test[[o]], sc9, quiet = TRUE)
-  a10 <- as.numeric(auc(r10)); a9 <- as.numeric(auc(r9))
-  dt <- roc.test(r9, r10, method = "delong")
+  r5  <- roc(test[[o]], sc5, quiet = TRUE)
+  a10 <- as.numeric(auc(r10))
+  a5  <- as.numeric(auc(r5))
+  dt <- roc.test(r5, r10, method = "delong")
   delong_results <- rbind(delong_results, data.table(
-    outcome = outcome_labels[o], AUC_10dim = round(a10, 4), AUC_9dim = round(a9, 4),
-    difference = round(a9 - a10, 4), Z = round(as.numeric(dt$statistic), 3),
-    p_value = signif(as.numeric(dt$p.value), 3)))
+    outcome = outcome_labels[o],
+    AUC_10dim = round(a10, 4), AUC_5dim = round(a5, 4),
+    difference = round(a10 - a5, 4),
+    Z = round(as.numeric(dt$statistic), 3),
+    p_value = signif(as.numeric(dt$p.value), 3)
+  ))
 }
 print(delong_results)
-fwrite(delong_results, file.path(tab_dir, "tab_delong_9vs10.csv"))
+fwrite(delong_results, file.path(tab_dir, "tab_delong_5vs10.csv"))
 
 # =============================================================================
 # 9. Single-dimension AUCs
@@ -412,7 +439,8 @@ single_aucs <- data.table()
 for (cc in comp_cols) {
   for (o in outcomes) {
     a <- as.numeric(auc(roc(test[[o]], X_test[, cc], quiet = TRUE)))
-    single_aucs <- rbind(single_aucs, data.table(component = cc, outcome = outcome_labels[o], AUC = a))
+    single_aucs <- rbind(single_aucs, data.table(
+      component = cc, outcome = outcome_labels[o], AUC = a))
   }
 }
 single_aucs_wide <- dcast(single_aucs, component ~ outcome, value.var = "AUC")
@@ -434,47 +462,34 @@ for (i in seq_len(nrow(auc_mat))) {
   for (j in seq_len(nrow(auc_mat))) {
     if (i == j) next
     if (all(auc_mat[j, ] >= auc_mat[i, ]) && any(auc_mat[j, ] > auc_mat[i, ])) {
-      is_pareto[i] <- FALSE; break
+      is_pareto[i] <- FALSE
+      break
     }
   }
 }
 all_sub[, pareto := is_pareto]
 pareto_set <- all_sub[pareto == TRUE][order(cv_AUC_mean, decreasing = TRUE)]
 cat(sprintf("  %d Pareto-optimal subsets found\n", nrow(pareto_set)))
-print(pareto_set[1:min(10, .N), .(k, subset, cv_AUC_highrisk, cv_AUC_fusion,
-                                   cv_AUC_conj, cv_AUC_bm, cv_AUC_mean)])
 fwrite(pareto_set, file.path(tab_dir, "tab_pareto_optimal_subsets.csv"))
 
 # =============================================================================
 # 11. Summary
 # =============================================================================
 cat("\n=== Summary: optimal dimensionality ===\n")
-
 best_k_mean <- best_by_k[which.max(cv_AUC_mean)]
 cat(sprintf("\nBest k by mean CV AUC: k=%d (mean AUC=%.4f)\n", best_k_mean$k, best_k_mean$cv_AUC_mean))
-cat(sprintf("  Subset: %s\n", best_k_mean$subset))
 
 auc_10 <- all_sub[k == 10, .(cv_AUC_highrisk, cv_AUC_fusion, cv_AUC_conj, cv_AUC_bm, cv_AUC_mean)]
 cat(sprintf("\n10-dim (full model): mean CV AUC=%.4f\n", auc_10$cv_AUC_mean))
-cat(sprintf("  HR=%.4f, Fus=%.4f, Conj=%.4f, BM=%.4f\n",
-            auc_10$cv_AUC_highrisk, auc_10$cv_AUC_fusion, auc_10$cv_AUC_conj, auc_10$cv_AUC_bm))
 
-subset9_str <- paste(subset9, collapse = "+")
-auc_9 <- all_sub[subset == subset9_str]
-cat(sprintf("\n9-dim (no S_BM): mean CV AUC=%.4f\n", auc_9$cv_AUC_mean))
-cat(sprintf("  HR=%.4f, Fus=%.4f, Conj=%.4f, BM=%.4f\n",
-            auc_9$cv_AUC_highrisk, auc_9$cv_AUC_fusion, auc_9$cv_AUC_conj, auc_9$cv_AUC_bm))
+lite_str <- paste(lite_dims, collapse = "+")
+auc_5 <- all_sub[subset == lite_str]
+cat(sprintf("\n5-dim (lite: %s): mean CV AUC=%.4f\n", lite_str, auc_5$cv_AUC_mean))
 
-within_1se <- best_by_k[cv_AUC_mean >= max(best_by_k$cv_AUC_mean) - 0.005]
-cat(sprintf("\nElbow k (within 0.5%% of best): k=%d\n", min(within_1se$k)))
-
-cat("\nPer-outcome optimal k:\n")
-for (o in outcomes) {
-  col <- paste0("cv_AUC_", sub("y_", "", o))
-  best_row <- all_sub[which.max(get(col))]
-  cat(sprintf("  %-16s: k=%d, AUC=%.4f (%s)\n",
-              outcome_labels[o], best_row$k, best_row[[col]], best_row$subset))
-}
+best_mean <- max(best_by_k$cv_AUC_mean)
+within_05 <- best_by_k[cv_AUC_mean >= best_mean - 0.005]
+elbow_k <- min(within_05$k)
+cat(sprintf("\nElbow k (within 0.5%% of best): k=%d\n", elbow_k))
 
 # =============================================================================
 # 12. Visualization
@@ -482,18 +497,20 @@ for (o in outcomes) {
 cat("\n=== Visualization ===\n")
 
 plot_data <- melt(all_sub, id.vars = c("k", "subset"),
-                  measure.vars = c("cv_AUC_highrisk", "cv_AUC_fusion", "cv_AUC_conj", "cv_AUC_bm"),
+                  measure.vars = c("cv_AUC_highrisk", "cv_AUC_fusion",
+                                   "cv_AUC_conj", "cv_AUC_bm"),
                   variable.name = "outcome", value.name = "AUC")
 plot_data[, outcome := factor(outcome,
-  levels = c("cv_AUC_highrisk","cv_AUC_fusion","cv_AUC_conj","cv_AUC_bm"),
-  labels = c("High-risk ARG","MDR-VF fusion","Conjugative","Biocide/metal"))]
+  levels = c("cv_AUC_highrisk", "cv_AUC_fusion", "cv_AUC_conj", "cv_AUC_bm"),
+  labels = c("High-risk ARG", "MDR-VF fusion", "Conjugative", "Biocide/metal"))]
 
 best_long <- melt(best_by_k, id.vars = c("k", "subset"),
-                  measure.vars = c("cv_AUC_highrisk","cv_AUC_fusion","cv_AUC_conj","cv_AUC_bm"),
+                  measure.vars = c("cv_AUC_highrisk", "cv_AUC_fusion",
+                                   "cv_AUC_conj", "cv_AUC_bm"),
                   variable.name = "outcome", value.name = "AUC")
 best_long[, outcome := factor(outcome,
-  levels = c("cv_AUC_highrisk","cv_AUC_fusion","cv_AUC_conj","cv_AUC_bm"),
-  labels = c("High-risk ARG","MDR-VF fusion","Conjugative","Biocide/metal"))]
+  levels = c("cv_AUC_highrisk", "cv_AUC_fusion", "cv_AUC_conj", "cv_AUC_bm"),
+  labels = c("High-risk ARG", "MDR-VF fusion", "Conjugative", "Biocide/metal"))]
 
 p1 <- ggplot(plot_data, aes(x = factor(k), y = AUC)) +
   geom_jitter(alpha = 0.08, size = 0.6, colour = "grey60", width = 0.2) +
@@ -503,72 +520,97 @@ p1 <- ggplot(plot_data, aes(x = factor(k), y = AUC)) +
   facet_wrap(~outcome, nrow = 2) +
   scale_y_continuous(limits = c(0.5, 1.0), breaks = seq(0.5, 1.0, 0.1)) +
   labs(title = "AUC vs number of dimensions",
-       subtitle = "Grey dots: all 1023 subsets; red line: best subset per k",
-       x = "Number of dimensions (k)", y = "AUC") + theme_pub
+       subtitle = "Grey dots: all 1023 subsets; red line: best subset per k (5-fold CV)",
+       x = "Number of dimensions (k)", y = "AUC") +
+  theme_pub
 
 fwd_long <- melt(forward_dt, id.vars = c("step", "k", "added"),
-                 measure.vars = c("cv_AUC_highrisk","cv_AUC_fusion","cv_AUC_conj","cv_AUC_bm","cv_AUC_mean"),
+                 measure.vars = c("cv_AUC_highrisk", "cv_AUC_fusion",
+                                  "cv_AUC_conj", "cv_AUC_bm", "cv_AUC_mean"),
                  variable.name = "outcome", value.name = "AUC")
 fwd_long[, outcome := factor(outcome,
-  levels = c("cv_AUC_highrisk","cv_AUC_fusion","cv_AUC_conj","cv_AUC_bm","cv_AUC_mean"),
-  labels = c("High-risk ARG","MDR-VF fusion","Conjugative","Biocide/metal","Mean"))]
+  levels = c("cv_AUC_highrisk", "cv_AUC_fusion", "cv_AUC_conj", "cv_AUC_bm", "cv_AUC_mean"),
+  labels = c("High-risk ARG", "MDR-VF fusion", "Conjugative", "Biocide/metal", "Mean"))]
 
 p2 <- ggplot(fwd_long, aes(x = k, y = AUC, colour = outcome)) +
   geom_line(linewidth = 0.8) + geom_point(size = 2) +
+  geom_vline(xintercept = 5, linetype = "dashed", colour = "#31a354", alpha = 0.7) +
   geom_vline(xintercept = 10, linetype = "dashed", colour = "#d73027", alpha = 0.7) +
+  annotate("text", x = 5, y = 0.65, label = "5-dim\n(lite)", hjust = -0.1, colour = "#31a354", size = 3) +
+  annotate("text", x = 10, y = 0.65, label = "10-dim\n(full)", hjust = 1.1, colour = "#d73027", size = 3) +
   scale_colour_brewer(palette = "Set1") +
   scale_x_continuous(breaks = 1:10) +
   scale_y_continuous(limits = c(0.6, 1.0), breaks = seq(0.6, 1.0, 0.1)) +
   labs(title = "Forward stepwise selection path",
        subtitle = "Features added greedily by mean CV AUC",
        x = "Number of dimensions", y = "5-fold CV AUC", colour = NULL) +
-  theme_pub + theme(legend.position.inside = c(0.75, 0.35),
-                    legend.background = element_rect(fill = alpha("white", 0.8)))
+  theme_pub +
+  theme(legend.position.inside = c(0.75, 0.35),
+        legend.background = element_rect(fill = alpha("white", 0.8)))
 
 p3 <- ggplot(best_by_k, aes(x = k, y = cv_AUC_mean)) +
   geom_ribbon(aes(ymin = cv_AUC_mean - 0.005, ymax = cv_AUC_mean + 0.005), fill = "#2c7fb8", alpha = 0.15) +
-  geom_line(colour = "#2c7fb8", linewidth = 1) + geom_point(size = 3, colour = "#2c7fb8") +
+  geom_line(colour = "#2c7fb8", linewidth = 1) +
+  geom_point(size = 3, colour = "#2c7fb8") +
   geom_point(data = best_by_k[k == 10], size = 5, colour = "#d73027", shape = 18) +
-  geom_point(data = best_by_k[k == 9], size = 4, colour = "#fc8d59", shape = 1) +
+  geom_point(data = best_by_k[k == 5], size = 5, colour = "#31a354", shape = 18) +
+  annotate("text", x = 10, y = best_by_k[k == 10, cv_AUC_mean] + 0.008,
+           label = "10-dim\n(full model)", colour = "#d73027", size = 3, fontface = "bold") +
+  annotate("text", x = 5, y = best_by_k[k == 5, cv_AUC_mean] + 0.008,
+           label = "5-dim\n(lite)", colour = "#31a354", size = 3, fontface = "bold") +
   scale_x_continuous(breaks = 1:10) +
   labs(title = "Mean CV AUC across 4 outcomes vs dimensionality",
-       subtitle = "Shaded band: ±0.5% (practical equivalence zone)",
-       x = "Number of dimensions (k)", y = "Mean CV AUC (4 outcomes)") + theme_pub
+       subtitle = "Shaded band: +/-0.5% (practical equivalence zone); plateau at k=5",
+       x = "Number of dimensions (k)", y = "Mean CV AUC (4 outcomes)") +
+  theme_pub
 
 p4 <- ggplot(all_sub, aes(x = cv_AUC_highrisk, y = cv_AUC_bm, colour = factor(k))) +
   geom_point(alpha = 0.3, size = 1.5) +
   geom_point(data = pareto_set, size = 3, shape = 21, stroke = 1.2, fill = NA, colour = "black") +
   geom_point(data = all_sub[k == 10], size = 5, colour = "#d73027", shape = 18) +
-  geom_point(data = all_sub[subset == subset9_str], size = 4, colour = "#d95f0e", shape = 1, stroke = 1.5) +
+  geom_point(data = all_sub[subset == lite_str], size = 5, colour = "#31a354", shape = 18) +
+  annotate("text", x = all_sub[k == 10, cv_AUC_highrisk] - 0.01,
+           y = all_sub[k == 10, cv_AUC_bm] + 0.01,
+           label = "10-dim", colour = "#d73027", size = 3.5, fontface = "bold") +
+  annotate("text", x = all_sub[subset == lite_str, cv_AUC_highrisk] + 0.01,
+           y = all_sub[subset == lite_str, cv_AUC_bm] - 0.015,
+           label = "5-dim\n(lite)", colour = "#31a354", size = 3, fontface = "bold") +
   scale_colour_viridis_d(option = "D", name = "k") +
   labs(title = "Pareto frontier: high-risk ARG vs biocide/metal prediction",
-       subtitle = "Circled: Pareto-optimal; red star: 10-dim; orange: 9-dim",
-       x = "CV AUC: High-risk ARG", y = "CV AUC: Biocide/metal") + theme_pub
+       subtitle = "Circled: Pareto-optimal; red star: 10-dim; green star: 5-dim lite",
+       x = "CV AUC: High-risk ARG", y = "CV AUC: Biocide/metal") +
+  theme_pub
 
 comb <- (p1 | p2) / (p3 | p4) +
   plot_annotation(title = "PlasRisk dimensionality analysis: how many risk dimensions?",
                   theme = theme(plot.title = element_text(face = "bold", size = 14)))
 save_plot(comb, "fig29_dimensionality_analysis", w = 16, h = 12)
 
-# Weight dilution figure
+# Fig 30: Weight distribution
 dilution <- data.table(
   component = comp_cols,
-  w_10 = W / sum(W),
-  w_9 = c(W[subset9] / sum(W[subset9]), S_BM = 0))
-dilution_long <- melt(dilution, id.vars = "component", variable.name = "model", value.name = "weight")
-dilution_long[, model := factor(model, levels = c("w_10", "w_9"),
-                                labels = c("10-dim (with S_BM)", "9-dim (no S_BM)"))]
+  w_10 = as.numeric(w10[comp_cols]),
+  w_5  = ifelse(comp_cols %in% lite_dims, as.numeric(w5[comp_cols]), 0)
+)
+dilution_long <- melt(dilution, id.vars = "component",
+                      variable.name = "model", value.name = "weight")
+dilution_long[, model := factor(model, levels = c("w_10", "w_5"),
+                                labels = c("10-dim (full)", "5-dim (lite)"))]
 dilution_long[, component := factor(component, levels = comp_cols)]
 
 p5 <- ggplot(dilution_long, aes(x = component, y = weight, fill = model)) +
   geom_col(position = position_dodge(0.8), width = 0.7, colour = "white", linewidth = 0.3) +
-  scale_fill_manual(values = c("10-dim (with S_BM)" = "#2c7fb8", "9-dim (no S_BM)" = "#fc8d59")) +
-  geom_text(aes(label = sprintf("%.3f", weight)), position = position_dodge(0.8), vjust = -0.3, size = 2.8) +
-  labs(title = "Weight dilution: adding S_BM reduces effective weight of S_ARG",
-       subtitle = sprintf("S_ARG weight: %.3f (9-dim) vs %.3f (10-dim)", as.numeric(w9["S_ARG"]), as.numeric(w10["S_ARG"])),
+  scale_fill_manual(values = c("10-dim (full)" = "#2c7fb8", "5-dim (lite)" = "#31a354")) +
+  geom_text(aes(label = ifelse(weight > 0, sprintf("%.3f", weight), "")),
+            position = position_dodge(0.8), vjust = -0.3, size = 2.8) +
+  labs(title = "Weight distribution: 5-dim lite vs 10-dim full model",
+       subtitle = "Lite model retains the 5 highest-weight dimensions (S_ARG, S_VF, S_MOB, S_SIZE, S_BM)",
        x = NULL, y = "Normalized weight") +
-  theme_pub + theme(axis.text.x = element_text(angle = 45, hjust = 1),
-                    legend.position.inside = c(0.8, 0.85), legend.title = element_blank())
+  theme_pub +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position.inside = c(0.8, 0.85),
+        legend.title = element_blank())
 save_plot(p5, "fig30_weight_dilution", w = 10, h = 6)
 
-cat("\nDone. Tables in:", tab_dir, "\nFigures in:", fig_dir, "\n")
+cat("\nDone. All tables saved to:", tab_dir, "\n")
+cat("Figures saved to:", fig_dir, "\n")
