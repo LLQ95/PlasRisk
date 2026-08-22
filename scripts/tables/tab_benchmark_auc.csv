@@ -1,0 +1,7 @@
+Model,AUC_highrisk,AUC_fusion
+"PlasRisk (10-dim, final)",0.9546,0.9645
+"PlasRisk (9-dim, no S_BM)",0.9693,0.9654
+PIPdb ordinal (risk_score),0.9661,0.9397
+S_ARG only,0.9803,0.9328
+S_MOB only,0.7091,0.6191
+ARG count (raw),0.9388,0.9252

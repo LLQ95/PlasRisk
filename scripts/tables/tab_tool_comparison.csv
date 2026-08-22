@@ -1,0 +1,20 @@
+Feature,PlasmidFinder,MOB_suite,RFPlasmid,Plasmer,PIPdb_index,PlasRisk
+Input type,FASTA,FASTA,FASTA,FASTA/short reads,Web query,FASTA
+Output,Replicon types,Mobility type + relaxase,Plasmid/chromosome origin,Plasmid probability,Ordinal risk 1-5,Continuous risk score A-E
+ARG annotation,No,No,No,No,Yes (CARD),Yes (CARD/ResFinder)
+VF annotation,No,No,No,No,Yes (VFDB),Yes (VFDB)
+Replicon typing,Yes,Yes (MOB-typer),No,No,Yes (PlasmidFinder),Yes (PlasmidFinder)
+Mobility prediction,No,Yes (T4CP/relaxase/MPF),No,No,Yes (oriTDB),Yes (T4CP/relaxase/oriT/aux)
+Biocide/metal resistance,No,No,No,No,Yes (BacMet),Yes (BacMet)
+Risk score,No,No,No,No,Yes (ordinal),Yes (continuous)
+Risk dimensions,0,0,0,0,6 (equal weight),10 (weighted)
+Continuous score,N/A,N/A,N/A,N/A,No,"Yes [0,1]"
+Validated model,N/A,N/A,Yes (RF),Yes (ML),No,Yes (RF+LASSO+LORO)
+Epidemiological priors,No,No,No,No,Yes,Yes (66 replicons)
+Geographic/temporal data,No,No,No,No,Yes,Yes (lookup)
+Batch processing,Yes,Yes,Yes,Yes,Web only,Yes
+Conda install,Yes (bioconda),Yes (bioconda),Yes,Yes (bioconda),No,Yes (bioconda)
+CLI,Yes,Yes,Yes,Yes,No,Yes
+Programming language,Perl/Python,Python,Python/R,Python,Web/PHP,Python
+Database scale,PlasmidFinder DB,Internal,Training genomes,PLSDB,"792,964 PSCs","PIPdb 792,964 PSCs"
+Open source,Yes,Yes,Yes,Yes,Web access,Yes (MIT)

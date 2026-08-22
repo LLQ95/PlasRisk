@@ -1,0 +1,26 @@
+arg,vf,N
+PC1 beta-lactamase (blaZ),SE,333
+APH(6)-Id,Colicin Ia,278
+APH(3'')-Ib,Colicin Ia,278
+CMY-2,Colicin Ib,209
+APH(6)-Id,Salmochelin siderophore,126
+APH(3'')-Ib,Salmochelin siderophore,126
+Sul2,Colicin Ib,81
+CMY-2,Colicin Ia,72
+TEM-1,Colicin Ia,71
+TEM-1,Colicin Ib,51
+Tet(M),IgA1 protease,51
+TetR,Colicin Ia,46
+Tet(B),Colicin Ia,45
+Tet(A),Colicin Ib,34
+MsrA,SE,27
+TEM-1,TraJ,26
+MphC,SE,26
+CMY-2,Colicin B,24
+AadA,Colicin Ib,23
+ErmB,IgA1 protease,23
+CTX-M-1,Colicin Ia,21
+CTX-M-1,Colicin Ib,20
+APH(3'')-Ib,Colicin Ib,17
+QnrS1,Colicin Ib,17
+APH(6)-Id,Colicin Ib,16

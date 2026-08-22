@@ -1,0 +1,21 @@
+metric,value
+Total PSCs,"638,393"
+With replicon typed,"100,546"
+With ARGs,"113,232"
+With VFs,"83,749"
+With integron,"25,752"
+Conjugative (complete),"4,071"
+Conjugative (likely),"30,166"
+Mobilizable,"60,492"
+Non-mobilizable,"543,664"
+Q1 (top 10%),"69,455"
+Q2,"99,298"
+Q3,"172,320"
+Q4,"297,320"
+Median length (kb),9.7
+Mean ARG count,0.46
+Mean VF count,0.21
+Distinct replicons,802
+Distinct species,390
+Distinct countries,76791
+Year range,1920-2023
