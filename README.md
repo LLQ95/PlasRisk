@@ -1,24 +1,28 @@
 # PlasRisk
 
-**10-dimension data-driven weighted risk assessment for bacterial plasmids from FASTA sequences**
+**Multi-dimension weighted risk assessment for bacterial plasmids from FASTA sequences**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
 
 PlasRisk computes a composite risk score for bacterial plasmids based on ten
-data-driven weighted dimensions: antimicrobial resistance gene (ARG) burden,
+biologically motivated dimensions: antimicrobial resistance gene (ARG) burden,
 virulence factors (VFs), mobility/conjugation potential, host range, replicon
 type, plasmid size, biocide/metal resistance (BMRG), geographic spread, habitat
 breadth, and temporal growth rate. It accepts plasmid FASTA sequences and
 automatically annotates them using [abricate](https://github.com/tseemann/abricate).
 
 ```
+Full model (10-dim):
 S = 0.245*S_ARG + 0.110*S_VF + 0.204*S_MOB + 0.028*S_HOST
   + 0.003*S_REP + 0.181*S_SIZE + 0.211*S_BM
   + 0.002*S_GEO + 0.002*S_HAB + 0.015*S_GROW
 
+Lite model (5-dim core, equivalent AUC):
+S = 0.258*S_ARG + 0.115*S_VF + 0.215*S_MOB + 0.190*S_SIZE + 0.222*S_BM
+
 Weights derived by data-driven consensus (Random Forest MDG, LASSO, and
-grid-search optimization) on 792,964 PIPdb PSCs; sum = 1.000.
+grid-search optimization) on 792,964 PIPdb PSCs; sum = 1.0.
 ```
 
 Risk grades: **A** (Very High, S >= 0.60), **B** (High, >= 0.45),
@@ -31,25 +35,15 @@ Risk grades: **A** (Very High, S >= 0.60), **B** (High, >= 0.45),
 ### Option 1: conda (recommended)
 
 ```bash
-# Create a dedicated environment
 conda create -n plasrisk -c bioconda -c conda-forge plasrisk
 conda activate plasrisk
-
-# Optional: install abricate and blast for full annotation capability
-conda install -c bioconda -c conda-forge abricate blast
 ```
-
-PlasRisk can run without abricate in sequence-only mode (`--no-abricate`),
-scoring based on plasmid length and replicon lookup priors.
 
 ### Option 2: pip + manual abricate
 
 ```bash
 pip install plasrisk
-
-# Install abricate separately for full annotation
 conda install -c bioconda abricate
-# or on Debian/Ubuntu: apt-get install abricate
 ```
 
 ### Option 3: from source
@@ -58,40 +52,21 @@ conda install -c bioconda abricate
 git clone https://github.com/LLQ95/PlasRisk.git
 cd PlasRisk
 pip install .
-
-# Install annotation dependencies (optional)
 conda install -c bioconda abricate blast
 ```
 
-### Set up abricate databases
-
-After installing abricate, download the databases you need:
-
-```bash
-# Download/update all default databases
-abricate-get_db --db card --force
-abricate-get_db --db vfdb --force
-abricate-get_db --db plasmidfinder --force
-abricate-get_db --db resfinder --force
-abricate-get_db --db ncbi --force
-
-# Verify
-abricate --list
-```
-
-For BacMet (biocide/metal resistance) database, see:
-https://github.com/tseemann/abricate#making-your-own-database
+Requires **Python 3.9+**.
 
 ---
 
 ## Quick start
 
 ```bash
-# Score a single plasmid
+# Score a single plasmid (10-dim full model)
 plasrisk plasmid.fasta
 
-# Score multiple plasmids
-plasrisk *.fasta
+# Lite mode: 5-dimension core (ARG + VF + MOB + SIZE + BM)
+plasrisk --mode lite *.fasta
 
 # Score all FASTA files in a directory
 plasrisk /path/to/plasmids/
@@ -102,40 +77,29 @@ plasrisk -o results *.fasta
 # Use specific abricate databases
 plasrisk --db card,vfdb,plasmidfinder,bacmet plasmid.fasta
 
-# Sequence-only mode (no abricate needed; scores based on length + replicon lookup)
+# Sequence-only mode (no abricate needed)
 plasrisk --no-abricate contigs.fasta
 
 # JSON output
 plasrisk --json -o results plasmid.fasta
-
-# Lite mode: 4-dimension core (ARG + MOB + SIZE + BM), 99.8% of full-model AUC
-plasrisk --mode lite *.fasta
 ```
 
 ### Full vs. Lite mode
 
-| | Full (10-dim) | Lite (4-dim) |
+| | Full (10-dim) | Lite (5-dim) |
 |---|---|---|
-| Dimensions | S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE, S_BM, S_GEO, S_HAB, S_GROW | S_ARG, S_MOB, S_SIZE, S_BM |
-| Weights | 0.245, 0.110, 0.204, 0.028, 0.003, 0.181, 0.211, 0.002, 0.002, 0.015 | 0.291, 0.243, 0.215, 0.251 |
-| Mean AUC (4 outcomes) | 0.920 | 0.918 |
-| Required annotations | ARG + VF + mobility + replicon + BacMet + metadata | ARG + mobility + length + BacMet |
-| Use case | Comprehensive risk assessment | Rapid screening, resource-limited settings |
+| Dimensions | S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE, S_BM, S_GEO, S_HAB, S_GROW | S_ARG, S_VF, S_MOB, S_SIZE, S_BM |
+| Weights | 0.245, 0.110, 0.204, 0.028, 0.003, 0.181, 0.211, 0.002, 0.002, 0.015 | 0.258, 0.115, 0.215, 0.190, 0.222 |
+| Mean AUC (4 outcomes) | 0.920 | 0.920 |
+| Required annotations | ARG + VF + mobility + replicon + BacMet + metadata | ARG + VF + mobility + length + BacMet |
+| Use case | Comprehensive One Health surveillance with epidemiological context | Rapid screening, resource-limited settings |
 
-### Example output
-
-```
-  Grade A:     3 (  3.2%) ######
-  Grade B:    12 ( 12.9%) ##########################
-  Grade C:    28 ( 30.1%) ############################################################
-  Grade D:    35 ( 37.6%) ############################################################################
-  Grade E:    15 ( 16.1%) ################################
-
-  Top 10 highest-risk plasmids:
-    pNDM-1_260kb                            S=0.718  grade A  8 ARG  IncN [blaNDM]
-    pMCR-1_33kb                             S=0.496  grade B  4 ARG  IncX4 [mcr]
-    pColE1-like_6.5kb                       S=0.156  grade D  0 ARG  Col(MG828)
-```
+Dimensionality analysis (all-subsets evaluation of 1,023 subsets with 5-fold CV)
+showed that performance plateaus at k=5: adding S_VF as the 5th dimension raises
+mean CV AUC from 0.918 to 0.920, and the remaining 5 context dimensions contribute
+<0.1% additional AUC. The 10-dim full model is retained for comprehensive
+surveillance because it is Pareto-optimal (non-dominated across all 4 outcomes)
+and provides epidemiological context.
 
 ### Output files
 
@@ -152,135 +116,66 @@ plasrisk --mode lite *.fasta
 ```python
 from plasrisk import PlasRiskScorer, PlasmidFeatures, annotate_fasta, load_replicon_lookup
 
-# Option A: annotate a FASTA file directly
 lookup = load_replicon_lookup()
 result = annotate_fasta("plasmid.fasta", lookup=lookup)
-scorer = PlasRiskScorer(replicon_lookup=lookup)  # full 10-dim
-df = scorer.score_dataframe(result.features)
-print(df[["seq_id", "S_norm", "grade", "high_risk_genes"]])
 
-# Lite mode (4-dim core)
+# Full 10-dim model
+scorer = PlasRiskScorer(replicon_lookup=lookup)
+df = scorer.score_dataframe(result.features)
+
+# Lite 5-dim model
 scorer_lite = PlasRiskScorer(replicon_lookup=lookup, mode="lite")
 df_lite = scorer_lite.score_dataframe(result.features)
-
-# Option B: construct features manually
-feat = PlasmidFeatures(
-    seq_id="pExample",
-    length_bp=85000,
-    arg_names=["NDM-1", "CTX-M-15", "TEM-1"],
-    vf_names=["aerobactin"],
-    vf_categories=["Nutritional/Metabolic factor"],
-    bm_gene_names=["merA", "qacEdelta1"],
-    replicon="IncX3",
-    has_t4cp=True,
-    has_relaxase=True,
-    has_oriT=True,
-    has_auxiliary=True,
-)
-scores = scorer.score(feat)
-print(f"S_norm = {scores['S_norm']:.3f}, grade = {scores['grade']}")
 ```
 
 ---
 
-## The 10 risk dimensions
+## The risk dimensions
 
-| Component | Weight | What it measures | Scoring basis |
-|-----------|--------|------------------|---------------|
-| **S_ARG** | 0.245 | ARG count, WHO-priority genes, high-risk genes (mcr, NDM, KPC, CTX-M, tetX, etc.) | Base + per-gene + high-risk bonuses |
-| **S_BM** | 0.211 | Biocide/metal resistance (mer, qac, ars/cop/sil) — co-selection potential | Base + per-gene + family bonuses |
-| **S_MOB** | 0.204 | T4CP, relaxase, oriT, auxiliary transfer proteins | Element-based additive score |
-| **S_SIZE** | 0.181 | Plasmid length (cargo capacity) | Sigmoid: midpoint 30 kb |
-| **S_VF** | 0.110 | VF count, exotoxins, secretion systems (T3SS/T4SS) | Base + per-gene + category bonuses |
-| **S_HOST** | 0.028 | Number of host genera / replicon prior | Empirical host range or lookup |
-| **S_GROW** | 0.015 | Annual growth rate of the replicon | PIPdb-derived lookup |
-| **S_REP** | 0.003 | Replicon backbone risk (IncX3, IncN, ColKP3 high; ColpVC low) | PIPdb-derived lookup table |
-| **S_HAB** | 0.002 | Habitat breadth (human/animal/environment) | PIPdb-derived lookup |
-| **S_GEO** | 0.002 | Number of countries observed | PIPdb-derived lookup |
-
----
-
-## Command-line options
-
-```
-plasrisk [options] <fasta1> [fasta2 ...]
-
-positional arguments:
-  FASTA                 FASTA file(s) or directory
-
-options:
-  -o, --output DIR      Output directory (default: ./plasrisk_output)
-  -t, --threads N       Number of abricate threads (default: 4)
-  --min-id FLOAT        Minimum abricate identity % (default: 75)
-  --min-cov FLOAT       Minimum abricate coverage % (default: 50)
-  --no-abricate         Skip abricate; sequence-only scoring
-  --mode {full,lite}    Scoring mode: full (10-dim, default) or lite (4-dim core)
-  --db LIST             Comma-separated abricate databases (default: auto)
-  --json                Also write JSON output
-  -q, --quiet           Suppress progress messages
-  -v, --version         Show version
-  -h, --help            Show help
-```
+| Component | Weight (full/lite) | What it measures |
+|-----------|--------------------|------------------|
+| **S_ARG** | 0.245 / 0.258 | ARG count, WHO-priority genes, high-risk genes (mcr, NDM, KPC, CTX-M, tetX) |
+| **S_BM** | 0.211 / 0.222 | Biocide/metal resistance (mer, qac, ars/cop/sil) — co-selection potential |
+| **S_MOB** | 0.204 / 0.215 | T4CP, relaxase, oriT, auxiliary transfer proteins |
+| **S_SIZE** | 0.181 / 0.190 | Plasmid length (cargo capacity), sigmoid midpoint 30 kb |
+| **S_VF** | 0.110 / 0.115 | VF count, exotoxins, secretion systems (T3SS/T4SS) |
+| **S_HOST** | 0.028 / — | Host range breadth |
+| **S_GROW** | 0.015 / — | Annual growth rate of the replicon |
+| **S_REP** | 0.003 / — | Replicon backbone risk prior |
+| **S_HAB** | 0.002 / — | Habitat breadth (human/animal/environment) |
+| **S_GEO** | 0.002 / — | Geographic spread |
 
 ---
 
 ## Model validation
 
-The PlasRisk model was developed and validated using 792,964 plasmid sequence
-clusters (PSCs) from PIPdb (Zhu et al., *Nucleic Acids Res.*, 2025). Validation
-included:
-
-- **Data-driven weights**: RF-MDG, LASSO, and grid-search optimization across four
-  outcomes (high-risk ARG, MDR-VF fusion, conjugative capacity, BMRG carriage)
-  converged on S_ARG (0.245), S_BM (0.211), S_MOB (0.204), and S_SIZE (0.181)
-  as dominant predictors (84% of total weight).
-- **AUC validation**: Final weights achieved AUC 0.958 (high-risk ARG), 0.964
-  (MDR-VF fusion), 0.856 (conjugation), 0.903 (BMRG); mean 0.920.
-- **Dimensionality analysis**: All-subsets evaluation (1,023 subsets, 5-fold CV)
-  showed that 4 core dimensions (ARG+MOB+SIZE+BM) achieve 99.8% of full-model
-  mean AUC (0.918 vs. 0.920), provided as `--mode lite`.
-- **Leave-one-replicon-out CV**: mean AUC = 0.962 (range 0.750–1.000) across 40 replicons.
-- **Weight perturbation sensitivity** (100 iterations, +/-30%): mean Spearman
-  rho = 0.995, mean top-10 overlap = 9.5/10.
-- **Natural-prevalence holdout** (3.1% high-risk rate, n = 157,046): ROC-AUC = 0.968;
-  Grades D/E (73.8% of PSCs) contained zero high-risk plasmids; Grade A had 46.1%
-  positive rate (LR+ = 27.2).
-- **Multivariable logistic regression**: S_ARG (OR = 36,107, p < 1e-300),
-  S_HOST (OR = 11.1, p = 3.3e-8), and S_BM (OR = 1.31, p = 0.033) were
-  independent predictors of high-risk ARG carriage.
-- **External validation**: 40 independent NCBI plasmids correctly classified
-  (18/20 high-risk Grade A, 19/20 low-risk Grade D/E).
-- **Case studies**: pNDM-1 (S = 0.718, Grade A), pHNSHP45/mcr-1 (S = 0.496, Grade B),
-  ColE1-like (S = 0.156, Grade D).
+- **792,964 PSCs** from PIPdb (Zhu et al., *Nucleic Acids Res.*, 2025)
+- **AUC**: 0.958 (high-risk ARG), 0.964 (MDR-VF fusion), 0.856 (conjugation), 0.903 (BMRG); mean 0.920
+- **Dimensionality analysis**: 5-dim lite achieves equivalent mean AUC to 10-dim full (0.920 vs 0.920); no overfitting (train-test gap < 0.003, bootstrap optimism < 0.005)
+- **LORO-CV**: mean AUC = 0.962 across 40 replicons
+- **Weight sensitivity** (100 iterations, +/-30%): Spearman rho = 0.994, top-10 overlap = 9.5/10
+- **External validation**: 40 independent NCBI plasmids (18/20 high-risk Grade A, 19/20 low-risk Grade D/E)
+- **Natural-prevalence holdout** (157,046 PSCs, 3.0% high-risk): ROC-AUC = 0.968, PR-AUC = 0.413
 
 ---
 
 ## Running tests
 
 ```bash
-cd PlasRisk
 python -m pytest tests/ -v
-# or
-python tests/test_scoring.py
 ```
-
----
 
 ## Citation
 
-If you use PlasRisk, please cite:
+> [Authors]. PlasRisk: a multi-dimension weighted risk assessment framework for
+> bacterial plasmids. *iMeta*, 2025. doi: [to be added]
 
-> [Authors]. PlasRisk: a ten-dimension data-driven weighted risk assessment
-> framework for bacterial plasmids. *Journal*, 2025. doi: [to be added]
-
-The model is based on data from:
+Based on data from:
 > Zhu Q, Chen Q, Lu X, et al. PIPdb: a comprehensive plasmid sequence resource
 > for tracking the horizontal transfer of pathogenic factors and antimicrobial
 > resistance genes. *Nucleic Acids Research*, 2025, 53(D1):D169-D178.
 > doi:10.1093/nar/gkae952
 
----
-
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE).
