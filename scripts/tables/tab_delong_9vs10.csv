@@ -1,0 +1,5 @@
+outcome,AUC_10dim,AUC_9dim,difference,Z,p_value
+High-risk ARG,0.9575,0.9709,0.0135,32.578,8.4e-233
+MDR-VF fusion,0.9641,0.964,-1e-04,-0.127,0.899
+Conjugative,0.8564,0.893,0.0366,53.98,0
+Biocide/metal,0.9032,0.7459,-0.1573,-212.798,0
