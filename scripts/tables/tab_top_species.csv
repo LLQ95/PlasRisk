@@ -1,0 +1,21 @@
+species_name,N
+Escherichia coli,217100
+Salmonella enterica,65712
+Klebsiella pneumoniae,60139
+Staphylococcus aureus,18994
+Enterococcus faecium,18173
+"Salmonella enterica,Escherichia coli",13501
+Campylobacter coli,12503
+Acinetobacter baumannii,11862
+Shigella sonnei,11473
+Campylobacter jejuni,10638
+Pseudomonas aeruginosa,10304
+Bacillus cereus,8801
+Vibrio parahaemolyticus,7396
+Enterococcus faecalis,6691
+Enterobacter hormaechei,6323
+Bacillus thuringiensis,6018
+Vibrio cholerae,5286
+Shigella flexneri,5007
+Lactiplantibacillus plantarum,4164
+"Escherichia coli,Klebsiella pneumoniae",4077
