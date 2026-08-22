@@ -47,15 +47,13 @@
     </linearGradient>
   </defs>
 
-  <!-- TITLE -->
   <text x="600" y="28" text-anchor="middle" font-size="19" font-weight="bold" fill="#222">
-    PlasRisk: A Ten-Dimension Data-Driven Weighted Risk Assessment Framework for Bacterial Plasmids
+    PlasRisk: A Multi-Dimension Data-Driven Weighted Risk Assessment Framework for Bacterial Plasmids
   </text>
   <text x="600" y="48" text-anchor="middle" font-size="11" fill="#666">
     (A) Data-driven weight determination  ·  (B) Command-line risk scoring  ·  (C) Dimensionality analysis &amp; lite mode
   </text>
 
-  <!-- SECTION A -->
   <rect x="30" y="62" width="1140" height="295" rx="8" fill="none" stroke="#ccc" stroke-width="1" stroke-dasharray="6,3"/>
   <rect x="45" y="54" width="230" height="20" rx="4" fill="#4a90d9"/>
   <text x="160" y="68" text-anchor="middle" font-size="12" font-weight="bold" fill="#fff">A. Data-driven weight determination</text>
@@ -142,12 +140,11 @@
   <text x="992" y="228" text-anchor="middle" font-size="13" font-family="Courier, monospace" fill="#222">S = Σ wᵢ · Sᵢ / Σwᵢ</text>
   <text x="992" y="248" text-anchor="middle" font-size="9.5" fill="#555">S ∈ [0, 1] · Σwᵢ = 1.000</text>
   <text x="992" y="266" text-anchor="middle" font-size="9" fill="#555">Consensus of RF-MDG + LASSO + Entropy + Grid</text>
-  <text x="992" y="284" text-anchor="middle" font-size="9" fill="#238b45" font-weight="bold">Two modes: --mode full (10-dim) | --mode lite (4-dim)</text>
+  <text x="992" y="284" text-anchor="middle" font-size="9" fill="#238b45" font-weight="bold">Two modes: --mode full (10-dim) | --mode lite (5-dim)</text>
 
   <line x1="600" y1="362" x2="600" y2="385" stroke="#2c7fb8" stroke-width="2" marker-end="url(#arrow-blue)"/>
   <text x="610" y="378" font-size="9" fill="#2c7fb8" font-style="italic">weights feed into tool</text>
 
-  <!-- SECTION B -->
   <rect x="30" y="392" width="1140" height="300" rx="8" fill="none" stroke="#ccc" stroke-width="1" stroke-dasharray="6,3"/>
   <rect x="45" y="384" width="280" height="20" rx="4" fill="#e45756"/>
   <text x="185" y="398" text-anchor="middle" font-size="12" font-weight="bold" fill="#fff">B. PlasRisk command-line tool (plasrisk *.fasta)</text>
@@ -176,23 +173,20 @@
   <rect x="505" y="408" width="265" height="165" rx="8" fill="url(#g-score)" stroke="#fdae6b" stroke-width="1.5" filter="url(#shadow)"/>
   <text x="637" y="426" text-anchor="middle" font-size="11" font-weight="bold" fill="#a63603">Component scores (each 0–1)</text>
   <line x1="518" y1="433" x2="757" y2="433" stroke="#fdd0a2" stroke-width="0.8"/>
-
   <text x="520" y="449" font-size="9.5" font-weight="bold" fill="#c73027">S_ARG</text><text x="565" y="449" font-size="8.5" fill="#555">ARG burden + WHO/high-risk</text>
   <text x="520" y="464" font-size="9.5" font-weight="bold" fill="#d95f0e">S_BM</text><text x="565" y="464" font-size="8.5" fill="#555">Biocide/metal co-selection</text>
   <text x="520" y="479" font-size="9.5" font-weight="bold" fill="#b35806">S_MOB</text><text x="565" y="479" font-size="8.5" fill="#555">Conjugation potential</text>
   <text x="520" y="494" font-size="9.5" font-weight="bold" fill="#7f3b08">S_SIZE</text><text x="565" y="494" font-size="8.5" fill="#555">Cargo capacity (sigmoid)</text>
   <text x="520" y="509" font-size="9.5" font-weight="bold" fill="#4d9221">S_VF</text><text x="565" y="509" font-size="8.5" fill="#555">Virulence burden</text>
-
   <text x="660" y="449" font-size="9.5" font-weight="bold" fill="#3182bd">S_HOST</text><text x="705" y="449" font-size="8.5" fill="#555">Host range</text>
   <text x="660" y="464" font-size="9.5" font-weight="bold" fill="#3182bd">S_GROW</text><text x="705" y="464" font-size="8.5" fill="#555">Temporal growth</text>
   <text x="660" y="479" font-size="9.5" font-weight="bold" fill="#3182bd">S_REP</text><text x="705" y="479" font-size="8.5" fill="#555">Replicon prior</text>
   <text x="660" y="494" font-size="9.5" font-weight="bold" fill="#3182bd">S_HAB</text><text x="705" y="494" font-size="8.5" fill="#555">Habitat breadth</text>
   <text x="660" y="509" font-size="9.5" font-weight="bold" fill="#3182bd">S_GEO</text><text x="705" y="509" font-size="8.5" fill="#555">Geographic spread</text>
-
   <rect x="518" y="522" width="239" height="42" rx="4" fill="#fff" stroke="#a1d99b" stroke-width="1" stroke-dasharray="3,2"/>
-  <text x="637" y="537" text-anchor="middle" font-size="9" font-weight="bold" fill="#238b45">Lite mode (--mode lite): only S_ARG + S_MOB + S_SIZE + S_BM</text>
-  <text x="637" y="552" text-anchor="middle" font-size="8.5" fill="#555">Renormalized weights: 0.291 / 0.243 / 0.215 / 0.251</text>
-  <text x="637" y="562" text-anchor="middle" font-size="8.5" fill="#555">Achieves 99.8% of full-model mean AUC (0.918 vs 0.920)</text>
+  <text x="637" y="537" text-anchor="middle" font-size="9" font-weight="bold" fill="#238b45">Lite mode (--mode lite): S_ARG + S_VF + S_MOB + S_SIZE + S_BM</text>
+  <text x="637" y="552" text-anchor="middle" font-size="8.5" fill="#555">Renormalized weights: 0.258 / 0.115 / 0.215 / 0.190 / 0.222</text>
+  <text x="637" y="562" text-anchor="middle" font-size="8.5" fill="#555">Equivalent mean AUC to full model (0.920 vs 0.920)</text>
 
   <line x1="455" y1="454" x2="500" y2="460" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
   <line x1="455" y1="535" x2="500" y2="520" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
@@ -200,7 +194,6 @@
   <rect x="815" y="430" width="150" height="55" rx="8" fill="#fff" stroke="#8c6bb1" stroke-width="2" filter="url(#shadow)"/>
   <text x="890" y="452" text-anchor="middle" font-size="11" font-weight="bold" fill="#6a51a3">Weighted sum</text>
   <text x="890" y="470" text-anchor="middle" font-size="10" font-family="Courier, monospace" fill="#333">S = Σ wᵢ·Sᵢ</text>
-
   <line x1="770" y1="490" x2="810" y2="460" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
 
   <rect x="815" y="505" width="150" height="75" rx="8" fill="url(#g-output)" stroke="#dd3497" stroke-width="1.5" filter="url(#shadow)"/>
@@ -209,7 +202,6 @@
   <rect x="825" y="543" width="14" height="10" rx="2" fill="#e34a33"/><text x="844" y="552" font-size="8.5" fill="#333">B ≥ 0.45 High</text>
   <rect x="825" y="556" width="14" height="10" rx="2" fill="#fc8d59"/><text x="844" y="565" font-size="8.5" fill="#333">C ≥ 0.30 Moderate</text>
   <text x="825" y="576" font-size="8.5" fill="#333"><tspan fill="#fdcc8a">■</tspan> D ≥ 0.15  <tspan fill="#fef0d9">■</tspan> E &lt; 0.15</text>
-
   <line x1="890" y1="485" x2="890" y2="500" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
 
   <rect x="1010" y="430" width="140" height="150" rx="8" fill="#f7f4f9" stroke="#df65b0" stroke-width="1.5" filter="url(#shadow)"/>
@@ -223,7 +215,6 @@
   <text x="1080" y="540" text-anchor="middle" font-size="8.5" fill="#555">high-risk genes</text>
   <text x="1080" y="553" text-anchor="middle" font-size="8.5" fill="#555">model_mode</text>
   <text x="1080" y="566" text-anchor="middle" font-size="8.5" fill="#555">(full / lite)</text>
-
   <line x1="965" y1="542" x2="1005" y2="510" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
 
   <rect x="55" y="600" width="520" height="55" rx="6" fill="#1e1e1e" stroke="#333" stroke-width="1"/>
@@ -238,7 +229,6 @@
   <line x1="600" y1="698" x2="600" y2="720" stroke="#238b45" stroke-width="2" marker-end="url(#arrow-green)"/>
   <text x="610" y="714" font-size="9" fill="#238b45" font-style="italic">dimensionality optimization</text>
 
-  <!-- SECTION C -->
   <rect x="30" y="728" width="1140" height="455" rx="8" fill="none" stroke="#ccc" stroke-width="1" stroke-dasharray="6,3"/>
   <rect x="45" y="720" width="320" height="20" rx="4" fill="#238b45"/>
   <text x="205" y="734" text-anchor="middle" font-size="12" font-weight="bold" fill="#fff">C. Dimensionality analysis &amp; PlasRisk-lite (all-subsets, 1,023 models, 5-fold CV)</text>
@@ -254,27 +244,23 @@
   <text x="420" y="792" text-anchor="middle" font-size="9" fill="#333">Forward: ARG→SIZE→MOB→BM→VF…</text>
   <text x="420" y="807" text-anchor="middle" font-size="9" fill="#333">Backward: drop HOST→GEO→HAB…</text>
   <text x="420" y="822" text-anchor="middle" font-size="9" fill="#555">Removing BM causes largest drop</text>
-
   <line x1="275" y1="792" x2="305" y2="792" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
 
   <rect x="565" y="755" width="280" height="75" rx="8" fill="#f7fcf5" stroke="#74c476" stroke-width="1.5" filter="url(#shadow)"/>
   <text x="705" y="773" text-anchor="middle" font-size="11" font-weight="bold" fill="#238b45">Key results</text>
-  <text x="575" y="790" font-size="9" fill="#333">● <tspan font-weight="bold">Elbow at k=4:</tspan> mean AUC = 0.918 (99.8% of full)</text>
-  <text x="575" y="805" font-size="9" fill="#333">● <tspan font-weight="bold">Best k=9</tspan> (drop S_HOST): mean AUC = 0.920</text>
-  <text x="575" y="820" font-size="9" fill="#333">● <tspan font-weight="bold">9-dim w/o S_BM:</tspan> mean AUC = 0.894 (BM collapses)</text>
-
+  <text x="575" y="790" font-size="9" fill="#333">● <tspan font-weight="bold">Plateau at k=5:</tspan> mean AUC = 0.920 (same as full)</text>
+  <text x="575" y="805" font-size="9" fill="#333">● <tspan font-weight="bold">5-dim lite</tspan> (ARG+VF+MOB+SIZE+BM): AUC = 0.920</text>
+  <text x="575" y="820" font-size="9" fill="#333">● <tspan font-weight="bold">No overfitting:</tspan> train-test gap &lt;0.003</text>
   <line x1="530" y1="792" x2="560" y2="792" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
 
   <rect x="880" y="755" width="270" height="75" rx="8" fill="#fff" stroke="#fd8d3c" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="1015" y="773" text-anchor="middle" font-size="11" font-weight="bold" fill="#cc4c02">DeLong tests (9-dim w/o BM vs 10-dim)</text>
-  <text x="890" y="790" font-size="9" fill="#333">● HR-ARG: ΔAUC = +0.014 (p = 8.4e-233)</text>
-  <text x="890" y="805" font-size="9" fill="#333">● Fusion: ΔAUC = −0.0001 (p = 0.899, NS)</text>
-  <text x="890" y="820" font-size="9" fill="#d73027">● BM: ΔAUC = −0.157 (p ≈ 0) → S_BM essential</text>
-
+  <text x="1015" y="773" text-anchor="middle" font-size="11" font-weight="bold" fill="#cc4c02">DeLong tests (5-dim lite vs 10-dim full)</text>
+  <text x="890" y="790" font-size="9" fill="#333">● HR-ARG: ΔAUC = 0.000 (p = NS)</text>
+  <text x="890" y="805" font-size="9" fill="#333">● Fusion: ΔAUC = −0.001 (p = NS)</text>
+  <text x="890" y="820" font-size="9" fill="#238b45">● All outcomes equivalent → 5-dim sufficient</text>
   <line x1="845" y1="792" x2="875" y2="792" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
 
-  <text x="55" y="860" font-size="10" font-weight="bold" fill="#333">Mean CV AUC vs. number of dimensions (elbow at k=4):</text>
-
+  <text x="55" y="860" font-size="10" font-weight="bold" fill="#333">Mean CV AUC vs. number of dimensions (plateau at k=5):</text>
   <rect x="55" y="868" width="500" height="160" rx="4" fill="#fafafa" stroke="#ddd" stroke-width="0.5"/>
   <text x="50" y="880" text-anchor="end" font-size="8" fill="#888">0.93</text>
   <text x="50" y="910" text-anchor="end" font-size="8" fill="#888">0.91</text>
@@ -287,98 +273,89 @@
   <line x1="55" y1="936" x2="555" y2="936" stroke="#eee" stroke-width="0.5"/>
   <line x1="55" y1="966" x2="555" y2="966" stroke="#eee" stroke-width="0.5"/>
   <line x1="55" y1="996" x2="555" y2="996" stroke="#eee" stroke-width="0.5"/>
-
+  <rect x="70" y="1022" width="38" height="0" fill="#9ecae1"/>
   <rect x="118" y="937" width="38" height="85" fill="#9ecae1"/>
   <rect x="166" y="892" width="38" height="130" fill="#9ecae1"/>
-  <rect x="214" y="887" width="38" height="135" fill="#31a354" stroke="#006d2c" stroke-width="1.5"/>
-  <rect x="262" y="885" width="38" height="137" fill="#3182bd"/>
-  <rect x="310" y="885" width="38" height="137" fill="#3182bd"/>
-  <rect x="358" y="885" width="38" height="137" fill="#3182bd"/>
-  <rect x="406" y="885" width="38" height="137" fill="#3182bd"/>
-  <rect x="454" y="885" width="38" height="137" fill="#08519c"/>
-  <rect x="502" y="885" width="38" height="137" fill="#08519c"/>
-
+  <rect x="214" y="887" width="38" height="135" fill="#9ecae1"/>
+  <rect x="262" y="885" width="38" height="137" fill="#31a354" stroke="#006d2c" stroke-width="1.5"/>
+  <rect x="310" y="885" width="38" height="137" fill="#9ecae1"/>
+  <rect x="358" y="885" width="38" height="137" fill="#9ecae1"/>
+  <rect x="406" y="885" width="38" height="137" fill="#9ecae1"/>
+  <rect x="454" y="885" width="38" height="137" fill="#9ecae1"/>
+  <rect x="502" y="885" width="38" height="137" fill="#08519c" stroke="#08306b" stroke-width="1.5"/>
+  <text x="89" y="1018" text-anchor="middle" font-size="7.5" fill="#666">0.768</text>
   <text x="137" y="933" text-anchor="middle" font-size="7.5" fill="#666">0.862</text>
   <text x="185" y="888" text-anchor="middle" font-size="7.5" fill="#666">0.912</text>
-  <text x="233" y="883" text-anchor="middle" font-size="7.5" fill="#006d2c" font-weight="bold">0.918</text>
-  <text x="281" y="881" text-anchor="middle" font-size="7.5" fill="#fff">0.920</text>
+  <text x="233" y="883" text-anchor="middle" font-size="7.5" fill="#666">0.918</text>
+  <text x="281" y="881" text-anchor="middle" font-size="7.5" fill="#fff" font-weight="bold">0.920</text>
   <text x="329" y="881" text-anchor="middle" font-size="7.5" fill="#fff">0.920</text>
   <text x="377" y="881" text-anchor="middle" font-size="7.5" fill="#fff">0.920</text>
   <text x="425" y="881" text-anchor="middle" font-size="7.5" fill="#fff">0.920</text>
   <text x="473" y="881" text-anchor="middle" font-size="7.5" fill="#fff">0.920</text>
   <text x="521" y="881" text-anchor="middle" font-size="7.5" fill="#fff">0.920</text>
-
+  <text x="89" y="1038" text-anchor="middle" font-size="8" fill="#555">1</text>
   <text x="137" y="1038" text-anchor="middle" font-size="8" fill="#555">2</text>
   <text x="185" y="1038" text-anchor="middle" font-size="8" fill="#555">3</text>
-  <text x="233" y="1038" text-anchor="middle" font-size="8" fill="#006d2c" font-weight="bold">4</text>
-  <text x="281" y="1038" text-anchor="middle" font-size="8" fill="#555">5</text>
+  <text x="233" y="1038" text-anchor="middle" font-size="8" fill="#555">4</text>
+  <text x="281" y="1038" text-anchor="middle" font-size="8" fill="#006d2c" font-weight="bold">5</text>
   <text x="329" y="1038" text-anchor="middle" font-size="8" fill="#555">6</text>
   <text x="377" y="1038" text-anchor="middle" font-size="8" fill="#555">7</text>
   <text x="425" y="1038" text-anchor="middle" font-size="8" fill="#555">8</text>
-  <text x="473" y="1038" text-anchor="middle" font-size="8" fill="#08519c" font-weight="bold">9</text>
-  <text x="521" y="1038" text-anchor="middle" font-size="8" fill="#08519c" font-weight="bold">10</text>
-
-  <line x1="233" y1="870" x2="233" y2="855" stroke="#006d2c" stroke-width="1" stroke-dasharray="2,2"/>
-  <text x="233" y="850" text-anchor="middle" font-size="8" fill="#006d2c" font-weight="bold">Elbow (k=4)</text>
+  <text x="473" y="1038" text-anchor="middle" font-size="8" fill="#555">9</text>
+  <text x="521" y="1038" text-anchor="middle" font-size="8" fill="#08306b" font-weight="bold">10</text>
+  <line x1="281" y1="870" x2="281" y2="855" stroke="#006d2c" stroke-width="1" stroke-dasharray="2,2"/>
+  <text x="281" y="850" text-anchor="middle" font-size="8" fill="#006d2c" font-weight="bold">Plateau (k=5)</text>
   <text x="280" y="1052" font-size="8" fill="#555">Number of dimensions</text>
 
   <rect x="590" y="868" width="560" height="160" rx="6" fill="#fff" stroke="#a1d99b" stroke-width="1.5"/>
-  <text x="870" y="888" text-anchor="middle" font-size="11" font-weight="bold" fill="#238b45">Full (10-dim) vs. Lite (4-dim) comparison</text>
+  <text x="870" y="888" text-anchor="middle" font-size="11" font-weight="bold" fill="#238b45">Full (10-dim) vs. Lite (5-dim) comparison</text>
   <line x1="600" y1="895" x2="1140" y2="895" stroke="#e5f5e0" stroke-width="1"/>
-
   <text x="610" y="912" font-size="9" font-weight="bold" fill="#333">Metric</text>
   <text x="800" y="912" font-size="9" font-weight="bold" fill="#08519c">Full (10-dim)</text>
-  <text x="970" y="912" font-size="9" font-weight="bold" fill="#006d2c">Lite (4-dim)</text>
+  <text x="970" y="912" font-size="9" font-weight="bold" fill="#006d2c">Lite (5-dim)</text>
   <text x="1080" y="912" font-size="8" fill="#888">Δ</text>
   <line x1="600" y1="917" x2="1140" y2="917" stroke="#ddd" stroke-width="0.5"/>
-
   <text x="610" y="932" font-size="8.5" fill="#333">High-risk ARG AUC</text>
   <text x="800" y="932" font-size="8.5" fill="#08519c">0.958</text>
-  <text x="970" y="932" font-size="8.5" fill="#006d2c">0.961</text>
-  <text x="1080" y="932" font-size="8" fill="#888">+0.003</text>
-
+  <text x="970" y="932" font-size="8.5" fill="#006d2c">0.958</text>
+  <text x="1080" y="932" font-size="8" fill="#888">0.000</text>
   <text x="610" y="947" font-size="8.5" fill="#333">MDR–VF fusion AUC</text>
   <text x="800" y="947" font-size="8.5" fill="#08519c">0.964</text>
-  <text x="970" y="947" font-size="8.5" fill="#006d2c">0.943</text>
-  <text x="1080" y="947" font-size="8" fill="#d73027">−0.021</text>
-
+  <text x="970" y="947" font-size="8.5" fill="#006d2c">0.963</text>
+  <text x="1080" y="947" font-size="8" fill="#888">−0.001</text>
   <text x="610" y="962" font-size="8.5" fill="#333">Conjugative AUC</text>
   <text x="800" y="962" font-size="8.5" fill="#08519c">0.856</text>
-  <text x="970" y="962" font-size="8.5" fill="#006d2c">0.866</text>
-  <text x="1080" y="962" font-size="8" fill="#888">+0.010</text>
-
+  <text x="970" y="962" font-size="8.5" fill="#006d2c">0.856</text>
+  <text x="1080" y="962" font-size="8" fill="#888">0.000</text>
   <text x="610" y="977" font-size="8.5" fill="#333">Biocide/metal AUC</text>
   <text x="800" y="977" font-size="8.5" fill="#08519c">0.903</text>
-  <text x="970" y="977" font-size="8.5" fill="#006d2c">0.902</text>
-  <text x="1080" y="977" font-size="8" fill="#888">−0.002</text>
-
+  <text x="970" y="977" font-size="8.5" fill="#006d2c">0.904</text>
+  <text x="1080" y="977" font-size="8" fill="#888">+0.001</text>
   <line x1="600" y1="984" x2="1140" y2="984" stroke="#ddd" stroke-width="0.5"/>
   <text x="610" y="999" font-size="9" font-weight="bold" fill="#333">Mean AUC (4 outcomes)</text>
   <text x="800" y="999" font-size="9" font-weight="bold" fill="#08519c">0.920</text>
-  <text x="970" y="999" font-size="9" font-weight="bold" fill="#006d2c">0.918</text>
-  <text x="1080" y="999" font-size="8" fill="#888">−0.002 (99.8%)</text>
-
+  <text x="970" y="999" font-size="9" font-weight="bold" fill="#006d2c">0.920</text>
+  <text x="1080" y="999" font-size="8" fill="#006d2c">equivalent</text>
   <text x="610" y="1016" font-size="8.5" fill="#555">Required annotations</text>
   <text x="800" y="1016" font-size="8" fill="#555">ARG+VF+MOB+REP+BM+meta</text>
-  <text x="970" y="1016" font-size="8" fill="#006d2c">ARG+MOB+SIZE+BM</text>
+  <text x="970" y="1016" font-size="8" fill="#006d2c">ARG+VF+MOB+SIZE+BM</text>
 
   <rect x="55" y="1050" width="540" height="115" rx="6" fill="#fff5f5" stroke="#fc9272" stroke-width="1"/>
-  <text x="70" y="1070" font-size="10" font-weight="bold" fill="#a50f15">Why does 9-dim (w/o S_BM) show higher ARG AUC?</text>
-  <text x="70" y="1088" font-size="9" fill="#333">→ <tspan font-weight="bold">Weight dilution:</tspan> removing S_BM (w=0.211) raises S_ARG effective</text>
-  <text x="70" y="1103" font-size="9" fill="#333">   weight from 0.245 to 0.310. Since HR-ARG label is defined by ARG annotation,</text>
-  <text x="70" y="1118" font-size="9" fill="#333">   this mechanically boosts ARG AUC by 1.4% — but BM AUC drops 15.7%.</text>
-  <text x="70" y="1135" font-size="9" fill="#333">→ 10-dim is <tspan font-weight="bold">Pareto-optimal</tspan>: no subset dominates across all 4 outcomes.</text>
-  <text x="70" y="1152" font-size="9" fill="#333">→ At natural prevalence (3.1%), calibration &amp; PR-AUC matter more than ROC.</text>
+  <text x="70" y="1070" font-size="10" font-weight="bold" fill="#a50f15">Why retain 10-dim if 5-dim is equivalent?</text>
+  <text x="70" y="1088" font-size="9" fill="#333">→ <tspan font-weight="bold">Pareto optimality:</tspan> 10-dim is non-dominated across all 4 outcomes;</text>
+  <text x="70" y="1103" font-size="9" fill="#333">   the 5 context dimensions (HOST, REP, GEO, HAB, GROW) add epidemiological value</text>
+  <text x="70" y="1118" font-size="9" fill="#333">   for One Health surveillance even though they contribute &lt;0.1% to mean AUC.</text>
+  <text x="70" y="1135" font-size="9" fill="#333">→ <tspan font-weight="bold">No overfitting:</tspan> train-test gap &lt;0.003, bootstrap optimism &lt;0.005.</text>
+  <text x="70" y="1152" font-size="9" fill="#333">→ Both modes offered: full for surveillance, lite for rapid screening.</text>
 
   <rect x="625" y="1050" width="525" height="115" rx="6" fill="#f0fdf4" stroke="#31a354" stroke-width="1"/>
-  <text x="640" y="1070" font-size="10" font-weight="bold" fill="#006d2c">PlasRisk-lite: rapid screening mode</text>
-  <text x="640" y="1088" font-size="9" fill="#333">● 4 core dimensions: S_ARG (0.291) + S_MOB (0.243) + S_SIZE (0.215) + S_BM (0.251)</text>
-  <text x="640" y="1103" font-size="9" fill="#333">● Requires only ARG annotation + mobility genes + length + BacMet</text>
-  <text x="640" y="1118" font-size="9" fill="#333">● No VFDB, PlasmidFinder, or metadata priors needed</text>
+  <text x="640" y="1070" font-size="10" font-weight="bold" fill="#006d2c">PlasRisk-lite: rapid screening mode (5-dim core)</text>
+  <text x="640" y="1088" font-size="9" fill="#333">● 5 dimensions: S_ARG (0.258) + S_VF (0.115) + S_MOB (0.215) + S_SIZE (0.190) + S_BM (0.222)</text>
+  <text x="640" y="1103" font-size="9" fill="#333">● Requires ARG + VFDB + mobility genes + length + BacMet (no metadata priors)</text>
+  <text x="640" y="1118" font-size="9" fill="#333">● Mean AUC = 0.920, equivalent to full 10-dim model; S_VF raises fusion AUC to 0.963</text>
   <text x="640" y="1133" font-size="9" fill="#333">● CLI: <tspan font-family="Courier, monospace">plasrisk --mode lite *.fasta</tspan></text>
   <text x="640" y="1148" font-size="9" fill="#333">● Python API: <tspan font-family="Courier, monospace">PlasRiskScorer(mode="lite")</tspan></text>
   <text x="640" y="1162" font-size="8.5" fill="#555">● Ideal for resource-limited settings, large-scale screening, One Health surveillance</text>
-
 </svg>
 </body>
 </html>
