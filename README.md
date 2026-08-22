@@ -3,7 +3,7 @@
 **10-dimension data-driven weighted risk assessment for bacterial plasmids from FASTA sequences**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://python.org)
+[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
 
 PlasRisk computes a composite risk score for bacterial plasmids based on ten
 data-driven weighted dimensions: antimicrobial resistance gene (ARG) burden,
@@ -18,7 +18,7 @@ S = 0.245*S_ARG + 0.110*S_VF + 0.204*S_MOB + 0.028*S_HOST
   + 0.002*S_GEO + 0.002*S_HAB + 0.015*S_GROW
 
 Weights derived by data-driven consensus (Random Forest MDG, LASSO, and
-grid-search optimization) on 792,964 PIPdb PSCs; sum ≈ 1.0.
+grid-search optimization) on 638,393 PIPdb PSCs; sum = 1.000.
 ```
 
 Risk grades: **A** (Very High, S >= 0.60), **B** (High, >= 0.45),
@@ -119,9 +119,9 @@ plasrisk --json -o results plasmid.fasta
   Grade E:    15 ( 16.1%) ################################
 
   Top 10 highest-risk plasmids:
-    pNDM-1_260kb                            S=0.712  grade A  8 ARG  IncX3 [blaNDM]
-    pMCR-1_33kb                             S=0.581  grade B  4 ARG  IncX4 [mcr]
-    pKPC-2_110kb                            S=0.534  grade B  6 ARG  IncFII(K) [blaKPC]
+    pNDM-1_260kb                            S=0.718  grade A  8 ARG  IncN [blaNDM]
+    pMCR-1_33kb                             S=0.496  grade B  4 ARG  IncX4 [mcr]
+    pColE1-like_6.5kb                       S=0.156  grade D  0 ARG  Col(MG828)
 ```
 
 ### Output files
@@ -208,23 +208,29 @@ options:
 
 ## Model validation
 
-The PlasRisk model was developed and validated using 792,964 plasmid sequence
-clusters from PIPdb (Zhu et al., *Nucleic Acids Res.*, 2025). Validation
+The PlasRisk model was developed and validated using 638,393 plasmid sequence
+clusters (PSCs) from PIPdb (Zhu et al., *Nucleic Acids Res.*, 2025). Validation
 included:
 
-- **Quartile stratification**: Q1 (highest risk) plasmids had 92.3% ARG prevalence,
-  28.2% high-risk ARG rate, 17.5% conjugative rate (vs. 0% in Q4).
 - **Data-driven weights**: RF-MDG, LASSO, and grid-search optimization across four
   outcomes (high-risk ARG, MDR-VF fusion, conjugative capacity, BMRG carriage)
   converged on S_ARG (0.245), S_BM (0.211), S_MOB (0.204), and S_SIZE (0.181)
-  as dominant predictors.
-- **AUC validation**: Final weights achieved AUC 0.956 (high-risk ARG), 0.961
+  as dominant predictors (84% of total weight).
+- **AUC validation**: Final weights achieved AUC 0.955 (high-risk ARG), 0.965
   (MDR-VF fusion), 0.856 (conjugation), 0.902 (BMRG); mean 0.919.
-- **Leave-one-replicon-out CV**: mean AUC = 0.962 across 40 replicons.
+- **Leave-one-replicon-out CV**: mean AUC = 0.962 (range 0.750–1.000) across 40 replicons.
 - **Weight perturbation sensitivity** (100 iterations, +/-30%): mean Spearman
-  rho = 0.994, mean top-10 overlap = 9.2/10.
+  rho = 0.995, mean top-10 overlap = 9.5/10.
+- **Natural-prevalence holdout** (3.1% high-risk rate, n = 157,046): ROC-AUC = 0.968;
+  Grades D/E (73.8% of PSCs) contained zero high-risk plasmids; Grade A had 46.1%
+  positive rate (LR+ = 27.2).
+- **Multivariable logistic regression**: S_ARG (OR = 36,107, p < 1e-300),
+  S_HOST (OR = 11.1, p = 3.3e-8), and S_BM (OR = 1.31, p = 0.033) were
+  independent predictors of high-risk ARG carriage.
 - **External validation**: 40 independent NCBI plasmids correctly classified
   (18/20 high-risk Grade A, 19/20 low-risk Grade D/E).
+- **Case studies**: pNDM-1 (S = 0.718, Grade A), pHNSHP45/mcr-1 (S = 0.496, Grade B),
+  ColE1-like (S = 0.156, Grade D).
 
 ---
 
@@ -281,12 +287,12 @@ build:
 
 requirements:
   host:
-    - python >=3.8
+    - python >=3.9
     - pip
     - setuptools >=61.0
     - wheel
   run:
-    - python >=3.8
+    - python >=3.9
     - pandas >=1.3
     - numpy >=1.20
     # abricate/blast optional; CLI falls back to --no-abricate mode
