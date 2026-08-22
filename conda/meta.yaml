@@ -16,12 +16,12 @@ build:
 
 requirements:
   host:
-    - python >=3.8
+    - python >=3.9
     - pip
     - setuptools >=61.0
     - wheel
   run:
-    - python >=3.8
+    - python >=3.9
     - pandas >=1.3
     - numpy >=1.20
     # abricate and blast are recommended but not hard dependencies;
@@ -53,7 +53,7 @@ about:
     resistance (S_BM), geographic spread (S_GEO), habitat breadth (S_HAB),
     and temporal growth rate (S_GROW). Weights were derived by data-driven
     consensus (Random Forest MDG, LASSO, grid-search optimization) on
-    792,964 PIPdb plasmid sequence clusters. Accepts FASTA input and uses
+    638,393 PIPdb plasmid sequence clusters. Accepts FASTA input and uses
     abricate for annotation when available.
   doc_url: https://github.com/LLQ95/PlasRisk#readme
   dev_url: https://github.com/LLQ95/PlasRisk
