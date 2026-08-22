@@ -81,32 +81,65 @@ dir.create(fig_dir, showWarnings = FALSE, recursive = TRUE)
 
 cat("Loading data ...\n")
 
-# Load the final scored PSC table (produced by pipdb_15/16 with final weights)
-score_file <- file.path(tab_dir, "tab_psc_final_scores.csv")
-if (!file.exists(score_file)) score_file <- file.path(results_dir, "tab_psc_final_scores.csv")
-if (!file.exists(score_file)) score_file <- "tables/tab_psc_final_scores.csv"
-if (!file.exists(score_file)) {
-  stop("Cannot find tab_psc_final_scores.csv. Run pipdb_15_risk_weight_table.R first.")
+# Load the final scored PSC table — try multiple candidate files
+candidate_files <- c(
+  file.path(tab_dir, "tab_psc_final_scores.csv"),
+  file.path(results_dir, "tab_psc_final_scores.csv"),
+  file.path(results_dir, "psc_risk_scores.tsv"),
+  file.path(results_dir, "psc_master.tsv"),
+  "tables/tab_psc_final_scores.csv",
+  "results/psc_risk_scores.tsv",
+  "results/psc_master.tsv"
+)
+score_file <- candidate_files[file.exists(candidate_files)][1]
+if (is.na(score_file)) {
+  stop(paste("Cannot find score table. Tried:\n  ",
+             paste(candidate_files, collapse = "\n  "),
+             "\nRun pipdb_15_risk_weight_table.R or pipdb_02_risk_score.py first."))
 }
+cat(sprintf("  Loading: %s\n", score_file))
 
 d <- fread(score_file)
-cat(sprintf("  %d PSCs loaded\n", nrow(d)))
+cat(sprintf("  %d PSCs loaded, %d columns\n", nrow(d), ncol(d)))
 
-# ---------- column name normalization (handle upper/lower case conventions) ----------
+# ---------- column name normalization (handle various naming conventions) ----------
 name_map <- list(
-  n_ARG = "n_arg", n_VF = "n_vf", n_BM = "n_metal",
-  S_final = "S_norm", S_total_norm = "S_norm"
+  # count columns
+  n_ARG = "n_arg", N_ARG = "n_arg", n_Arg = "n_arg",
+  n_VF = "n_vf", N_VF = "n_vf", n_Vf = "n_vf",
+  n_BM = "n_metal", N_BM = "n_metal", n_bacmet = "n_metal",
+  n_high_risk_ARG = "n_high_risk_arg", N_high_risk = "n_high_risk_arg",
+  n_who_arg = "n_high_risk_arg",
+  # score columns
+  S_final = "S_norm", S_total_norm = "S_norm", S_total = "S_norm",
+  risk_score = "S_norm", composite_risk = "S_norm", combined_risk_index = "S_norm",
+  # mobility
+  mobility = "mobility_class"
 )
 for (old in names(name_map)) {
   new <- name_map[[old]]
   if (old %in% names(d) && !new %in% names(d)) setnames(d, old, new)
 }
+
+# If n_high_risk_arg is still missing but n_who_arg exists, use it
+if (!"n_high_risk_arg" %in% names(d) && "n_who_arg" %in% names(d)) {
+  setnames(d, "n_who_arg", "n_high_risk_arg")
+}
+# If n_metal is missing but gene_bacmet exists, count comma-separated entries
+if (!"n_metal" %in% names(d) && "gene_bacmet" %in% names(d)) {
+  d[, n_metal := ifelse(is.na(gene_bacmet) | gene_bacmet == "" | gene_bacmet == "\\N",
+                        0L, lengths(gregexpr(",", gene_bacmet)) + 1L)]
+}
+
 # Ensure required columns exist
 required_cols <- c("n_arg", "n_vf", "n_high_risk_arg", "S_norm", "replicon_primary")
 missing_cols <- required_cols[!required_cols %in% names(d)]
 if (length(missing_cols) > 0) {
+  cat(sprintf("  Available columns: %s\n", paste(head(names(d), 30), collapse = ", ")))
   stop(sprintf("Missing required columns in score table: %s", paste(missing_cols, collapse = ", ")))
 }
+cat(sprintf("  Score column: S_norm (range: %.3f–%.3f)\n",
+            min(d$S_norm, na.rm = TRUE), max(d$S_norm, na.rm = TRUE)))
 
 # ---------- 1. Define labels ----------
 d[, y_highrisk := as.integer(n_high_risk_arg > 0)]
@@ -183,7 +216,7 @@ results_list <- list()
 results_list[[1]] <- evaluate_model(test$S_norm, test$y_highrisk, "PlasRisk (10-dim)")
 
 # 9-dim (no S_BM) - recompute from component columns if available
-comp9 <- c("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_REP", "S_SIZE",
+comp9  <- c("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_REP", "S_SIZE",
            "S_GEO", "S_HAB", "S_GROW")
 if (all(comp9 %in% names(test))) {
   w9 <- c(S_ARG=0.2448, S_VF=0.1096, S_MOB=0.2041, S_HOST=0.0282,
