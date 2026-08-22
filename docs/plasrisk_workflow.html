@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PlasRisk Workflow</title>
+<style>
+  body { margin: 0; padding: 20px; background: #fff; font-family: 'Helvetica Neue', Arial, sans-serif; }
+  svg { display: block; margin: 0 auto; }
+  text { font-family: 'Helvetica Neue', Arial, sans-serif; }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 880" width="1200" height="880">
+  <defs>
+    <!-- Arrow markers -->
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#555"/>
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2c7fb8"/>
+    </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#d73027"/>
+    </marker>
+    <!-- Drop shadow -->
+    <filter id="shadow" x="-5%" y="-5%" width="115%" height="115%">
+      <feDropShadow dx="1" dy="1" stdDeviation="2" flood-opacity="0.12"/>
+    </filter>
+    <!-- Gradients -->
+    <linearGradient id="g-input" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e8f4f8"/><stop offset="100%" stop-color="#bdd7e7"/>
+    </linearGradient>
+    <linearGradient id="g-annot" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f0f9e8"/><stop offset="100%" stop-color="#c7e9c0"/>
+    </linearGradient>
+    <linearGradient id="g-score" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff7ec"/><stop offset="100%" stop-color="#fdd49e"/>
+    </linearGradient>
+    <linearGradient id="g-output" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fde0dd"/><stop offset="100%" stop-color="#fa9fb5"/>
+    </linearGradient>
+    <linearGradient id="g-weight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e0ecf4"/><stop offset="100%" stop-color="#9ebcda"/>
+    </linearGradient>
+    <linearGradient id="g-data" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#edf8fb"/><stop offset="100%" stop-color="#b3cde3"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ===================== TITLE ===================== -->
+  <text x="600" y="30" text-anchor="middle" font-size="20" font-weight="bold" fill="#222">
+    PlasRisk: A Ten-Dimension Data-Driven Weighted Risk Assessment Framework for Bacterial Plasmids
+  </text>
+  <text x="600" y="52" text-anchor="middle" font-size="12" fill="#666">
+    Workflow schematic — data-driven weight determination (A) and command-line risk scoring (B)
+  </text>
+
+  <!-- ===================== SECTION A LABEL ===================== -->
+  <rect x="30" y="68" width="1140" height="310" rx="8" fill="none" stroke="#ccc" stroke-width="1" stroke-dasharray="6,3"/>
+  <rect x="45" y="60" width="200" height="22" rx="4" fill="#4a90d9"/>
+  <text x="145" y="76" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">A. Data-driven weight determination</text>
+
+  <!-- A1: PIPdb database -->
+  <rect x="55" y="105" width="170" height="70" rx="8" fill="url(#g-data)" stroke="#6baed6" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="140" y="130" text-anchor="middle" font-size="13" font-weight="bold" fill="#08519c">PIPdb database</text>
+  <text x="140" y="148" text-anchor="middle" font-size="11" fill="#333">792,964 PSCs</text>
+  <text x="140" y="164" text-anchor="middle" font-size="10" fill="#666">638,393 after filtering</text>
+
+  <!-- A2: Component extraction -->
+  <rect x="275" y="105" width="175" height="70" rx="8" fill="url(#g-annot)" stroke="#74c476" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="362" y="128" text-anchor="middle" font-size="12" font-weight="bold" fill="#238b45">Component extraction</text>
+  <text x="362" y="145" text-anchor="middle" font-size="10" fill="#333">10 risk dimensions (0–1)</text>
+  <text x="362" y="160" text-anchor="middle" font-size="10" fill="#333">ARG · VF · MOB · BM · SIZE …</text>
+
+  <!-- A3: Four outcomes -->
+  <rect x="500" y="95" width="200" height="95" rx="8" fill="#fff" stroke="#fd8d3c" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="600" y="115" text-anchor="middle" font-size="12" font-weight="bold" fill="#cc4c02">Training labels (4 outcomes)</text>
+  <text x="515" y="135" font-size="10" fill="#333">● High-risk ARG carriage</text>
+  <text x="515" y="150" font-size="10" fill="#333">● MDR–virulence fusion</text>
+  <text x="515" y="165" font-size="10" fill="#333">● Conjugative mobility</text>
+  <text x="515" y="180" font-size="10" fill="#333">● Biocide/metal resistance</text>
+
+  <!-- A4: Four methods -->
+  <rect x="750" y="88" width="195" height="110" rx="8" fill="#fff" stroke="#756bb1" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="847" y="108" text-anchor="middle" font-size="12" font-weight="bold" fill="#54278f">Weight inference methods</text>
+  <text x="763" y="126" font-size="10" fill="#333">① Random Forest MDG (4 outcomes)</text>
+  <text x="763" y="141" font-size="10" fill="#333">② LASSO logistic regression</text>
+  <text x="763" y="156" font-size="10" fill="#333">③ Entropy weight method</text>
+  <text x="763" y="171" font-size="10" fill="#333">④ Grid-search AUC optimization</text>
+  <text x="763" y="188" font-size="9" fill="#888" font-style="italic">+ LORO cross-validation</text>
+
+  <!-- A5: Consensus weights -->
+  <rect x="990" y="105" width="165" height="70" rx="8" fill="url(#g-weight)" stroke="#8c96c6" stroke-width="2" filter="url(#shadow)"/>
+  <text x="1072" y="128" text-anchor="middle" font-size="12" font-weight="bold" fill="#3f007d">Consensus weights</text>
+  <text x="1072" y="145" text-anchor="middle" font-size="10" fill="#333">Mean of RF + LASSO</text>
+  <text x="1072" y="160" text-anchor="middle" font-size="10" fill="#333">+ Optimized (Σ = 1.00)</text>
+
+  <!-- Arrows A -->
+  <line x1="225" y1="140" x2="270" y2="140" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="450" y1="140" x2="495" y2="140" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="700" y1="140" x2="745" y2="140" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="945" y1="140" x2="985" y2="140" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- A6: Weight bar chart -->
+  <text x="55" y="210" font-size="11" font-weight="bold" fill="#333">Final data-driven weights:</text>
+  <!-- S_ARG 0.245 -->
+  <rect x="55" y="220" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="55" y="220" width="196" height="18" rx="3" fill="#d73027" opacity="0.85"/>
+  <text x="62" y="233" font-size="10" fill="#fff" font-weight="bold">S_ARG  0.245</text>
+  <!-- S_BM 0.211 -->
+  <rect x="55" y="242" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="55" y="242" width="169" height="18" rx="3" fill="#fc8d59" opacity="0.85"/>
+  <text x="62" y="255" font-size="10" fill="#fff" font-weight="bold">S_BM  0.211</text>
+  <!-- S_MOB 0.204 -->
+  <rect x="55" y="264" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="55" y="264" width="163" height="18" rx="3" fill="#fee08b" opacity="0.9"/>
+  <text x="62" y="277" font-size="10" fill="#333" font-weight="bold">S_MOB  0.204</text>
+  <!-- S_SIZE 0.181 -->
+  <rect x="55" y="286" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="55" y="286" width="145" height="18" rx="3" fill="#d9ef8b" opacity="0.9"/>
+  <text x="62" y="299" font-size="10" fill="#333" font-weight="bold">S_SIZE  0.181</text>
+  <!-- S_VF 0.110 -->
+  <rect x="55" y="308" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="55" y="308" width="88" height="18" rx="3" fill="#91cf60" opacity="0.85"/>
+  <text x="62" y="321" font-size="10" fill="#333" font-weight="bold">S_VF  0.110</text>
+
+  <!-- Right side weights -->
+  <!-- S_HOST 0.028 -->
+  <rect x="280" y="220" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="280" y="220" width="22" height="18" rx="3" fill="#1a9850" opacity="0.7"/>
+  <text x="307" y="233" font-size="10" fill="#333">S_HOST 0.028</text>
+  <!-- S_GROW 0.015 -->
+  <rect x="280" y="242" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="280" y="242" width="12" height="18" rx="3" fill="#4575b4" opacity="0.6"/>
+  <text x="297" y="255" font-size="10" fill="#333">S_GROW 0.015</text>
+  <!-- S_REP 0.003 -->
+  <rect x="280" y="264" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="280" y="264" width="4" height="18" rx="2" fill="#54278f" opacity="0.5"/>
+  <text x="289" y="277" font-size="10" fill="#333">S_REP 0.003</text>
+  <!-- S_HAB 0.002 -->
+  <rect x="280" y="286" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="280" y="286" width="3" height="18" rx="2" fill="#54278f" opacity="0.4"/>
+  <text x="288" y="299" font-size="10" fill="#333">S_HAB 0.002</text>
+  <!-- S_GEO 0.002 -->
+  <rect x="280" y="308" width="200" height="18" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
+  <rect x="280" y="308" width="3" height="18" rx="2" fill="#54278f" opacity="0.4"/>
+  <text x="288" y="321" font-size="10" fill="#333">S_GEO 0.002</text>
+
+  <!-- Validation box -->
+  <rect x="530" y="210" width="290" height="100" rx="8" fill="#f7f7f7" stroke="#bbb" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="675" y="230" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Validation results</text>
+  <text x="545" y="248" font-size="10" fill="#333">● High-risk ARG prediction: AUC = 0.955</text>
+  <text x="545" y="263" font-size="10" fill="#333">● MDR-VF fusion: AUC = 0.965</text>
+  <text x="545" y="278" font-size="10" fill="#333">● LORO-CV: mean AUC = 0.962 (40 replicons)</text>
+  <text x="545" y="293" font-size="10" fill="#333">● ±30% perturbation: Spearman ρ = 0.995</text>
+  <text x="545" y="308" font-size="10" fill="#333">● Natural prevalence (3.1%): LR+ = 27.2</text>
+
+  <!-- Weight formula -->
+  <rect x="860" y="215" width="295" height="90" rx="8" fill="#fafafa" stroke="#999" stroke-width="1"/>
+  <text x="1007" y="237" text-anchor="middle" font-size="11" font-weight="bold" fill="#333">Composite risk score</text>
+  <text x="1007" y="260" text-anchor="middle" font-size="13" font-family="Courier, monospace" fill="#222">S = Σ wᵢ · Sᵢ</text>
+  <text x="1007" y="280" text-anchor="middle" font-size="10" fill="#555">S ∈ [0, 1] · Σwᵢ = 1.00</text>
+  <text x="1007" y="298" text-anchor="middle" font-size="10" fill="#555">Consensus of RF-MDG + LASSO + Optimized</text>
+
+  <!-- Arrow from A to B -->
+  <line x1="600" y1="385" x2="600" y2="410" stroke="#2c7fb8" stroke-width="2" marker-end="url(#arrow-blue)"/>
+  <text x="610" y="402" font-size="10" fill="#2c7fb8" font-style="italic">weights feed into tool</text>
+
+  <!-- ===================== SECTION B LABEL ===================== -->
+  <rect x="30" y="418" width="1140" height="440" rx="8" fill="none" stroke="#ccc" stroke-width="1" stroke-dasharray="6,3"/>
+  <rect x="45" y="410" width="240" height="22" rx="4" fill="#e45756"/>
+  <text x="165" y="426" text-anchor="middle" font-size="13" font-weight="bold" fill="#fff">B. PlasRisk command-line tool (plasrisk *.fasta)</text>
+
+  <!-- B1: Input -->
+  <rect x="55" y="450" width="155" height="80" rx="8" fill="url(#g-input)" stroke="#6baed6" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="132" y="475" text-anchor="middle" font-size="12" font-weight="bold" fill="#08519c">Input</text>
+  <text x="132" y="493" text-anchor="middle" font-size="10" fill="#333">Plasmid FASTA</text>
+  <text x="132" y="508" text-anchor="middle" font-size="10" fill="#333">*.fasta / *.fa / *.fna</text>
+  <text x="132" y="523" text-anchor="middle" font-size="9" fill="#888">single or multiple files</text>
+
+  <!-- B2: Annotation -->
+  <rect x="260" y="440" width="230" height="100" rx="8" fill="url(#g-annot)" stroke="#74c476" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="375" y="462" text-anchor="middle" font-size="12" font-weight="bold" fill="#238b45">Annotation (abricate + seq)</text>
+  <line x1="275" y1="470" x2="475" y2="470" stroke="#a1d99b" stroke-width="0.8"/>
+  <text x="275" y="486" font-size="10" fill="#333">CARD → ARGs (n, WHO, high-risk)</text>
+  <text x="275" y="501" font-size="10" fill="#333">VFDB → VFs (exotoxin, T3SS/T4SS)</text>
+  <text x="275" y="516" font-size="10" fill="#333">PlasmidFinder → replicon type</text>
+  <text x="275" y="531" font-size="10" fill="#333">BacMet → biocide/metal genes</text>
+
+  <!-- B2b: Sequence analysis -->
+  <rect x="260" y="552" width="230" height="70" rx="8" fill="#f7fcf5" stroke="#a1d99b" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="375" y="572" text-anchor="middle" font-size="11" font-weight="bold" fill="#238b45">Sequence analysis</text>
+  <text x="275" y="590" font-size="10" fill="#333">Length · GC content</text>
+  <text x="275" y="605" font-size="10" fill="#333">T4CP · relaxase · oriT · MPF</text>
+  <text x="275" y="618" font-size="9" fill="#888">(mobility gene HMM/regex scan)</text>
+
+  <!-- Arrow B1->B2 -->
+  <line x1="210" y1="490" x2="255" y2="490" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- B3: 10 component scores -->
+  <rect x="540" y="435" width="280" height="195" rx="8" fill="url(#g-score)" stroke="#fdae6b" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="680" y="457" text-anchor="middle" font-size="12" font-weight="bold" fill="#a63603">Ten component scores (each 0–1)</text>
+  <line x1="555" y1="465" x2="805" y2="465" stroke="#fdd0a2" stroke-width="0.8"/>
+
+  <!-- Two columns of components -->
+  <text x="558" y="483" font-size="10" font-weight="bold" fill="#c73027">S_ARG</text>
+  <text x="558" y="498" font-size="9" fill="#555">ARG burden + WHO/high-risk</text>
+  <text x="558" y="516" font-size="10" font-weight="bold" fill="#d95f0e">S_BM</text>
+  <text x="558" y="531" font-size="9" fill="#555">Biocide/metal co-selection</text>
+  <text x="558" y="549" font-size="10" font-weight="bold" fill="#b35806">S_MOB</text>
+  <text x="558" y="564" font-size="9" fill="#555">Conjugation potential</text>
+  <text x="558" y="582" font-size="10" font-weight="bold" fill="#7f3b08">S_SIZE</text>
+  <text x="558" y="597" font-size="9" fill="#555">Cargo capacity (sigmoid)</text>
+  <text x="558" y="615" font-size="10" font-weight="bold" fill="#4d9221">S_VF</text>
+  <text x="558" y="627" font-size="9" fill="#555">Virulence burden</text>
+
+  <text x="700" y="483" font-size="10" font-weight="bold" fill="#3182bd">S_HOST</text>
+  <text x="700" y="498" font-size="9" fill="#555">Host range breadth</text>
+  <text x="700" y="516" font-size="10" font-weight="bold" fill="#3182bd">S_GROW</text>
+  <text x="700" y="531" font-size="9" fill="#555">Temporal growth rate</text>
+  <text x="700" y="549" font-size="10" font-weight="bold" fill="#3182bd">S_REP</text>
+  <text x="700" y="564" font-size="9" fill="#555">Replicon prior (lookup)</text>
+  <text x="700" y="582" font-size="10" font-weight="bold" fill="#3182bd">S_HAB</text>
+  <text x="700" y="597" font-size="9" fill="#555">Habitat breadth</text>
+  <text x="700" y="615" font-size="10" font-weight="bold" fill="#3182bd">S_GEO</text>
+  <text x="700" y="627" font-size="9" fill="#555">Geographic spread</text>
+
+  <!-- Arrow B2->B3 -->
+  <line x1="490" y1="490" x2="535" y2="500" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="490" y1="587" x2="535" y2="560" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- B4: Weighted sum -->
+  <rect x="870" y="470" width="145" height="60" rx="8" fill="#fff" stroke="#8c6bb1" stroke-width="2" filter="url(#shadow)"/>
+  <text x="942" y="495" text-anchor="middle" font-size="12" font-weight="bold" fill="#6a51a3">Weighted sum</text>
+  <text x="942" y="515" text-anchor="middle" font-size="11" font-family="Courier, monospace" fill="#333">S = Σ wᵢ·Sᵢ</text>
+
+  <!-- Arrow B3->B4 -->
+  <line x1="820" y1="532" x2="865" y2="500" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- B5: Risk grade -->
+  <rect x="870" y="555" width="145" height="75" rx="8" fill="url(#g-output)" stroke="#dd3497" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="942" y="577" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a0177">Risk grade</text>
+  <rect x="882" y="585" width="18" height="12" rx="2" fill="#b30000"/><text x="906" y="595" font-size="9" fill="#333">A ≥ 0.60 Very High</text>
+  <rect x="882" y="600" width="18" height="12" rx="2" fill="#e34a33"/><text x="906" y="610" font-size="9" fill="#333">B ≥ 0.45 High</text>
+  <rect x="882" y="615" width="18" height="12" rx="2" fill="#fc8d59"/><text x="906" y="625" font-size="9" fill="#333">C ≥ 0.30 Moderate</text>
+
+  <!-- Arrow B4->B5 -->
+  <line x1="942" y1="530" x2="942" y2="550" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- Grade D/E continuation -->
+  <text x="882" y="642" font-size="9" fill="#333">
+    <tspan fill="#fdcc8a">■</tspan> D ≥ 0.15  <tspan fill="#fef0d9">■</tspan> E &lt; 0.15
+  </text>
+
+  <!-- B6: Output -->
+  <rect x="1055" y="470" width="105" height="160" rx="8" fill="#f7f4f9" stroke="#df65b0" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1107" y="495" text-anchor="middle" font-size="12" font-weight="bold" fill="#7a0177">Output</text>
+  <line x1="1065" y1="502" x2="1150" y2="502" stroke="#e7e1ef" stroke-width="0.8"/>
+  <text x="1107" y="520" text-anchor="middle" font-size="9" fill="#333">TSV table</text>
+  <text x="1107" y="535" text-anchor="middle" font-size="9" fill="#333">JSON report</text>
+  <text x="1107" y="555" text-anchor="middle" font-size="9" fill="#555">10 component</text>
+  <text x="1107" y="567" text-anchor="middle" font-size="9" fill="#555">scores + S_total</text>
+  <text x="1107" y="582" text-anchor="middle" font-size="9" fill="#555">+ grade (A–E)</text>
+  <text x="1107" y="602" text-anchor="middle" font-size="9" fill="#555">replicon,</text>
+  <text x="1107" y="614" text-anchor="middle" font-size="9" fill="#555">mobility class,</text>
+  <text x="1107" y="626" text-anchor="middle" font-size="9" fill="#555">high-risk genes</text>
+
+  <!-- Arrow B5->B6 -->
+  <line x1="1015" y1="592" x2="1050" y2="550" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- CLI example -->
+  <rect x="55" y="660" width="490" height="55" rx="6" fill="#1e1e1e" stroke="#333" stroke-width="1"/>
+  <text x="68" y="682" font-size="11" font-family="Courier, monospace" fill="#d4d4d4">$ plasrisk plasmid_1.fasta plasmid_2.fasta -o results/</text>
+  <text x="68" y="700" font-size="10" font-family="Courier, monospace" fill="#6a9955"># --no-abricate for sequence-only mode  ·  --json for JSON output</text>
+
+  <!-- Replicon lookup note -->
+  <rect x="580" y="660" width="580" height="55" rx="6" fill="#f0f7ff" stroke="#bdd7e7" stroke-width="1"/>
+  <text x="595" y="680" font-size="10" fill="#333"><tspan font-weight="bold">Replicon prior lookup:</tspan> 66 typed replicons with pre-computed S_REP / S_GEO / S_HAB / S_GROW / S_HOST</text>
+  <text x="595" y="698" font-size="10" fill="#555">Unknown replicons receive neutral defaults (0.30); prefix matching handles subtypes (e.g., IncFII(K) → IncFII).</text>
+
+  <!-- ===================== BOTTOM BAR: validation summary ===================== -->
+  <rect x="55" y="745" width="1105" height="95" rx="8" fill="#fafafa" stroke="#ddd" stroke-width="1"/>
+  <text x="607" y="767" text-anchor="middle" font-size="12" font-weight="bold" fill="#333">Model validation &amp; benchmarking</text>
+
+  <circle cx="120" cy="790" r="5" fill="#2c7fb8"/>
+  <text x="132" y="794" font-size="10" fill="#333"><tspan font-weight="bold">Internal:</tspan> 4-outcome AUC 0.86–0.97; LORO-CV 0.962</text>
+
+  <circle cx="420" cy="790" r="5" fill="#2c7fb8"/>
+  <text x="432" y="794" font-size="10" fill="#333"><tspan font-weight="bold">External:</tspan> 40 NCBI plasmids (20 high + 20 low risk)</text>
+
+  <circle cx="720" cy="790" r="5" fill="#2c7fb8"/>
+  <text x="732" y="794" font-size="10" fill="#333"><tspan font-weight="bold">Sensitivity:</tspan> ±30% weight perturbation ρ = 0.995</text>
+
+  <circle cx="1000" cy="790" r="5" fill="#2c7fb8"/>
+  <text x="1012" y="794" font-size="10" fill="#333"><tspan font-weight="bold">Benchmark:</tspan> vs PIPdb index; calibrated</text>
+
+  <text x="120" y="818" font-size="9" fill="#888">Random Forest (300 trees) · LASSO (10-fold CV) · Entropy method · Coordinate-descent grid search</text>
+  <text x="700" y="818" font-size="9" fill="#888">Decile calibration · Decision-curve analysis · Leave-one-replicon-out CV for generalisation across backbones</text>
+
+</svg>
+</body>
+</html>
