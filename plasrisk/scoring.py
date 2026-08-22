@@ -1,9 +1,13 @@
 """
-scoring.py - Ten-dimension plasmid risk scoring model.
+scoring.py - Multi-dimension plasmid risk scoring model.
 
 Each component S_i is normalized to [0, 1].
 Composite score:  S = sum(w_i * S_i), normalized by sum(w_i).
-Supports full (10-dim) and lite (4-dim core) modes.
+
+Two modes:
+  full (10-dim): comprehensive One Health surveillance
+  lite (5-dim):  parsimonious core (S_ARG + S_VF + S_MOB + S_SIZE + S_BM),
+                 equivalent mean AUC (0.920) for routine screening
 """
 
 from __future__ import annotations
@@ -33,20 +37,24 @@ RISK_WEIGHTS: Dict[str, float] = {
     "S_GROW": 0.0147,  # Temporal growth rate
 }
 
-WEIGHT_SUM = sum(RISK_WEIGHTS.values())  # 1.0001 ~ 1.0
+WEIGHT_SUM = sum(RISK_WEIGHTS.values())  # 1.0001 ≈ 1.0
 
 # ---------------------------------------------------------------------------
-# Lite mode: 4-dimension core (S_ARG + S_MOB + S_SIZE + S_BM)
-# Renormalized from the full consensus weights; captures 99.8% of mean AUC.
-# Derived from all-subsets dimensionality analysis (pipdb_20, 5-fold CV).
+# Lite mode: 5-dimension core (S_ARG + S_VF + S_MOB + S_SIZE + S_BM)
+# Renormalized from the full consensus weights; captures >=99.9% of mean AUC
+# (0.920 vs 0.920 for 10-dim at 3 decimal places).
+# Derived from all-subsets dimensionality analysis (pipdb_20, 5-fold CV):
+#   k=5 mean CV AUC = 0.9201 vs k=10 = 0.9203 (difference 0.0002, NS).
+# Includes S_VF because it raises MDR-VF fusion AUC from 0.943 to 0.963.
+# Overfitting analysis (pipdb_21) confirmed no train-test gap for either model.
 # ---------------------------------------------------------------------------
-LITE_DIMENSIONS = ("S_ARG", "S_MOB", "S_SIZE", "S_BM")
+LITE_DIMENSIONS = ("S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BM")
 LITE_WEIGHTS_RAW = {k: RISK_WEIGHTS[k] for k in LITE_DIMENSIONS}
-LITE_WEIGHT_SUM = sum(LITE_WEIGHTS_RAW.values())  # 0.8409
+LITE_WEIGHT_SUM = sum(LITE_WEIGHTS_RAW.values())  # 0.9505
 RISK_WEIGHTS_LITE: Dict[str, float] = {
     k: v / LITE_WEIGHT_SUM for k, v in LITE_WEIGHTS_RAW.items()
 }
-# S_ARG=0.2911, S_MOB=0.2427, S_SIZE=0.2150, S_BM=0.2512
+# S_ARG=0.2576, S_VF=0.1153, S_MOB=0.2147, S_SIZE=0.1902, S_BM=0.2222
 
 # ---------------------------------------------------------------------------
 # Risk grade thresholds (on normalized S_norm in [0, 1])
@@ -84,21 +92,11 @@ WHO_ARG_PATTERNS = re.compile(
     re.I,
 )
 
-# ---------------------------------------------------------------------------
-# Mobility gene markers
-# ---------------------------------------------------------------------------
-T4CP_PATTERN = re.compile(
-    r"\b(traD|traG|virD4|trwB|T4CP|coupling)\b", re.I)
-RELAXASE_PATTERN = re.compile(
-    r"\b(traI|mobA|nikB|traA|relaxase|traH|traJ_rel|mobC)\b", re.I)
-ORIT_PATTERN = re.compile(
-    r"\b(oriT|nic|traI_rel|mob)\b", re.I)
-AUX_PATTERN = re.compile(
-    r"\b(traJ|traK|traM|traY|traN|traO|traP|trb[A-Z]|Pil|taxC)\b", re.I)
+T4CP_PATTERN = re.compile(r"\b(traD|traG|virD4|trwB|T4CP|coupling)\b", re.I)
+RELAXASE_PATTERN = re.compile(r"\b(traI|mobA|nikB|traA|relaxase|traH|traJ_rel|mobC)\b", re.I)
+ORIT_PATTERN = re.compile(r"\b(oriT|nic|traI_rel|mob)\b", re.I)
+AUX_PATTERN = re.compile(r"\b(traJ|traK|traM|traY|traN|traO|traP|trb[A-Z]|Pil|taxC)\b", re.I)
 
-# ---------------------------------------------------------------------------
-# Biocide / metal resistance patterns
-# ---------------------------------------------------------------------------
 MER_PATTERN = re.compile(r"\bmer[A-Z]?\b|mercury", re.I)
 QAC_PATTERN = re.compile(r"qac|quaternary|disinfectant", re.I)
 ARS_COP_PATTERN = re.compile(
@@ -110,9 +108,6 @@ EXOTOXIN_PATTERN = re.compile(r"exotoxin|toxin|enterotoxin|hemolysin|cytolysin",
 EFFECTOR_PATTERN = re.compile(r"effector delivery|type III|type IV|T3SS|T4SS|secretion", re.I)
 
 
-# ---------------------------------------------------------------------------
-# Data class for plasmid features
-# ---------------------------------------------------------------------------
 @dataclass
 class PlasmidFeatures:
     """Container for all features needed to score a single plasmid."""
@@ -177,26 +172,11 @@ class PlasmidFeatures:
         return len(self.high_risk_args) > 0
 
 
-# ---------------------------------------------------------------------------
-# Scorer
-# ---------------------------------------------------------------------------
 class PlasRiskScorer:
-    """Compute PlasRisk scores for plasmids (10-dim full or 4-dim lite)."""
+    """Compute PlasRisk scores for plasmids (10-dim full or 5-dim lite)."""
 
     def __init__(self, replicon_lookup: Optional[pd.DataFrame] = None,
                  mode: str = "full"):
-        """
-        Parameters
-        ----------
-        replicon_lookup : pd.DataFrame, optional
-            Lookup table with columns:
-            replicon_primary, S_REP, S_GEO, S_HAB, S_GROW, S_HOST
-            If None, built-in defaults are used.
-        mode : str
-            "full" (default): 10-dimension model.
-            "lite": 4-dimension core (S_ARG, S_MOB, S_SIZE, S_BM),
-                    achieving 99.8% of full-model mean AUC.
-        """
         if mode not in ("full", "lite"):
             raise ValueError("mode must be 'full' or 'lite', got %r" % mode)
         self.mode = mode
@@ -216,10 +196,6 @@ class PlasRiskScorer:
             "S_GROW": 0.30,
             "S_HOST": 0.50,
         }
-
-    # ------------------------------------------------------------------
-    # Individual component scorers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def score_arg(feat: PlasmidFeatures) -> float:
@@ -346,10 +322,6 @@ class PlasRiskScorer:
             return float(feat.s_grow_prior)
         return self._lookup_prior(feat.replicon, "S_GROW")
 
-    # ------------------------------------------------------------------
-    # Lookup helpers
-    # ------------------------------------------------------------------
-
     def _lookup_prior(self, replicon: str, column: str) -> float:
         if not replicon or self.lookup is None:
             return self.defaults.get(column, 0.3)
@@ -362,18 +334,7 @@ class PlasRiskScorer:
                 return float(val) if pd.notna(val) else self.defaults[column]
         return self.defaults[column]
 
-    # ------------------------------------------------------------------
-    # Main scoring
-    # ------------------------------------------------------------------
-
     def score(self, feat: PlasmidFeatures) -> Dict:
-        """
-        Compute component scores and the composite.
-
-        In full mode, all 10 components are computed.
-        In lite mode, only the 4 core components (S_ARG, S_MOB, S_SIZE, S_BM)
-        are computed; other S_* fields are reported as None.
-        """
         all_components = {
             "S_ARG":  self.score_arg(feat),
             "S_VF":   self.score_vf(feat),
@@ -398,7 +359,7 @@ class PlasRiskScorer:
 
         grade, grade_label = self._grade(s_norm)
 
-        mob_class = feat.mobility_class or self._infer_mob_class(all_components["S_MOB"])
+        mob_class = feat.mobility_class or self._infer_mob_class(components["S_MOB"])
 
         result = {
             "seq_id": feat.seq_id,
@@ -427,10 +388,6 @@ class PlasRiskScorer:
             df = df.sort_values("S_norm", ascending=False).reset_index(drop=True)
             df.insert(0, "rank", range(1, len(df) + 1))
         return df
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _grade(s_norm: float) -> Tuple[str, str]:

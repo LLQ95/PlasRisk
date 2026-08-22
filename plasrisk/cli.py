@@ -13,7 +13,7 @@ Options:
     --min-id FLOAT       Minimum abricate identity % (default: 75)
     --min-cov FLOAT      Minimum abricate coverage % (default: 50)
     --no-abricate        Skip abricate; sequence-only scoring
-    --mode {full,lite}   Scoring mode: full (10-dim, default) or lite (4-dim core)
+    --mode MODE          'full' (10-dim, default) or 'lite' (5-dim core)
     --db LIST            Comma-separated abricate databases to use
                          (default: auto-detect)
     --json               Also write JSON summary
@@ -50,16 +50,16 @@ from .scoring import PlasRiskScorer, RISK_WEIGHTS, RISK_WEIGHTS_LITE, WEIGHT_SUM
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         prog="plasrisk",
-        description="PlasRisk v%s - 10-dimension plasmid risk assessment" % __version__,
+        description="PlasRisk v%s - Multi-dimension plasmid risk assessment" % __version__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   plasrisk plasmid.fasta
   plasrisk -o results *.fasta
   plasrisk /data/plasmids/
+  plasrisk --mode lite plasmid.fasta
   plasrisk --db card,vfdb,plasmidfinder plasmid.fasta
   plasrisk --no-abricate contigs.fasta
-  plasrisk --mode lite *.fasta
         """,
     )
     parser.add_argument("inputs", nargs="+", metavar="FASTA",
@@ -67,7 +67,7 @@ Examples:
     parser.add_argument("-o", "--output", default="plasrisk_output",
                         help="Output directory (default: ./plasrisk_output)")
     parser.add_argument("-t", "--threads", type=int, default=4,
-                        help="Number of abricate threads (default: 4)")
+                        help="Number of threads (default: 4)")
     parser.add_argument("--min-id", type=float, default=75.0,
                         help="Minimum abricate identity %% (default: 75)")
     parser.add_argument("--min-cov", type=float, default=50.0,
@@ -76,7 +76,7 @@ Examples:
                         help="Skip abricate annotation; sequence-only scoring")
     parser.add_argument("--mode", choices=["full", "lite"], default="full",
                         help="Scoring mode: 'full' (10-dim, default) or 'lite' "
-                             "(4-dim core: ARG+MOB+SIZE+BM; 99.8%% of full AUC)")
+                             "(5-dim core: ARG+VF+MOB+SIZE+BM; equivalent AUC)")
     parser.add_argument("--db", default=None,
                         help="Comma-separated abricate databases (default: auto)")
     parser.add_argument("--json", action="store_true",
@@ -93,7 +93,6 @@ Examples:
 
 
 def collect_fasta_files(inputs: List[str]) -> List[str]:
-    """Expand inputs (files, globs, directories) into a list of FASTA paths."""
     fasta_files = []
     fasta_exts = {".fasta", ".fa", ".fna", ".ffn", ".fsa", ".fas"}
     for inp in inputs:
@@ -120,7 +119,7 @@ def collect_fasta_files(inputs: List[str]) -> List[str]:
 
 
 def print_banner(args):
-    mode_str = "LITE (4-dim core)" if args.mode == "lite" else "FULL (10-dim)"
+    mode_str = "LITE (5-dim core)" if args.mode == "lite" else "FULL (10-dim)"
     print("=" * 68)
     print("  PlasRisk v%s - Plasmid Risk Assessment" % __version__)
     print("  Model: %s" % mode_str)

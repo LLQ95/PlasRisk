@@ -43,7 +43,10 @@ def test_high_risk_plasmid():
         vf_categories=["Exotoxin", "Nutritional/Metabolic factor"],
         bm_gene_names=["merA", "merR", "qacEdelta1", "arsC"],
         replicon="IncX3",
-        has_t4cp=True, has_relaxase=True, has_oriT=True, has_auxiliary=True,
+        has_t4cp=True,
+        has_relaxase=True,
+        has_oriT=True,
+        has_auxiliary=True,
     )
     result = scorer.score(feat)
     assert result["S_ARG"] > 0.7
@@ -116,7 +119,7 @@ def test_dataframe_output():
 
 def test_lite_weights():
     assert abs(sum(RISK_WEIGHTS_LITE.values()) - 1.0) < 0.001
-    assert set(RISK_WEIGHTS_LITE.keys()) == {"S_ARG", "S_MOB", "S_SIZE", "S_BM"}
+    assert set(RISK_WEIGHTS_LITE.keys()) == {"S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BM"}
 
 
 def test_lite_mode_scoring():
@@ -125,16 +128,17 @@ def test_lite_mode_scoring():
         seq_id="pLite",
         length_bp=80000,
         arg_names=["NDM-1", "CTX-M-15"],
+        vf_names=["hemolysin", "T3SS effector"],
         bm_gene_names=["merA", "qacEdelta1"],
         has_t4cp=True, has_relaxase=True, has_oriT=True, has_auxiliary=True,
     )
     result = scorer.score(feat)
     assert result["model_mode"] == "lite"
     assert result["S_ARG"] is not None
+    assert result["S_VF"] is not None
     assert result["S_MOB"] is not None
     assert result["S_SIZE"] is not None
     assert result["S_BM"] is not None
-    assert result["S_VF"] is None
     assert result["S_HOST"] is None
     assert result["grade"] in ("A", "B", "C")
 
