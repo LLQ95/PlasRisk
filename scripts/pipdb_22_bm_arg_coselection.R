@@ -7,9 +7,8 @@
 #   tab_bm_arg_cooccurrence.csv    - Fisher exact tests for ARG family x BM category
 #   tab_bm_arg_summary.csv         - overall co-occurrence rates
 #   tab_bm_arg_by_replicon.csv     - BM-ARG co-occurrence by major replicon
-#   tab_bm_arg_highrisk.csv        - BMG co-occurrence with high-risk ARGs
 #   fig32_bm_arg_network.pdf/png   - bipartite ARG-BM co-occurrence network
-#   fig33_bm_arg_coselection_bar   - co-occurrence rate bar chart
+#   fig33_bm_arg_upset.pdf/png     - co-occurrence rate bar chart
 #   fig34_bm_arg_heatmap.pdf/png   - ARG family x BM category OR heatmap
 # =============================================================================
 
@@ -69,13 +68,15 @@ cat(sprintf("  %d PSCs loaded\n", nrow(d)))
 # =============================================================================
 cat("=== Parsing BM gene categories ===\n")
 
+# BM gene category mapping (case-insensitive regex patterns)
 bm_categories <- list(
   Mercury = c("mer[A-Z]?", "merR\\d?", "merE", "merD"),
   QAC_Disinf = c("qac", "emr", "mdfA", "norA", "acr", "mex", "sugE", "bcr", "blt", "mtrR", "adeI", "adeL", "vcaM", "mdt", "farA", "wtpC", "ttgV", "actP", "amvA", "oprN", "vexE", "evg", "bae", "gadX", "kdpE"),
   Arsenic = c("ars[A-Z]?", "aioE", "aio[AB]"),
   Copper = c("cop[A-Z]?", "pco[A-Z]?", "csoR", "copZ", "mmco"),
   Silver = c("sil[A-Z]?", "silR", "silS"),
-  Zinc_Cadmium = c("czc[A-Z]?", "znt", "zitB", "zra", "znu", "cad", "cnr", "nik", "mnt", "fec", "mod", "smf", "cor")
+  Zinc_Cadmium = c("czc[A-Z]?", "znt", "zitB", "zra", "znu", "cad", "cnr", "nik", "mnt", "fec", "mod", "smf", "cor"),
+  Other_MDR = c("blaTEM", "tet", "sul", "dfr", "cat", "flo", "cml", "mph", "msr", "ere", "vat")  # not BM, exclude
 )
 
 classify_bm <- function(gene_str) {
@@ -104,9 +105,10 @@ classify_bm <- function(gene_str) {
   unique(cats)
 }
 
+# Apply classification
 cat("  Classifying BM genes ...\n")
 d[, bm_cats := lapply(gene_bacmet, classify_bm)]
-d[, has_bm := n_metal > 0 & !is.na(n_metal)]
+d[, has_bm := n_metal > 0 & !is.na(n_metal) & n_metal > 0]
 d[, has_mer := vapply(bm_cats, function(x) "Mercury (mer)" %in% x, logical(1))]
 d[, has_qac := vapply(bm_cats, function(x) "QAC/Disinfectant" %in% x, logical(1))]
 d[, has_ars := vapply(bm_cats, function(x) "Arsenic (ars)" %in% x, logical(1))]
@@ -126,15 +128,26 @@ cat(sprintf("  Zn/Cd/Ni: %d (%.1f%%)\n", sum(d$has_zn), 100*mean(d$has_zn)))
 cat("=== Parsing ARG families ===\n")
 
 arg_family_map <- list(
-  TEM = c("TEM"), CTX_M = c("CTX-M"), SHV = c("SHV"), CMY = c("CMY"),
-  KPC = c("KPC"), NDM = c("NDM"), VIM = c("VIM"), IMP = c("IMP"),
-  OXA = c("OXA"), AAC_APH = c("AAC", "APH", "ANT", "Aad"),
-  Tet = c("Tet", "TetR", "tet"), Sul = c("Sul", "sul"),
-  Dfr = c("Dfr", "dfr"), Qnr = c("Qnr", "qnr"),
-  MCR = c("MCR", "mcr"), Van = c("van", "Van"),
+  TEM = c("TEM"),
+  CTX_M = c("CTX-M"),
+  SHV = c("SHV"),
+  CMY = c("CMY"),
+  KPC = c("KPC"),
+  NDM = c("NDM"),
+  VIM = c("VIM"),
+  IMP = c("IMP"),
+  OXA = c("OXA"),
+  AAC_APH = c("AAC", "APH", "ANT", "Aad"),
+  Tet = c("Tet", "TetR", "tet"),
+  Sul = c("Sul", "sul"),
+  Dfr = c("Dfr", "dfr"),
+  Qnr = c("Qnr", "qnr"),
+  MCR = c("MCR", "mcr"),
+  Van = c("van", "Van"),
   Mph_Msr = c("Mph", "Msr", "mph", "msr"),
   Cat_Flo = c("Cat", "cat", "Flo", "flo", "Cml", "cml"),
-  Erm = c("Erm", "erm"), QacEdelta = c("QacEdelta", "qacEdelta")
+  Erm = c("Erm", "erm"),
+  QacEdelta = c("QacEdelta", "qacEdelta")
 )
 
 classify_arg <- function(gene_str) {
@@ -155,8 +168,8 @@ classify_arg <- function(gene_str) {
 }
 
 d[, arg_fams := lapply(aro_name, classify_arg)]
-d[, has_arg := n_arg > 0 & !is.na(n_arg)]
-d[, has_hr_arg := n_high_risk_arg > 0 & !is.na(n_high_risk_arg)]
+d[, has_arg := n_arg > 0 & !is.na(n_arg) & n_arg > 0]
+d[, has_hr_arg := n_high_risk_arg > 0 & !is.na(n_high_risk_arg) & n_high_risk_arg > 0]
 
 # =============================================================================
 # 3. Overall co-occurrence summary
@@ -177,7 +190,9 @@ summary_dt <- data.table(
   pct = c(100, 100*n_arg_only/n_total, 100*n_bm_only/n_total, 100*n_both/n_total, 100*n_neither/n_total)
 )
 
+# Among ARG+ plasmids, what % also carry BM genes?
 pct_bm_among_arg <- 100 * n_both / n_arg
+# Among BM+ plasmids, what % also carry ARGs?
 pct_arg_among_bm <- 100 * n_both / n_bm
 
 cat(sprintf("  ARG+ plasmids: %d (%.1f%%)\n", n_arg, 100*n_arg/n_total))
@@ -186,6 +201,7 @@ cat(sprintf("  Co-occurrence: %d (%.1f%% of all)\n", n_both, 100*n_both/n_total)
 cat(sprintf("  Among ARG+: %.1f%% also carry BMGs\n", pct_bm_among_arg))
 cat(sprintf("  Among BMG+: %.1f%% also carry ARGs\n", pct_arg_among_bm))
 
+# Fisher exact test for overall association
 ct <- matrix(c(n_both, n_arg_only, n_bm_only, n_neither), nrow = 2,
              dimnames = list(c("ARG+", "ARG-"), c("BMG+", "BMG-")))
 ft <- fisher.test(ct)
@@ -210,11 +226,13 @@ bm_cols <- c("Mercury (mer)" = "has_mer",
              "Cu/Ag" = "has_cop",
              "Zn/Cd/Ni" = "has_zn")
 
+# Get ARG family columns
 all_arg_fams <- names(arg_family_map)
 for (fam in all_arg_fams) {
   d[, (fam) := vapply(arg_fams, function(x) fam %in% x, logical(1))]
 }
 
+# Only test families with >= 100 occurrences
 arg_counts <- sapply(all_arg_fams, function(f) sum(d[[f]]))
 test_fams <- names(arg_counts[arg_counts >= 100])
 cat(sprintf("  Testing %d ARG families (>=100 occurrences) x %d BM categories\n",
@@ -224,19 +242,24 @@ results <- list()
 for (fam in test_fams) {
   for (bm_name in names(bm_cols)) {
     bm_col <- bm_cols[[bm_name]]
-    a <- sum(d[[fam]] & d[[bm_col]])
-    b <- sum(d[[fam]] & !d[[bm_col]])
-    c_ <- sum(!d[[fam]] & d[[bm_col]])
-    dd <- sum(!d[[fam]] & !d[[bm_col]])
-    if (a < 10) next
+    a <- sum(d[[fam]] & d[[bm_col]])  # both
+    b <- sum(d[[fam]] & !d[[bm_col]]) # ARG only
+    c_ <- sum(!d[[fam]] & d[[bm_col]]) # BM only
+    dd <- sum(!d[[fam]] & !d[[bm_col]]) # neither
+    if (a < 10) next  # skip sparse pairs
     ct2 <- matrix(c(a, b, c_, dd), nrow = 2)
     ft2 <- tryCatch(fisher.test(ct2), error = function(e) NULL)
     if (is.null(ft2)) next
     results[[length(results) + 1]] <- data.table(
-      arg_family = fam, bm_category = bm_name,
-      n_both = a, n_arg_only = b, n_bm_only = c_, n_neither = dd,
+      arg_family = fam,
+      bm_category = bm_name,
+      n_both = a,
+      n_arg_only = b,
+      n_bm_only = c_,
+      n_neither = dd,
       odds_ratio = as.numeric(ft2$estimate),
-      or_low = ft2$conf.int[1], or_high = ft2$conf.int[2],
+      or_low = ft2$conf.int[1],
+      or_high = ft2$conf.int[2],
       p_value = ft2$p.value,
       enrichment = (a / (a + b)) / ((a + c_) / n_total)
     )
@@ -257,23 +280,39 @@ print(head(res[order(-odds_ratio)], 20))
 cat("=== BM-ARG co-occurrence by major replicon ===\n")
 
 rep_stats <- d[!is.na(replicon_primary), .(
-  n = .N, n_arg = sum(has_arg), n_bm = sum(has_bm),
-  n_both = sum(has_arg & has_bm), n_hr_arg = sum(has_hr_arg),
-  n_mer = sum(has_mer), n_qac = sum(has_qac)
-), by = replicon_primary][n >= 50][order(-n_both)]
+  n = .N,
+  n_arg = sum(has_arg),
+  n_bm = sum(has_bm),
+  n_both = sum(has_arg & has_bm),
+  n_hr_arg = sum(has_hr_arg),
+  n_hr_both = sum(has_hr_arg & has_bm),
+  n_mer = sum(has_mer),
+  n_qac = sum(has_qac)
+), by = replicon_primary][n >= 50]
 
-rep_stats[, pct_arg_bm := 100 * n_both / n_arg]
-rep_stats[, pct_bm := 100 * n_bm / n]
-setorder(rep_stats, -pct_arg_bm)
-fwrite(rep_stats, file.path(tab_dir, "tab_bm_arg_by_replicon.csv"))
-cat("  Top 15 replicons by BM-ARG co-occurrence rate:\n")
-print(head(rep_stats, 15))
+# For replicons with ARGs: co-occurrence rate among ARG+ plasmids
+rep_with_arg <- rep_stats[n_arg > 0]
+rep_with_arg[, pct_arg_bm := 100 * n_both / n_arg]
+rep_with_arg[, pct_bm := 100 * n_bm / n]
+rep_with_arg[, pct_hr_bm := 100 * n_hr_both / pmax(n_hr_arg, 1)]
+setorder(rep_with_arg, -pct_arg_bm)
+fwrite(rep_with_arg, file.path(tab_dir, "tab_bm_arg_by_replicon.csv"))
+cat(sprintf("  %d replicons with >=50 PSCs and >=1 ARG+ plasmid\n", nrow(rep_with_arg)))
+cat("  Top 15 replicons by BM-ARG co-occurrence rate (among ARG+):\n")
+print(head(rep_with_arg, 15))
+
+# Also report BMG-only replicons (BMG carriage without ARGs)
+rep_bm_only <- rep_stats[n_arg == 0 & n_bm > 0][order(-n_bm)]
+cat(sprintf("\n  %d replicons carry BMGs but no ARGs (potential co-selection reservoirs)\n",
+            nrow(rep_bm_only)))
+if (nrow(rep_bm_only) > 0) print(head(rep_bm_only, 10))
 
 # =============================================================================
-# 6. Visualization
+# 6. Visualization: Co-occurrence bar chart (fig33)
 # =============================================================================
 cat("=== Visualization ===\n")
 
+# Bar chart: proportion of ARG+ plasmids carrying each BM category
 bm_long <- data.table(
   BM_category = c("Mercury (mer)", "QAC/Disinfectant", "Arsenic (ars)", "Cu/Ag", "Zn/Cd/Ni"),
   among_ARG = c(
@@ -282,6 +321,13 @@ bm_long <- data.table(
     100 * sum(d$has_arg & d$has_ars) / n_arg,
     100 * sum(d$has_arg & d$has_cop) / n_arg,
     100 * sum(d$has_arg & d$has_zn) / n_arg
+  ),
+  among_all = c(
+    100 * mean(d$has_mer),
+    100 * mean(d$has_qac),
+    100 * mean(d$has_ars),
+    100 * mean(d$has_cop),
+    100 * mean(d$has_zn)
   )
 )
 
@@ -299,9 +345,13 @@ p_bar <- ggplot(bm_long, aes(x = reorder(BM_category, -among_ARG), y = among_ARG
   theme(axis.text.x = element_text(angle = 30, hjust = 1))
 save_plot(p_bar, "fig33_bm_arg_coselection_bar", w = 7, h = 5)
 
+# =============================================================================
+# 7. Heatmap of ORs (fig34)
+# =============================================================================
+
 res_sig <- res[p_adj < 0.001 & odds_ratio > 1.5]
 if (nrow(res_sig) > 0) {
-  res_sig[, or_plot := pmin(odds_ratio, 15)]
+  res_sig[, or_plot := pmin(odds_ratio, 15)]  # cap for visualization
   p_hm <- ggplot(res_sig, aes(x = bm_category, y = arg_family, fill = or_plot)) +
     geom_tile(color = "white", linewidth = 0.5) +
     geom_text(aes(label = sprintf("%.1f", odds_ratio)), size = 3, color = "white") +
@@ -309,23 +359,30 @@ if (nrow(res_sig) > 0) {
                          name = "Odds Ratio", limits = c(1, 15), na.value = "#f7f7f7") +
     labs(x = "Biocide/metal resistance category", y = "ARG family",
          title = "ARG-BMG co-occurrence odds ratios",
-         subtitle = "Fisher's exact test, BH-adjusted p < 0.001") +
+         subtitle = "Fisher exact test, BH-adjusted p < 0.001") +
     theme_pub +
     theme(axis.text.x = element_text(angle = 30, hjust = 1))
   save_plot(p_hm, "fig34_bm_arg_heatmap", w = 8, h = 7)
 }
 
+# =============================================================================
+# 8. Bipartite network (fig32)
+# =============================================================================
+
+# Build edge list for network: significant pairs only
 net_edges <- res[p_adj < 0.001 & odds_ratio > 2 & n_both >= 20]
 if (nrow(net_edges) > 0) {
   nodes_arg <- data.table(name = unique(net_edges$arg_family), type = "ARG")
   nodes_bm <- data.table(name = unique(net_edges$bm_category), type = "BMG")
   nodes <- rbind(nodes_arg, nodes_bm)
+
   g <- graph_from_data_frame(net_edges[, .(arg_family, bm_category, odds_ratio, n_both)],
                               vertices = nodes, directed = FALSE)
-  arg_tot <- net_edges[, .(tot = sum(n_both)), by = arg_family]
   V(g)$size <- ifelse(V(g)$type == "ARG",
-                       arg_tot[match(V(g)$name, arg_family), sqrt(tot)] * 1.5, 12)
+                       sqrt(net_edges[, .(tot = sum(n_both)), by = arg_family][match(V(g)$name, arg_family), tot]) * 1.5,
+                       12)
   V(g)$size[is.na(V(g)$size)] <- 12
+
   set.seed(42)
   p_net <- ggraph(g, layout = "fr") +
     geom_edge_link(aes(width = odds_ratio, alpha = after_stat(index)),
@@ -335,7 +392,7 @@ if (nrow(net_edges) > 0) {
     scale_edge_width(range = c(0.5, 4), name = "Odds Ratio") +
     scale_color_manual(values = c("ARG" = "#d73027", "BMG" = "#1b7837")) +
     labs(title = "ARG-biocide/metal resistance gene co-occurrence network",
-         subtitle = "Edges: Fisher's exact BH p < 0.001, OR > 2, n >= 20") +
+         subtitle = "Edges: Fisher exact BH p < 0.001, OR > 2, n >= 20") +
     theme_void() +
     theme(plot.title = element_text(hjust = 0.5, size = 12, face = "bold"),
           plot.subtitle = element_text(hjust = 0.5, size = 9, color = "grey30"))
@@ -343,7 +400,7 @@ if (nrow(net_edges) > 0) {
 }
 
 # =============================================================================
-# 7. High-risk ARG co-occurrence with BM categories
+# 9. High-risk ARG co-occurrence with BM categories
 # =============================================================================
 cat("=== High-risk ARG co-occurrence with BMGs ===\n")
 
