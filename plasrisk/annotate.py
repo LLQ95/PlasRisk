@@ -1,8 +1,8 @@
 """
 annotate.py - FASTA annotation using abricate and sequence analysis.
 
-Wraps abricate for ARG/VF/replicon/BMRG annotation when available,
-with graceful fallback to sequence-only scoring.
+Wraps abricate for ARG/VF/replicon/BMRG/IS/transposon annotation when available,
+with graceful fallback to replicon-empirical priors when databases are missing.
 """
 
 from __future__ import annotations
@@ -20,11 +20,21 @@ import pandas as pd
 
 from .scoring import (
     AUX_PATTERN,
+    CARD_BM_PATTERN,
+    GLOBAL_MEDIANS,
+    HOUSEKEEPING_GENES,
     ORIT_PATTERN,
     RELAXASE_PATTERN,
     T4CP_PATTERN,
+    WHO_PATHOGEN_PATTERN,
     PlasmidFeatures,
 )
+
+# IS detection: gene names starting with "IS" followed by digits/letters
+IS_PATTERN = re.compile(r"\bIS[A-Z]?[\d_]+", re.I)
+# Integron detection: integrase genes
+INTEGRON_PATTERN = re.compile(
+    r"\bintI[1-4]\b|integrase|integron", re.I)
 
 
 # ---------------------------------------------------------------------------
@@ -70,11 +80,13 @@ ABRICATE_DATABASES = {
     "resfinder": "ARG (ResFinder)",
     "vfdb": "Virulence factors (VFDB)",
     "plasmidfinder": "Replicon typing (PlasmidFinder)",
-    "bacmet": "Biocide/metal resistance (BacMet)",
+    "bacmet2": "Biocide/metal resistance (BacMet2, protein)",
     "ecoli_vf": "E. coli virulence factors",
     "ncbi": "ARG (NCBI AMRFinder)",
     "megares": "ARG (MEGARes)",
     "argannot": "ARG (ARG-ANNOT)",
+    "ISfinder": "Insertion sequences (ISfinder)",
+    "Tn": "Transposons (Tn)",
 }
 
 
@@ -112,13 +124,11 @@ def run_abricate(fasta_path: str, db: str, min_id: float = 75.0,
     if not abricate_available():
         return pd.DataFrame()
     try:
-        with tempfile.NamedTemporaryFile(suffix=".tsv", delete=False, mode="w") as tmp:
-            tmp_path = tmp.name
         cmd = [
             "abricate",
             "--db", db,
             "--minid", str(min_id),
-            "--mincov", str(min_cv),
+            "--mincov", str(min_cov),
             "--threads", str(threads),
             "--quiet",
             fasta_path,
@@ -131,12 +141,6 @@ def run_abricate(fasta_path: str, db: str, min_id: float = 75.0,
         return df
     except Exception:
         return pd.DataFrame()
-    finally:
-        if "tmp_path" in locals():
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +185,7 @@ def annotate_fasta(
     threads : int
         Number of threads for abricate (default 4).
     lookup : pd.DataFrame, optional
-        Replicon lookup table for prior scores.
+        Replicon lookup table for prior scores (all 10 dimensions).
 
     Returns
     -------
@@ -203,12 +207,14 @@ def annotate_fasta(
     # Determine which databases to use
     available_dbs = []
     abricate_hits = {}
+    mobility_dbs_run = False
     if use_abricate and abricate_available():
         installed = abricate_databases()
         if abricate_dbs is None:
-            # Priority order: card + vfdb + plasmidfinder + bacmet
-            preferred = ["card", "vfdb", "plasmidfinder", "bacmet",
-                         "resfinder", "ecoli_vf", "ncbi"]
+            # Priority order: card + resfinder + vfdb + plasmidfinder + bacmet2
+            # + ISfinder + Tn for mobility/IS detection
+            preferred = ["card", "resfinder", "vfdb", "plasmidfinder", "bacmet2",
+                         "ISfinder", "Tn", "ecoli_vf", "ncbi"]
             available_dbs = [d for d in preferred if d in installed]
         else:
             available_dbs = [d for d in abricate_dbs if d in installed]
@@ -216,17 +222,22 @@ def annotate_fasta(
         if not available_dbs:
             result.warnings.append(
                 "abricate found but no standard databases installed. "
-                "Run 'abricate-get_db --db card --force' etc."
+                "Run 'abricate-get_db --db card --force' etc. "
+                "Proceeding with replicon-empirical priors."
             )
         else:
             result.databases_used = available_dbs
             for db in available_dbs:
                 abricate_hits[db] = run_abricate(fasta_path, db, min_id, min_cov, threads)
+            # Check if mobility-specific databases were run.
+            # CARD/ResFinder/NCBI do not reliably detect T4CP/relaxase/oriT,
+            # so only ISfinder and Tn count as mobility-specific.
+            mobility_dbs_run = bool(set(available_dbs) & {"ISfinder", "Tn"})
     elif use_abricate and not abricate_available():
         result.warnings.append(
             "abricate not found in PATH. Install with: "
             "conda install -c bioconda abricate. "
-            "Proceeding with sequence-only scoring."
+            "Proceeding with replicon-empirical priors."
         )
 
     # Build lookup dict for priors
@@ -241,17 +252,25 @@ def annotate_fasta(
 
         # Extract hits for this sequence
         arg_names = []
+        arg_products = {}
+        arg_resistance = {}
         vf_names = []
         vf_categories = []
         bm_names = []
         replicons = []
         all_gene_names = []
+        is_from_isfinder = set()
 
         for db, df in abricate_hits.items():
             if df.empty:
                 continue
-            # abricate output: #FILE SEQUENCE START END GENE COVERAGE ...
-            seq_hits = df[df["SEQUENCE"].astype(str) == seq_id] if "SEQUENCE" in df.columns else df
+            # abricate SEQUENCE column may have version suffix (e.g., NC_019050.1)
+            if "SEQUENCE" in df.columns:
+                seq_col = df["SEQUENCE"].astype(str).apply(
+                    lambda x: re.sub(r"\.\d+$", "", x))
+                seq_hits = df[seq_col == seq_id]
+            else:
+                seq_hits = df
             if seq_hits.empty:
                 continue
 
@@ -259,6 +278,7 @@ def annotate_fasta(
                 gene = str(hit.get("GENE", "")).strip()
                 product = str(hit.get("PRODUCT", "")).strip()
                 accession = str(hit.get("ACCESSION", "")).strip()
+                resistance = str(hit.get("RESISTANCE", "")).strip()
                 name = gene if gene and gene != "nan" else product
                 if not name or name == "nan":
                     continue
@@ -268,25 +288,49 @@ def annotate_fasta(
                     # Clean gene name: take first allele before parenthesis
                     clean = re.split(r"[(_;]", name)[0].strip()
                     if clean:
-                        arg_names.append(name)
+                        # Exclude chromosomal housekeeping genes
+                        if not HOUSEKEEPING_GENES.match(clean):
+                            arg_names.append(name)
+                            arg_products[name] = product
+                            arg_resistance[name] = resistance
                 elif db in ("vfdb", "ecoli_vf"):
                     vf_names.append(name)
-                    # VFDB PRODUCT often contains category info
                     if product and product != "nan":
                         vf_categories.append(product)
                 elif db == "plasmidfinder":
                     replicons.append(name)
-                elif db == "bacmet":
+                elif db == "bacmet2":
+                    bm_names.append(name)
+                elif db == "ISfinder":
+                    is_from_isfinder.add(name)
+                    all_gene_names.append(name)
+
+        # CARD-based fallback for biocide/metal genes when BacMet is
+        # unavailable or returns no hits.
+        if not bm_names:
+            for name in arg_names:
+                if CARD_BM_PATTERN.search(name):
                     bm_names.append(name)
 
         feat.arg_names = arg_names
+        feat.metadata["arg_products"] = arg_products
+        feat.metadata["arg_resistance"] = arg_resistance
         feat.vf_names = vf_names
         feat.vf_categories = vf_categories
         feat.bm_gene_names = bm_names
 
-        # Replicon: take first PlasmidFinder hit, normalize
+        # Replicon: collect ALL PlasmidFinder hits, normalize each,
+        # join with ';' for multi-replicon plasmids (e.g., IncFII;IncFIA;IncR)
         if replicons:
-            feat.replicon = _normalize_replicon(replicons[0])
+            normalized = [_normalize_replicon(r) for r in replicons]
+            # Deduplicate while preserving order
+            seen = set()
+            unique_reps = []
+            for r in normalized:
+                if r and r not in seen:
+                    seen.add(r)
+                    unique_reps.append(r)
+            feat.replicon = ";".join(unique_reps)
         else:
             feat.replicon = ""
 
@@ -297,20 +341,68 @@ def annotate_fasta(
             feat.has_relaxase = bool(RELAXASE_PATTERN.search(all_text))
             feat.has_oriT = bool(ORIT_PATTERN.search(all_text))
             feat.has_auxiliary = bool(AUX_PATTERN.search(all_text))
+            feat.has_integron = bool(INTEGRON_PATTERN.search(all_text))
+            # IS count: combine ISfinder hits with pattern detection
+            pattern_is = set(IS_PATTERN.findall(all_text))
+            feat.n_is = len(is_from_isfinder | pattern_is)
+            # mobility_annotated = True only if we have actual mobility
+            # evidence OR mobility-specific databases were run.
+            # abricate CARD/VFDB alone do not reliably detect T4CP/relaxase,
+            # so we should not claim mobility was assessed if no mobility
+            # genes were found.
+            has_mob_evidence = (feat.has_t4cp or feat.has_relaxase or
+                                feat.has_oriT or feat.has_auxiliary or
+                                feat.has_integron or feat.n_is > 0)
+            feat.mobility_annotated = has_mob_evidence or mobility_dbs_run
         else:
             feat.has_t4cp = False
             feat.has_relaxase = False
             feat.has_oriT = False
             feat.has_auxiliary = False
+            feat.has_integron = False
+            feat.n_is = 0
+            # No genes found at all; only claim mobility was annotated if
+            # mobility-specific databases (ISfinder/Tn) were actually run.
+            feat.mobility_annotated = mobility_dbs_run
 
-        # Apply replicon lookup priors
-        if feat.replicon and feat.replicon in lookup_dict:
-            priors = lookup_dict[feat.replicon]
-            feat.s_rep_prior = priors.get("S_REP", 0.3)
-            feat.s_geo_prior = priors.get("S_GEO", 0.3)
-            feat.s_hab_prior = priors.get("S_HAB", 0.3)
-            feat.s_grow_prior = priors.get("S_GROW", 0.3)
-            feat.s_host_prior = priors.get("S_HOST", 0.5)
+        # Detect WHO priority pathogen from sequence header or metadata
+        header_text = seq_id.upper()
+        if WHO_PATHOGEN_PATTERN.search(header_text):
+            feat.host_is_who_priority = True
+
+        # Apply replicon lookup priors (all 10 dimensions)
+        # For multi-replicon plasmids, take the max prior across replicons
+        if feat.replicon and lookup_dict:
+            rep_list = [r.strip() for r in re.split(r"[;,/]", feat.replicon) if r.strip()]
+            best_priors = {}
+            for dim in ("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_REP",
+                        "S_SIZE", "S_BM", "S_GEO", "S_HAB", "S_GROW"):
+                best_val = None
+                for rep in rep_list:
+                    # Exact match
+                    if rep in lookup_dict:
+                        val = lookup_dict[rep].get(dim)
+                        if val is not None and val == val:  # not NaN
+                            if best_val is None or val > best_val:
+                                best_val = val
+                    else:
+                        # Prefix match
+                        for rep_key in lookup_dict:
+                            if rep.startswith(rep_key) or rep_key.startswith(rep):
+                                val = lookup_dict[rep_key].get(dim)
+                                if val is not None and val == val:
+                                    if best_val is None or val > best_val:
+                                        best_val = val
+                                break
+                if best_val is not None:
+                    best_priors[dim] = best_val
+
+            feat.s_rep_prior = best_priors.get("S_REP", GLOBAL_MEDIANS["S_REP"])
+            feat.s_geo_prior = best_priors.get("S_GEO", GLOBAL_MEDIANS["S_GEO"])
+            feat.s_hab_prior = best_priors.get("S_HAB", GLOBAL_MEDIANS["S_HAB"])
+            feat.s_grow_prior = best_priors.get("S_GROW", GLOBAL_MEDIANS["S_GROW"])
+            feat.s_host_prior = best_priors.get("S_HOST", GLOBAL_MEDIANS["S_HOST"])
+            feat.s_mob_prior = best_priors.get("S_MOB", GLOBAL_MEDIANS["S_MOB"])
 
         result.features.append(feat)
 
