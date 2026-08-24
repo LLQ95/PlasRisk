@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "plasrisk"
 version = "1.1.0"
-description = "PlasRisk: ten-dimension data-driven weighted risk assessment for bacterial plasmids from FASTA sequences"
+description = "PlasRisk: multi-model plasmid risk assessment — 10-dimension weighted model plus the original PIPdb ordinal model"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -26,6 +26,7 @@ keywords = [
     "biocide resistance",
     "co-selection",
     "horizontal gene transfer",
+    "PIPdb",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
