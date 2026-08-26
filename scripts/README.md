@@ -78,16 +78,16 @@ These scripts consume the `tab_*.csv` tables produced by the pipeline above and 
 
 | Script | Figure | Content |
 |--------|--------|---------|
-| `fig2_weight_validation.R` | Figure 2 | Consensus weight comparison across RF-MDG, LASSO, and grid search; weight robustness |
-| `fig3_bm_arg_network.R` | Figure 3 | ARG family x BMG category co-occurrence bipartite network |
-| `fig4_dimensionality.R` | Figure 4 | All-subsets performance curve and 5-dim lite vs 10-dim full comparison |
-| `fig5_risk_stratification.R` | Figure 5 | A-E grade stratification, calibration, and decision-curve analysis |
-| `fig6_highrisk_arg_replicon.R` | Figure 6 | High-risk ARG carriage across replicons, length-rate landscape, ARG-replicon network |
-| `fig7_fusion_plasmids.R` | Figure 7 | MDR-VF fusion plasmid features and per-replicon enrichment |
-| `fig8_dimension_epidemiology.R` | Figure 8 | Dimension-score heatmap, temporal trends, dimension correlation matrix, risk landscape |
-| `fig9_global_outcomes_maps.R` | Figure 9 | Global country-level prevalence maps for the four outcomes |
-| `fig10_grade_pie_map.R` | Figure 10 | World map with grade-distribution pies per country |
-| `fig11_conjugative_replicon.R` | Figure 11 | Conjugative rate vs high-risk ARG/BMG/fusion cargo across replicons |
+| `fig2_weight_validation.R` | Figure 2 | Consensus weight comparison across RF-MDG, LASSO, and grid search; ROC, LORO-CV, perturbation stability, calibration, DCA |
+| `fig3_bm_arg_network.R` | Figure 3 | BMG-ARG co-occurrence: BMG category prevalence, tripartite ARG-BMG-replicon network (top 12 replicons), OR heatmap, replicon co-carriage bubble |
+| `fig4_dimensionality.R` | Figure 4 | All-subsets AUC vs k, forward/backward selection, Pareto frontier, full vs lite weights |
+| `fig5_risk_stratification.R` | Figure 5 | Quartile characteristics, ROC benchmark, natural-prevalence PR curves, grade distribution, case-study radar, external validation ROC |
+| `fig6_highrisk_arg_replicon.R` | Figure 6 | High-risk ARG carriage across replicons, length-rate landscape, ARG-replicon network, family heatmap |
+| `fig7_fusion_plasmids.R` | Figure 7 | MDR-VF fusion rate and counts by replicon, fusion feature profile, ARG vs VF burden scatter |
+| `fig8_dimension_epidemiology.R` | Figure 8 | Dimension-score heatmap, temporal trends, dimension correlation, S_ARG-S_BM risk landscape |
+| `fig9_global_outcomes_maps.R` | Figure 9 | Global country-level prevalence maps for the four outcomes (maps package) |
+| `fig10_grade_pie_map.R` | Figure 10 | World map with grade-distribution pies per country (hand-built pie grobs, no scatterpie) |
+| `fig11_conjugative_replicon.R` | Figure 11 | Top conjugative replicons and conjugative rate vs high-risk ARG/BMG cargo bubbles, plus four-outcome heatmap |
 
 ### Utility
 
@@ -187,7 +187,7 @@ Packages needed only for specific scripts (auto-installed with fallback if unava
 | `randomForest` | pipdb_15, pipdb_16, pipdb_17 | - |
 | `glmnet` | pipdb_17 | - |
 | `PRROC` | pipdb_18_imbalanced | pROC-based PR-AUC |
-| `igraph`, `ggraph` | pipdb_14, fig3 | - |
+| `igraph`, `ggraph` | pipdb_14, fig3, fig6 | - |
 | `maps`, `mapproj` | fig9, fig10 (world maps) | required for map figures |
 | `sf` | optional modern map loading | `maps::map_data` + `geom_polygon` |
 | `scatterpie` | optional map pies | hand-computed trigonometric pie grobs (works on R 4.1.x) |
