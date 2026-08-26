@@ -1,10 +1,10 @@
 #!/usr/bin/env Rscript
 # =============================================================================
-# Figure 7: MDR-VF fusion plasmids
-# (A) Fusion rate by replicon
-# (B) Feature comparison fusion vs non-fusion (length, IS, integron, conjugative)
-# (C) Absolute fusion counts by replicon
-# (D) Mean VF count vs mean ARG count per replicon
+# Figure 7: MDR-VF fusion plasmid characteristics
+# (A) Bubble plot: fusion rate by replicon (labeled with ggrepel)
+# (B) Fusion plasmid feature profile
+# (C) Replicon distribution of fusion plasmids
+# (D) ARG vs VF burden across replicons (fusion rate as color)
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -21,76 +21,99 @@ fdir   <- file.path(resdir, "figures")
 dir.create(fdir, showWarnings = FALSE, recursive = TRUE)
 
 theme_pub <- theme_classic(base_size = 10) +
-  theme(strip.background = element_blank(), legend.position = "bottom",
-        plot.tag = element_text(face = "bold", size = 12, color = "#3E2723"),
-        axis.text = element_text(color = "#3E2723"),
-        plot.margin = margin(4, 6, 4, 4))
+  theme(
+    strip.background = element_blank(),
+    legend.position  = "bottom",
+    legend.key.size  = unit(0.35, "cm"),
+    legend.text      = element_text(size = 7.5),
+    legend.title     = element_text(size = 8),
+    axis.text        = element_text(size = 8, color = "#3E2723"),
+    axis.title       = element_text(size = 9, color = "#3E2723"),
+    plot.tag         = element_text(face = "bold", size = 12, color = "#3E2723"),
+    plot.margin      = margin(3, 5, 3, 3)
+  )
 
-rep <- fread(file.path(tdir, "tab_replicon_summary.csv"))
-namecol <- intersect(c("replicon_primary", "replicon", "Replicon"), names(rep))[1]
-ncol_   <- intersect(c("n", "N", "n_psc"), names(rep))[1]
-fuscol  <- intersect(c("fusion_rate", "vf_arg_rate", "fusion"), names(rep))[1]
-argcol  <- intersect(c("mean_arg", "arg_count", "mean_narg"), names(rep))[1]
-vfcol   <- intersect(c("mean_vf", "vf_count", "mean_nvf"), names(rep))[1]
-setnames(rep, c(namecol, ncol_), c("replicon", "n"))
-if (is.na(fuscol)) rep[, fusion_rate := NA_real_] else setnames(rep, fuscol, "fusion_rate")
-if (is.na(argcol)) rep[, mean_arg := NA_real_] else setnames(rep, argcol, "mean_arg")
-if (is.na(vfcol))  rep[, mean_vf := NA_real_] else setnames(rep, vfcol, "mean_vf")
+fus_rep <- fread(file.path(tdir, "tab_fusion_by_replicon.csv"))
+fus_sum <- fread(file.path(tdir, "tab_fusion_plasmid_summary.csv"))
+rep_vr  <- fread(file.path(tdir, "tab_replicon_virulence_resistance.csv"))
 
-# ---- (A) fusion rate by replicon ----
-top <- rep[n >= 100 & !is.na(fusion_rate)][order(-fusion_rate)][1:15]
-top[, replicon := factor(replicon, levels = rev(replicon))]
-pA <- ggplot(top, aes(fusion_rate * 100, replicon)) +
-  geom_col(fill = "#F4A261", width = 0.7) +
-  geom_text(aes(label = sprintf("%.1f%%", fusion_rate * 100)), hjust = -0.1, size = 2.6) +
-  scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
-  labs(x = "MDR-VF fusion rate (%)", y = NULL, tag = "A") +
-  theme_pub + theme(axis.text.y = element_text(size = 7.5))
+# ---- (A) Bubble plot: fusion rate by replicon ----
+fus_plot <- fus_rep[order(-N)][1:15]
+fus_plot[, label := replicon_primary]
+fus_plot[, replicon_primary := factor(replicon_primary,
+  levels = rev(fus_plot$replicon_primary))]
 
-# ---- (B) feature comparison ----
-feat_file <- file.path(tdir, "tab_fusion_features.csv")
-pB <- ggplot() + theme_void() + labs(tag = "B")
-if (file.exists(feat_file)) {
-  feat <- fread(feat_file)
-  if (all(c("feature", "fusion", "nonfusion") %in% names(feat))) {
-    fl <- melt(feat, id.vars = "feature", variable.name = "group", value.name = "value")
-    fl[, group := factor(group, levels = c("nonfusion", "fusion"),
-                         labels = c("Non-fusion", "Fusion"))]
-    pB <- ggplot(fl, aes(feature, value, fill = group)) +
-      geom_col(position = position_dodge(0.8), width = 0.7) +
-      scale_fill_manual(values = c("Non-fusion" = "#A8DADC", "Fusion" = "#E76F51")) +
-      labs(x = NULL, y = "Mean / proportion", fill = NULL, tag = "B") +
-      theme_pub +
-      theme(axis.text.x = element_text(angle = 20, hjust = 1, size = 7.5))
-  }
-}
+pA <- ggplot(fus_plot, aes(fus_rate, replicon_primary)) +
+  geom_point(aes(size = N, color = pct), alpha = 0.8) +
+  geom_text(aes(label = sprintf("%.1f%%", fus_rate)),
+            hjust = -0.6, size = 2.5, color = "#3E2723") +
+  scale_size_continuous(name = "Fusion\nplasmids (N)", range = c(1.5, 6)) +
+  scale_color_gradient(low = "#FFE8D6", high = "#E76F51",
+                       name = "% of all\nfusion plasmids") +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.35))) +
+  labs(x = "Fusion rate within replicon (%)", y = NULL, tag = "A") +
+  theme_pub +
+  theme(axis.text.y = element_text(size = 7.5),
+        legend.box = "vertical",
+        legend.key.height = unit(0.4, "cm"))
 
-# ---- (C) absolute counts ----
-rep[, n_fusion := round(fusion_rate * n)]
-cn <- rep[!is.na(n_fusion)][order(-n_fusion)][1:15]
-cn[, replicon := factor(replicon, levels = rev(replicon))]
-pC <- ggplot(cn, aes(n_fusion, replicon)) +
-  geom_col(fill = "#2A9D8F", width = 0.7) +
-  geom_text(aes(label = n_fusion), hjust = -0.1, size = 2.6) +
+# ---- (B) Fusion plasmid feature profile ----
+feat <- data.table(
+  Feature = c("Mean length (kb)", "Mean ARG count", "Mean VF count",
+              "Mean IS count", "Conjugative (%)", "Integron (%)", "Human host (%)"),
+  Value   = c(fus_sum$mean_len, fus_sum$mean_arg, fus_sum$mean_vf,
+              fus_sum$mean_is, fus_sum$pct_conj, fus_sum$pct_integron, fus_sum$pct_human)
+)
+feat[, Feature := factor(Feature, levels = rev(Feature))]
+feat_group <- ifelse(feat$Feature %in% c("Conjugative (%)", "Integron (%)", "Human host (%)"),
+                     "Percentage", "Count/Mean")
+
+pB <- ggplot(feat, aes(Value, Feature)) +
+  geom_col(aes(fill = feat_group), width = 0.65, color = "white", linewidth = 0.2) +
+  geom_text(aes(label = sprintf("%.2f", Value)), hjust = -0.1, size = 2.5) +
+  scale_fill_manual(values = c("Count/Mean" = "#F4A261", "Percentage" = "#2A9D8F"),
+                    name = NULL) +
+  scale_x_continuous(expand = expansion(mult = c(0, 0.2))) +
+  labs(x = "Value", y = NULL, tag = "B") +
+  theme_pub +
+  theme(axis.text.y = element_text(size = 8),
+        legend.key.height = unit(0.4, "cm"))
+
+# ---- (C) Replicon distribution ----
+fus_dist <- fus_rep[order(-N)][1:12]
+fus_dist[, replicon_primary := factor(replicon_primary,
+  levels = rev(fus_dist$replicon_primary))]
+
+pC <- ggplot(fus_dist, aes(N, replicon_primary)) +
+  geom_col(fill = "#E76F51", width = 0.7, color = "white", linewidth = 0.2) +
+  geom_text(aes(label = N), hjust = -0.3, size = 2.5) +
   scale_x_continuous(expand = expansion(mult = c(0, 0.15))) +
   labs(x = "Number of fusion plasmids", y = NULL, tag = "C") +
-  theme_pub + theme(axis.text.y = element_text(size = 7.5))
+  theme_pub +
+  theme(axis.text.y = element_text(size = 7.5))
 
-# ---- (D) VF vs ARG scatter ----
-sc <- rep[n >= 100 & !is.na(mean_arg) & !is.na(mean_vf)]
-sc[, lab := ifelse(mean_vf > quantile(mean_vf, 0.9, na.rm = TRUE) |
-                     mean_arg > quantile(mean_arg, 0.9, na.rm = TRUE),
-                   as.character(replicon), "")]
-pD <- ggplot(sc, aes(mean_arg, mean_vf, size = n)) +
-  geom_point(alpha = 0.55, color = "#F4A261") +
-  geom_text_repel(aes(label = lab), size = 2.4, max.overlaps = 15) +
-  scale_size_continuous(range = c(1, 7), name = "PSC count") +
-  labs(x = "Mean ARG count", y = "Mean VF count", tag = "D") +
-  theme_pub
+# ---- (D) ARG vs VF burden with ggrepel ----
+rep_vr_f <- rep_vr[n >= 100]
+rep_vr_f[, label := ifelse(pct_mdr_vf > 5 | n >= 2000, replicon_primary, "")]
 
-fig <- (pA | pB) / (pC | pD)
-ggsave(file.path(fdir, "Figure7_fusion_plasmids.pdf"), fig, width = 9, height = 8,
-       units = "in")
-ggsave(file.path(fdir, "Figure7_fusion_plasmids.png"), fig, width = 9, height = 8,
-       units = "in", dpi = 300)
+pD <- ggplot(rep_vr_f, aes(mean_arg, mean_vf)) +
+  geom_point(aes(size = n, color = pct_mdr_vf), alpha = 0.75) +
+  geom_text_repel(aes(label = label), size = 2.5, max.overlaps = 15,
+                  color = "#3E2723", box.padding = 0.35, min.segment.length = 0,
+                  segment.color = "#BCAAA4", segment.size = 0.3) +
+  scale_size_continuous(name = "n (PSC)", range = c(1.5, 6)) +
+  scale_color_gradient(low = "#FFE8D6", high = "#9C2C2C",
+                       name = "MDR-VF\nfusion (%)") +
+  labs(x = "Mean ARG count per PSC", y = "Mean VF count per PSC", tag = "D") +
+  theme_pub +
+  guides(size = guide_legend(nrow = 2), color = guide_colorbar(barwidth = 4))
+
+# ---- assemble ----
+fig <- (pA | pB) / (pC | pD) +
+  plot_layout(heights = c(1.1, 1))
+
+ggsave(file.path(fdir, "Figure7_fusion_plasmids.pdf"), fig,
+       width = 7.5, height = 8, units = "in")
+ggsave(file.path(fdir, "Figure7_fusion_plasmids.png"), fig,
+       width = 7.5, height = 8, units = "in", dpi = 300)
 cat("Saved Figure7_fusion_plasmids.pdf/png to", fdir, "\n")
