@@ -18,6 +18,14 @@ models**:
    (Zhu et al., *Nucleic Acids Res.*, 2025), provided for reproducibility and
    direct comparison.
 
+PlasRisk was validated against four complementary biological outcomes that
+capture distinct aspects of plasmid risk: high-risk ARG carriage (clinical
+threat), MDR–virulence fusion (resistance–virulence convergence), conjugative
+mobility (horizontal transmission), and biocide/metal resistance (co-selection
+maintenance). The four outcomes are only weakly correlated at the replicon
+level (Spearman rho from 0.01 to 0.31), so no single dimension or outcome can
+substitute for the others.
+
 ---
 
 ## Scoring models
@@ -37,8 +45,8 @@ S = 0.258*S_ARG + 0.115*S_VF + 0.215*S_MOB + 0.190*S_SIZE + 0.222*S_BM
 Weights were derived by data-driven consensus (Random Forest mean decrease in
 Gini, LASSO, and grid-search optimization) on 792,964 PIPdb PSCs; sum = 1.0.
 
-Risk grades: **A** (Very High, S ≥ 0.60), **B** (High, ≥ 0.45),
-**C** (Moderate, ≥ 0.30), **D** (Low, ≥ 0.15), **E** (Minimal, < 0.15).
+Risk grades: **A** (Very High, S >= 0.60), **B** (High, >= 0.45),
+**C** (Moderate, >= 0.30), **D** (Low, >= 0.15), **E** (Minimal, < 0.15).
 
 ### PIPdb (original 8-item ordinal model)
 
@@ -224,14 +232,37 @@ from plasrisk import PlasRiskScorer, PIPdbScorer
 
 ---
 
+## Four complementary risk outcomes
+
+Weights and validation targets were defined from four binary outcomes chosen
+to cover separate stages of plasmid-mediated risk. Their natural prevalence
+in PIPdb differs by more than tenfold:
+
+| Outcome | Definition | Prevalence |
+|---------|-----------|------------|
+| High-risk ARG | At least one critically important ARG (carbapenemase, mcr, etc.) | 3.1% |
+| MDR–VF fusion | At least one ARG and one virulence factor on the same plasmid | 1.8% |
+| Conjugative mobility | Complete conjugative transfer machinery | 5.1% |
+| Biocide/metal resistance | At least one biocide/metal resistance gene | 34.0% |
+
+The outcomes overlap non-randomly (60.3% of ARG-carrying plasmids also carry
+BMGs; OR = 3.82) but remain biologically distinct: conjugative rate was
+essentially uncorrelated with high-risk ARG carriage across replicons
+(Spearman rho = 0.01), and the backbones with the highest high-risk ARG rates
+(ColKP3 82.5%, Col3M 48.3%) are small and largely non-conjugative, whereas the
+most conjugative families (IncN2 88.1%, IncFII variants 42–56%) rarely carry
+critical ARGs. IncN2 and IncN are exceptions combining both properties.
+
+---
+
 ## Model validation
 
 ### Internal validation (792,964 PIPdb PSCs)
 
 | Outcome | AUC (PlasRisk) | AUC (PIPdb) |
 |---------|---------------|-------------|
-| High-risk ARG carriage | 0.955 | 0.966 |
-| MDR–VF fusion | 0.965 | 0.940 |
+| High-risk ARG carriage | 0.958 | 0.966 |
+| MDR–VF fusion | 0.964 | 0.940 |
 | Conjugation potential | 0.856 | — |
 | Biocide/metal resistance | 0.903 | — |
 | **Mean (4 outcomes)** | **0.920** | — |
@@ -240,25 +271,37 @@ from plasrisk import PlasRiskScorer, PIPdbScorer
   10-dim full (0.920 vs. 0.920); no overfitting (train-test gap < 0.003,
   bootstrap optimism < 0.005).
 - **LORO-CV**: mean AUC = 0.962 across 40 replicons.
-- **Weight sensitivity** (100 iterations, ±30%): Spearman ρ = 0.994, top-10
+- **Weight sensitivity** (100 iterations, ±30%): Spearman rho = 0.994, top-10
   overlap = 9.5/10.
-- **Natural-prevalence holdout** (157,046 PSCs, 3.0% high-risk): ROC-AUC =
-  0.968, PR-AUC = 0.413.
-- **Temporal split validation**: train on pre-2020 PSCs, test on 2020+ PSCs;
-  stable discrimination with no performance decay.
+- **Natural-prevalence calibration** (~3.1% high-risk): Grade A plasmids had
+  a 46.1% observed high-risk rate versus the 3.1% baseline (positive likelihood
+  ratio 27.2), while Grades D/E contained no high-risk plasmids.
+- **Temporal split validation**: train on pre-2020 PSCs (n = 722,350), test on
+  2020+ PSCs (n = 70,614); stable discrimination (mean AUC 0.924 vs. 0.916)
+  with no performance decay.
 
 ### External validation
 
-40 independently curated NCBI plasmids (20 high-risk carrying blaNDM, blaKPC,
-mcr-1, etc.; 20 low-risk cloning vectors and small cryptic plasmids), all
-verified as true plasmid sequences (no chromosomal contamination). Performance
-is reported both with and without sequence-derived annotations; dimensions that
-cannot be annotated from a standalone FASTA are imputed from replicon empirical
-medians.
+367 independently curated NCBI plasmids absent from PIPdb (167 carrying
+critical ARGs such as blaNDM, blaKPC, and mcr; 200 small ARG/VF-free plasmids),
+all verified as true plasmid sequences (<500 kb, no chromosomal contamination).
+Labels were assigned by abricate annotation rather than sequence titles.
+PlasRisk achieved ROC-AUC = 0.998 (95% CI 0.994–1.000), with sensitivity 0.994
+and specificity 0.960 at S >= 0.30; dimensions that cannot be annotated from a
+standalone FASTA are imputed from replicon empirical medians.
 
 ---
 
-## Running tests
+## Reproducibility
+
+The complete data-driven analysis and manuscript figures are reproducible from
+the [`scripts/`](scripts/) directory. The `pipdb_*.R/.py` pipeline rebuilds
+all result tables from PIPdb metadata, and `fig2_weight_validation.R` through
+`fig11_conjugative_replicon.R` generate manuscript Figures 2–11 (run as
+`Rscript figN_*.R results`; figures are written to `results/figures/`). The
+figure scripts are pure-ASCII and tested on R 4.1.x, using the `maps`
+package for world maps so that older R installations do not require `sf` or
+`scatterpie`.
 
 ```bash
 python -m pytest tests/ -v          # PlasRisk core tests
@@ -291,8 +334,8 @@ python test_pipdb_model.py          # PIPdb model tests (8/8)
 
 ## Citation
 
-> [Authors]. PlasRisk: a multi-dimension weighted risk assessment framework for
-> bacterial plasmids. *iMeta*, 2025. doi: [to be added]
+> Li L, Wu Y. PlasRisk: a multi-dimensional data-driven weighted risk
+> assessment framework for bacterial plasmids. Manuscript in preparation, 2026.
 
 Based on data from:
 > Zhu Q, Chen Q, Lu X, et al. PIPdb: a comprehensive plasmid sequence resource
