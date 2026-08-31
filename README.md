@@ -262,19 +262,27 @@ critical ARGs. IncN2 and IncN are exceptions combining both properties.
 
 ## Model validation
 
-### Internal validation (792,964 PIPdb PSCs)
+### Internal validation (locked test, n = 158,587; 792,964 PIPdb PSCs overall)
 
-| Outcome | AUC (PlasRisk) | AUC (PIPdb) |
-|---------|---------------|-------------|
-| High-risk ARG carriage | 0.958 | 0.966 |
-| MDR–VF fusion | 0.964 | 0.940 |
-| Conjugation potential | 0.856 | — |
-| Biocide/metal resistance | 0.903 | — |
-| **Mean (4 outcomes)** | **0.920** | — |
+Locked-test ROC-AUC from the leak-free triple split (80/20 working/locked,
+then 75/25 train/validation), with the original PIPdb ordinal score evaluated
+on the same locked test set:
+
+| Outcome | AUC PlasRisk (full) | AUC PlasRisk (lite) | AUC PIPdb (ordinal) |
+|---------|---------------------|---------------------|---------------------|
+| High-risk ARG carriage | 0.954 | 0.955 | 0.953 |
+| MDR–VF fusion | 0.965 | 0.964 | 0.927 |
+| Conjugation potential | 0.855 | 0.854 | 0.829 |
+| Biocide/metal resistance | 0.906 | 0.907 | 0.662 |
+| **Mean (4 outcomes)** | **0.920** | **0.920** | **0.843** |
 
 - **Dimensionality analysis**: 5-dim lite achieves equivalent mean AUC to
   10-dim full (0.920 vs. 0.920); no overfitting (train-test gap < 0.003,
   bootstrap optimism < 0.005).
+- **Species-cluster bootstrap** (B = 1,000, holding all 11,057 species
+  clusters out whole): full-model locked AUC stays within narrow 95% bands
+  (high-risk ARG 0.956 [0.944–0.968], fusion 0.966 [0.958–0.976],
+  conjugation 0.860 [0.836–0.894], BMG 0.906 [0.898–0.916]).
 - **LORO-CV**: mean AUC = 0.962 across 40 replicons.
 - **Weight sensitivity** (100 iterations, ±30%): Spearman rho = 0.994, top-10
   overlap = 9.5/10.
