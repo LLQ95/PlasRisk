@@ -6,7 +6,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/p/plasrisk/plasrisk-{{ version }}.tar.gz
-  sha256: REPLACE_WITH_SHA256_FROM_PYPI
+  sha256: 4a019f2dd57a0a7e11f4f518442083ab4066c92a5074245dbf5ca3afec14c497
 
 build:
   number: 0
