@@ -13,10 +13,13 @@ Options:
     --min-id FLOAT       Minimum abricate identity % (default: 75)
     --min-cov FLOAT      Minimum abricate coverage % (default: 50)
     --no-abricate        Skip abricate; sequence-only scoring
-    --model MODEL        Scoring model: 'plasrisk' (10-dim weighted, default)
-                         or 'pipdb' (original PIPdb 8-item ordinal)
-    --mode MODE          PlasRisk mode: 'full' (10-dim, default) or 'lite'
-                         (5-dim core; ignored when --model pipdb)
+    --model MODEL        Scoring model: 'plasrisk' (weighted, default) or
+                         'pipdb' (original PIPdb 8-item ordinal)
+    --mode MODE          PlasRisk mode: 'lite' (5-dim FASTA-only core,
+                         default) or 'full' (10-dim; ignored for --model pipdb)
+    --rank-concordance   Also verify that the package sigmoid S_SIZE and the
+                         pipeline log-ratio S_SIZE give identical rankings on
+                         the input sequences (writes rank_concordance.tsv)
     --db LIST            Comma-separated abricate databases to use
                          (default: auto-detect)
     --json               Also write JSON summary
@@ -45,26 +48,29 @@ from .annotate import (
     abricate_available,
     abricate_databases,
     annotate_fasta,
+    parse_fasta,
 )
 from .lookup import load_replicon_lookup
 from .scoring import (PlasRiskScorer, PIPdbScorer, RISK_WEIGHTS,
-                      RISK_WEIGHTS_LITE, WEIGHT_SUM, get_scorer)
+                      RISK_WEIGHTS_LITE, WEIGHT_SUM, get_scorer,
+                      size_rank_concordance)
 
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         prog="plasrisk",
-        description="PlasRisk v%s - plasmid risk assessment (PlasRisk or PIPdb model)" % __version__,
+        description="PlasRisk v%s - plasmid risk assessment "
+                    "(default: 5-dimension FASTA-only lite core)" % __version__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  plasrisk plasmid.fasta
+  plasrisk plasmid.fasta                  # lite (5-dim, FASTA-only), default
+  plasrisk --mode full plasmid.fasta      # full 10-dim with replicon priors
   plasrisk -o results *.fasta
   plasrisk /data/plasmids/
   plasrisk --db card,vfdb,plasmidfinder plasmid.fasta
   plasrisk --no-abricate contigs.fasta
-  plasrisk --model pipdb plasmid.fasta
-  plasrisk --model plasrisk --mode lite plasmid.fasta
+  plasrisk --rank-concordance plasmid.fasta
         """,
     )
     parser.add_argument("inputs", nargs="+", metavar="FASTA",
@@ -72,7 +78,7 @@ Examples:
     parser.add_argument("-o", "--output", default="plasrisk_output",
                         help="Output directory (default: ./plasrisk_output)")
     parser.add_argument("-t", "--threads", type=int, default=4,
-                        help="Number of threads (default: 4)")
+                        help="Number of abricate threads (default: 4)")
     parser.add_argument("--min-id", type=float, default=75.0,
                         help="Minimum abricate identity %% (default: 75)")
     parser.add_argument("--min-cov", type=float, default=50.0,
@@ -81,11 +87,16 @@ Examples:
                         help="Skip abricate annotation; sequence-only scoring")
     parser.add_argument("--model", choices=["plasrisk", "pipdb"],
                         default="plasrisk",
-                        help="Scoring model: 'plasrisk' (10-dim weighted, "
+                        help="Scoring model: 'plasrisk' (weighted continuous, "
                              "default) or 'pipdb' (original PIPdb 8-item ordinal)")
-    parser.add_argument("--mode", choices=["full", "lite"], default="full",
-                        help="PlasRisk mode: 'full' (10-dim, default) or 'lite' "
-                             "(5-dim core; ignored when --model pipdb)")
+    parser.add_argument("--mode", choices=["lite", "full"], default="lite",
+                        help="PlasRisk mode: 'lite' (5-dim FASTA-only core, "
+                             "default) or 'full' (10-dim; ignored when "
+                             "--model pipdb)")
+    parser.add_argument("--rank-concordance", action="store_true",
+                        help="Verify rank concordance between package sigmoid "
+                             "S_SIZE and pipeline log-ratio S_SIZE on the "
+                             "input sequences; writes rank_concordance.tsv")
     parser.add_argument("--db", default=None,
                         help="Comma-separated abricate databases (default: auto)")
     parser.add_argument("--json", action="store_true",
@@ -177,6 +188,37 @@ def main(argv=None):
 
     # Create output directory
     os.makedirs(args.output, exist_ok=True)
+
+    # Optional: S_SIZE rank-concordance check (package sigmoid vs pipeline
+    # log-ratio). Both transforms are strictly monotonic, so Spearman rho
+    # must be 1.0; see Supplementary Text S1.
+    if args.rank_concordance and args.model == "plasrisk":
+        lengths = []
+        for fp in fasta_files:
+            try:
+                seqs = parse_fasta(fp)
+            except Exception as exc:
+                print("    WARNING: cannot parse %s (%s)" % (fp, exc),
+                      file=sys.stderr)
+                continue
+            lengths.extend(len(s) for s in seqs.values())
+        if len(lengths) >= 2:
+            conc = size_rank_concordance(lengths)
+            conc_path = os.path.join(args.output, "rank_concordance.tsv")
+            with open(conc_path, "w") as cf:
+                cf.write("metric\tvalue\n")
+                cf.write("n_sequences\t%d\n" % conc["n"])
+                cf.write("spearman_rho\t%.6f\n" % conc["spearman_rho"])
+                cf.write("kendall_tau\t%.6f\n" % conc["kendall_tau"])
+                cf.write("min_length_bp\t%d\n" % conc["min_length_bp"])
+                cf.write("max_length_bp\t%d\n" % conc["max_length_bp"])
+            print("  S_SIZE rank concordance (n=%d): Spearman rho=%.4f, "
+                  "Kendall tau=%.4f -> %s" % (
+                      conc["n"], conc["spearman_rho"], conc["kendall_tau"],
+                      conc_path))
+        else:
+            print("  WARNING: fewer than 2 sequences; rank-concordance "
+                  "check skipped.", file=sys.stderr)
 
     # Load replicon lookup and create scorer
     lookup = load_replicon_lookup()
