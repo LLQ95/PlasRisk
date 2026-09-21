@@ -96,16 +96,22 @@ def abricate_available() -> bool:
 
 
 def abricate_databases() -> List[str]:
-    """List abricate databases currently installed."""
+    """List abricate databases currently installed.
+
+    Some abricate builds (incl. several conda packages) write the `--list`
+    table to STDERR rather than STDOUT, so both streams are merged and rows
+    are recognised by their "<name> <integer-count> ..." shape.
+    """
     try:
         result = subprocess.run(
             ["abricate", "--list"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=60,
         )
+        blob = "%s\n%s" % (result.stdout or "", result.stderr or "")
         dbs = []
-        for line in result.stdout.strip().split("\n")[1:]:  # skip header
+        for line in blob.strip().split("\n"):
             parts = line.split()
-            if parts:
+            if len(parts) >= 2 and parts[0].lower() != "database" and parts[1].isdigit():
                 dbs.append(parts[0])
         return dbs
     except Exception:
@@ -264,11 +270,16 @@ def annotate_fasta(
         for db, df in abricate_hits.items():
             if df.empty:
                 continue
-            # abricate SEQUENCE column may have version suffix (e.g., NC_019050.1)
+            # abricate SEQUENCE column may have an accession version suffix
+            # (e.g. NC_019050.1). NOTE: do NOT normalise unconditionally -- SPAdes
+            # /PlasFlow headers end in a float coverage "cov_84.855263", and
+            # stripping a trailing .<digits> would corrupt them into "cov_84" so
+            # they could never match the parsed sequence id. Match the raw id
+            # first and only fall back to the de-versioned form.
             if "SEQUENCE" in df.columns:
-                seq_col = df["SEQUENCE"].astype(str).apply(
-                    lambda x: re.sub(r"\.\d+$", "", x))
-                seq_hits = df[seq_col == seq_id]
+                seq_raw = df["SEQUENCE"].astype(str)
+                seq_norm = seq_raw.apply(lambda x: re.sub(r"\.\d+$", "", x))
+                seq_hits = df[(seq_raw == seq_id) | (seq_norm == seq_id)]
             else:
                 seq_hits = df
             if seq_hits.empty:
