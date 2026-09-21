@@ -2,27 +2,26 @@
 PlasRisk - Plasmid Risk Assessment Tool
 ========================================
 
-A 10-dimension weighted risk scoring framework for bacterial plasmids.
-Weights derived by data-driven consensus (Random Forest MDG, LASSO, and
-grid-search optimization) on 792,964 PIPdb PSCs.
+Data-driven weighted risk scoring framework for bacterial plasmids,
+derived on 792,964 PIPdb PSCs (Random Forest MDG, LASSO, and grid-search
+consensus weights).
 
-S = 0.245*S_ARG + 0.110*S_VF + 0.204*S_MOB + 0.028*S_HOST
-  + 0.003*S_REP + 0.181*S_SIZE + 0.211*S_BM
-  + 0.002*S_GEO + 0.002*S_HAB + 0.015*S_GROW
+Default output is the 5-dimension FASTA-only lite core:
+S = 0.258*S_ARG + 0.115*S_VF + 0.215*S_MOB + 0.190*S_SIZE + 0.222*S_BM
 
-Two scoring models are available:
-  - PlasRiskScorer: 10-dimension weighted continuous model (default)
-  - PIPdbScorer: original PIPdb 8-item ordinal model (use --model pipdb)
+The full 10-dimension model (--mode full) adds S_HOST, S_REP, S_GEO,
+S_HAB and S_GROW, which require PIPdb-style metadata and are otherwise
+imputed from replicon priors.
 
 Reference: [to be updated upon publication]
 """
 
-__version__ = "1.1.0"
+__version__ = "1.1.1"
 __author__ = "PlasRisk Team"
 
 from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,
                       RISK_WEIGHTS, RISK_WEIGHTS_LITE, RISK_GRADES,
-                      WEIGHT_SUM, get_scorer)
+                      WEIGHT_SUM, get_scorer, size_rank_concordance)
 from .annotate import annotate_fasta, AnnotationResult
 from .lookup import load_replicon_lookup
 
@@ -35,6 +34,7 @@ __all__ = [
     "RISK_GRADES",
     "WEIGHT_SUM",
     "get_scorer",
+    "size_rank_concordance",
     "annotate_fasta",
     "AnnotationResult",
     "load_replicon_lookup",
