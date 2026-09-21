@@ -1,4 +1,4 @@
-{% set version = "1.1.0" %}
+{% set version = "1.1.1" %}
 
 package:
   name: plasrisk
@@ -6,7 +6,7 @@ package:
 
 source:
   url: https://pypi.io/packages/source/p/plasrisk/plasrisk-{{ version }}.tar.gz
-  sha256: 4a019f2dd57a0a7e11f4f518442083ab4066c92a5074245dbf5ca3afec14c497
+  sha256: 951c507534e5e7199af88b0cc954e559e1452dbbfc85c761b379f4dafd3a81bb
 
 build:
   number: 0
@@ -50,18 +50,17 @@ about:
   summary: "Multi-model plasmid risk assessment: 10-dim weighted PlasRisk plus original PIPdb ordinal model"
   description: |
     PlasRisk provides two scoring models for bacterial plasmid risk assessment.
-    The default PlasRisk model computes a composite score from ten dimensions:
-    antimicrobial resistance gene burden (S_ARG), virulence factors (S_VF),
-    mobility/conjugation potential (S_MOB), host range (S_HOST), replicon type
-    (S_REP), plasmid size (S_SIZE), biocide/metal resistance (S_BM), geographic
+    The default output is a FASTA-only 5-dimension lite core (S_ARG, S_VF,
+    S_MOB, S_SIZE, S_BM) with equivalent discrimination to the full model;
+    --mode full adds host range (S_HOST), replicon type (S_REP), geographic
     spread (S_GEO), habitat breadth (S_HAB), and temporal growth rate (S_GROW).
     Weights were derived by data-driven consensus (Random Forest MDG, LASSO,
     grid-search optimization) on 792,964 PIPdb plasmid sequence clusters.
-    A 5-dimension lite mode achieves equivalent AUC. The alternative PIPdb
-    model reproduces the original 8-item ordinal scoring system (Zhu et al.,
-    Nucleic Acids Res. 2025). Accepts FASTA input and uses abricate for
-    annotation when available; sequence-derived dimensions fall back to
-    replicon empirical medians when annotation is unavailable.
+    The alternative PIPdb model reproduces the original 8-item ordinal
+    scoring system (Zhu et al., Nucleic Acids Res. 2025). Accepts FASTA
+    input and uses abricate for annotation when available; sequence-derived
+    dimensions fall back to replicon empirical medians when annotation is
+    unavailable.
   doc_url: https://github.com/LLQ95/PlasRisk#readme
   dev_url: https://github.com/LLQ95/PlasRisk
 
