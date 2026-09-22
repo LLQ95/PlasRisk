@@ -8,9 +8,7 @@ access to the PIPdb source database or the annotation pipeline.
 
 All analyses use a single, pre-specified split (`seed = 42`):
 **train 475,779 / validation 158,591 / locked test 158,594 = 792,964 PSCs**.
-The locked test set was evaluated exactly once. A frozen archive of this
-package is deposited at Zenodo under DOI **[ZENODO DOI TO BE ADDED]**; please
-cite the Zenodo archive in addition to the paper if you use these files.
+The locked test set was evaluated exactly once.
 
 ## Files
 
