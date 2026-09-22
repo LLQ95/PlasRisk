@@ -1,4 +1,4 @@
-# PlasRisk locked-analysis data release (v1.1.1)
+﻿# PlasRisk locked-analysis data release (v1.1.1)
 
 This folder contains the reproducibility package for the PlasRisk manuscript
 submitted to iMeta. It allows every number in the weight-derivation,
@@ -135,7 +135,7 @@ predictions and grades, the external case-control challenge scores, and the
 weight vectors are available in the PlasRisk GitHub repository
 (https://github.com/LLQ95/PlasRisk, `data/locked_v1.1.1/`) and archived at
 Zenodo [DOI]. The source plasmid sequences are available from PIPdb
-(https://www.pipdb.net; Zhu et al., *Nucleic Acids Research*, 2025). The
+(https://nmdc.cn/pipdb; Zhu et al., *Nucleic Acids Research*, 2025). The
 PlasRisk scoring package is available from PyPI (plasrisk v1.1.1) and
 Bioconda, and the complete R/Python analysis code is provided in the same
 GitHub repository."
