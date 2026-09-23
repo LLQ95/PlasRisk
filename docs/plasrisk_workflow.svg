@@ -339,9 +339,9 @@
 
   <rect x="625" y="1050" width="525" height="115" rx="6" fill="#f0fdf4" stroke="#31a354" stroke-width="1"/>
   <text x="640" y="1070" font-size="10" font-weight="bold" fill="#006d2c">PlasRisk-lite: rapid screening mode (5-dim core)</text>
-  <text x="640" y="1088" font-size="9" fill="#333">● 5 dimensions: S_ARG (0.258) + S_VF (0.115) + S_MOB (0.215) + S_SIZE (0.190) + S_BM (0.222)</text>
+  <text x="640" y="1088" font-size="9" fill="#333">● 5 dimensions: S_ARG (0.253) + S_VF (0.135) + S_MOB (0.201) + S_SIZE (0.175) + S_BM (0.237)</text>
   <text x="640" y="1103" font-size="9" fill="#333">● Requires ARG + VFDB + mobility genes + length + BacMet (no metadata priors)</text>
-  <text x="640" y="1118" font-size="9" fill="#333">● Mean AUC = 0.920, equivalent to full 10-dim model; S_VF raises fusion AUC to 0.963</text>
+  <text x="640" y="1118" font-size="9" fill="#333">● Mean AUC = 0.919, equivalent to full 10-dim model; S_VF raises fusion AUC to 0.966</text>
   <text x="640" y="1133" font-size="9" fill="#333">● CLI: <tspan font-family="Courier, monospace">plasrisk --mode lite *.fasta</tspan></text>
   <text x="640" y="1148" font-size="9" fill="#333">● Python API: <tspan font-family="Courier, monospace">PlasRiskScorer(mode="lite")</tspan></text>
   <text x="640" y="1162" font-size="8.5" fill="#555">● Ideal for resource-limited settings, large-scale screening, One Health surveillance</text>
