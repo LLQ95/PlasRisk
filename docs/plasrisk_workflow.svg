@@ -104,16 +104,16 @@
   <text x="291" y="205" font-size="9" fill="#333">S_HOST 0.030</text>
   <rect x="265" y="212" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="265" y="212" width="11" height="16" rx="3" fill="#4575b4" opacity="0.6"/>
-  <text x="281" y="224" font-size="9" fill="#333">S_GROW 0.002</text>
+  <text x="272" y="224" font-size="9" fill="#333">S_HAB 0.019</text>
   <rect x="265" y="231" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="265" y="231" width="3" height="16" rx="2" fill="#54278f" opacity="0.5"/>
-  <text x="273" y="243" font-size="9" fill="#333">S_REP 0.004</text>
+  <text x="272" y="243" font-size="9" fill="#333">S_GEO 0.005</text>
   <rect x="265" y="250" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="265" y="250" width="2" height="16" rx="2" fill="#54278f" opacity="0.4"/>
-  <text x="272" y="262" font-size="9" fill="#333">S_HAB 0.019</text>
+  <text x="273" y="262" font-size="9" fill="#333">S_REP 0.004</text>
   <rect x="265" y="269" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="265" y="269" width="2" height="16" rx="2" fill="#54278f" opacity="0.4"/>
-  <text x="272" y="281" font-size="9" fill="#333">S_GEO 0.005</text>
+  <text x="281" y="281" font-size="9" fill="#333">S_GROW 0.002</text>
 
   <rect x="500" y="185" width="300" height="110" rx="8" fill="#f7f7f7" stroke="#bbb" stroke-width="1" stroke-dasharray="4,2"/>
   <text x="650" y="203" text-anchor="middle" font-size="10" font-weight="bold" fill="#333">5-fold CV validation (4 outcomes)</text>
@@ -173,9 +173,9 @@
   <text x="660" y="494" font-size="9.5" font-weight="bold" fill="#3182bd">S_HAB</text><text x="705" y="494" font-size="8.5" fill="#555">Habitat breadth</text>
   <text x="660" y="509" font-size="9.5" font-weight="bold" fill="#3182bd">S_GEO</text><text x="705" y="509" font-size="8.5" fill="#555">Geographic spread</text>
   <rect x="518" y="522" width="239" height="42" rx="4" fill="#fff" stroke="#a1d99b" stroke-width="1" stroke-dasharray="3,2"/>
-  <text x="637" y="537" text-anchor="middle" font-size="9" font-weight="bold" fill="#238b45">Lite mode (--mode lite): S_ARG + S_VF + S_MOB + S_SIZE + S_BM</text>
-  <text x="637" y="552" text-anchor="middle" font-size="8.5" fill="#555">Renormalized weights: 0.253 / 0.135 / 0.201 / 0.175 / 0.237</text>
-  <text x="637" y="562" text-anchor="middle" font-size="8.5" fill="#555">Equivalent mean AUC to full model (0.920 vs 0.920)</text>
+  <text x="637" y="537" text-anchor="middle" font-size="9" font-weight="bold" fill="#238b45">Lite mode (--mode lite): S_ARG + S_BM + S_MOB + S_SIZE + S_VF</text>
+  <text x="637" y="552" text-anchor="middle" font-size="8.5" fill="#555">Renormalized weights: 0.253 / 0.237 / 0.201 / 0.175 / 0.135</text>
+  <text x="637" y="562" text-anchor="middle" font-size="8.5" fill="#555">Equivalent mean AUC to full model (0.919 vs 0.919)</text>
 
   <line x1="455" y1="454" x2="500" y2="460" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
   <line x1="455" y1="535" x2="500" y2="520" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
@@ -339,7 +339,7 @@
 
   <rect x="625" y="1050" width="525" height="115" rx="6" fill="#f0fdf4" stroke="#31a354" stroke-width="1"/>
   <text x="640" y="1070" font-size="10" font-weight="bold" fill="#006d2c">PlasRisk-lite: rapid screening mode (5-dim core)</text>
-  <text x="640" y="1088" font-size="9" fill="#333">● 5 dimensions: S_ARG (0.253) + S_VF (0.135) + S_MOB (0.201) + S_SIZE (0.175) + S_BM (0.237)</text>
+  <text x="640" y="1088" font-size="9" fill="#333">● 5 dimensions: S_ARG (0.253) + S_BM (0.237) + S_MOB (0.201) + S_SIZE (0.175) + S_VF (0.135)</text>
   <text x="640" y="1103" font-size="9" fill="#333">● Requires ARG + VFDB + mobility genes + length + BacMet (no metadata priors)</text>
   <text x="640" y="1118" font-size="9" fill="#333">● Mean AUC = 0.919, equivalent to full 10-dim model; S_VF raises fusion AUC to 0.966</text>
   <text x="640" y="1133" font-size="9" fill="#333">● CLI: <tspan font-family="Courier, monospace">plasrisk --mode lite *.fasta</tspan></text>

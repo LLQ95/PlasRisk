@@ -16,15 +16,15 @@ automatically annotates them using [abricate](https://github.com/tseemann/abrica
 The default output is the FASTA-only lite core:
 
 ```
-S_lite = 0.258*S_ARG + 0.115*S_VF + 0.215*S_MOB + 0.190*S_SIZE + 0.222*S_BM
+S_lite = 0.253*S_ARG + 0.237*S_BM + 0.201*S_MOB + 0.175*S_SIZE + 0.135*S_VF
 ```
 
 The full 10-dimension model (`--mode full`) is:
 
 ```
-S_full = 0.245*S_ARG + 0.110*S_VF + 0.204*S_MOB + 0.028*S_HOST
-       + 0.003*S_REP + 0.181*S_SIZE + 0.211*S_BM
-       + 0.002*S_GEO + 0.002*S_HAB + 0.015*S_GROW
+S_full = 0.237*S_ARG + 0.222*S_BM + 0.189*S_MOB + 0.164*S_SIZE
+       + 0.126*S_VF + 0.030*S_HOST + 0.019*S_HAB + 0.005*S_GEO
+       + 0.004*S_REP + 0.002*S_GROW
 
 Weights derived by data-driven consensus (Random Forest MDG, LASSO, and
 grid-search optimization) on 792,964 PIPdb PSCs; sum ≈ 1.0.
@@ -130,10 +130,10 @@ metadata are required. The full 10-dimension model is available with
 
 | | Lite (5-dim, default) | Full (10-dim) |
 |---|---|---|
-| Dimensions | S_ARG, S_VF, S_MOB, S_SIZE, S_BM | S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE, S_BM, S_GEO, S_HAB, S_GROW |
-| Weights | 0.258, 0.115, 0.215, 0.190, 0.222 | 0.245, 0.110, 0.204, 0.028, 0.003, 0.181, 0.211, 0.002, 0.002, 0.015 |
-| Mean AUC (4 outcomes) | 0.920 | 0.920 |
-| Grade agreement | 92.7% exact / 100% within one grade vs. full | reference |
+| Dimensions | S_ARG, S_BM, S_MOB, S_SIZE, S_VF | S_ARG, S_BM, S_MOB, S_SIZE, S_VF, S_HOST, S_HAB, S_GEO, S_REP, S_GROW |
+| Weights | 0.253, 0.237, 0.201, 0.175, 0.135 | 0.237, 0.222, 0.189, 0.164, 0.126, 0.030, 0.019, 0.005, 0.004, 0.002 |
+| Mean AUC (4 outcomes) | 0.919 | 0.919 |
+| Grade agreement | 98.2% exact / 100% within one grade vs. full | reference |
 | Required annotations | ARG + VF + mobility + length + BacMet | ARG + VF + mobility + replicon + BacMet + metadata |
 | Use case | Rapid FASTA-only screening, resource-limited settings | Comprehensive risk assessment with epidemiological context |
 
@@ -224,16 +224,16 @@ print(f"S_norm = {scores['S_norm']:.3f}, grade = {scores['grade']}")
 
 | Component | Weight | What it measures | Scoring basis |
 |-----------|--------|------------------|---------------|
-| **S_ARG** | 0.245 | ARG count, WHO-priority genes, high-risk genes (mcr, NDM, KPC, CTX-M, tetX, etc.) | Base + per-gene + high-risk bonuses |
-| **S_BM** | 0.211 | Biocide/metal resistance (mer, qac, ars/cop/sil) — co-selection potential | Base + per-gene + family bonuses |
-| **S_MOB** | 0.204 | T4CP, relaxase, oriT, auxiliary transfer proteins | Element-based additive score |
-| **S_SIZE** | 0.181 | Plasmid length (cargo capacity) | Sigmoid: midpoint 30 kb |
-| **S_VF** | 0.110 | VF count, exotoxins, secretion systems (T3SS/T4SS) | Base + per-gene + category bonuses |
-| **S_HOST** | 0.028 | Number of host genera / replicon prior | Empirical host range or lookup |
-| **S_GROW** | 0.015 | Annual growth rate of the replicon | PIPdb-derived lookup |
-| **S_REP** | 0.003 | Replicon backbone risk (IncX3, IncN, ColKP3 high; ColpVC low) | PIPdb-derived lookup table |
-| **S_HAB** | 0.002 | Habitat breadth (human/animal/environment) | PIPdb-derived lookup |
-| **S_GEO** | 0.002 | Number of countries observed | PIPdb-derived lookup |
+| **S_ARG** | 0.237 | ARG count, WHO-priority genes, high-risk genes (mcr, NDM, KPC, CTX-M, tetX, etc.) | Base + per-gene + high-risk bonuses |
+| **S_BM** | 0.222 | Biocide/metal resistance (mer, qac, ars/cop/sil), co-selection potential | Base + per-gene + family bonuses |
+| **S_MOB** | 0.189 | T4CP, relaxase, oriT, auxiliary transfer proteins | Element-based additive score |
+| **S_SIZE** | 0.164 | Plasmid length (cargo capacity) | Sigmoid: midpoint 30 kb |
+| **S_VF** | 0.126 | VF count, exotoxins, secretion systems (T3SS/T4SS) | Base + per-gene + category bonuses |
+| **S_HOST** | 0.030 | Number of host genera / replicon prior | Empirical host range or lookup |
+| **S_HAB** | 0.019 | Habitat breadth (human/animal/environment) | PIPdb-derived lookup |
+| **S_GEO** | 0.005 | Number of countries observed | PIPdb-derived lookup |
+| **S_REP** | 0.004 | Replicon backbone risk (IncX3, IncN, ColKP3 high; ColpVC low) | PIPdb-derived lookup table |
+| **S_GROW** | 0.002 | Annual growth rate of the replicon | PIPdb-derived lookup |
 
 ---
 
@@ -273,20 +273,22 @@ included:
   12.2% high-risk ARG rate, 13.3% conjugative rate (vs. 0% in Q4).
 - **Data-driven weights**: RF-MDG, LASSO, and grid-search optimization across four
   outcomes (high-risk ARG, MDR-VF fusion, conjugative capacity, BMRG carriage)
-  converged on S_ARG (0.245), S_BM (0.211), S_MOB (0.204), and S_SIZE (0.181)
+  converged on S_ARG (0.237), S_BM (0.222), S_MOB (0.189), and S_SIZE (0.164)
   as dominant predictors.
-- **AUC validation**: Final weights achieved AUC 0.958 (high-risk ARG), 0.964
-  (MDR-VF fusion), 0.856 (conjugation), 0.903 (BMRG); mean 0.920.
+- **AUC validation**: Final weights achieved AUC 0.955 (high-risk ARG), 0.967
+  (MDR-VF fusion), 0.846 (conjugation), 0.910 (BMRG); mean 0.919.
 - **Dimensionality analysis**: All-subsets evaluation (1,023 subsets, 5-fold CV)
-  showed that 5 core dimensions (ARG+VF+MOB+SIZE+BM) achieve equivalent mean AUC
-  to the full 10-dim model (0.920 vs. 0.920), provided as `--mode lite`.
+  showed that 5 core dimensions (ARG+BM+MOB+SIZE+VF) achieve equivalent mean AUC
+  to the full 10-dim model (0.919 vs. 0.919), provided as `--mode lite`.
   Overfitting diagnostics (train-test gap, bootstrap optimism, learning curves)
   confirmed no excess optimism in either model.
 - **Leave-one-replicon-out CV**: mean AUC = 0.962 across 40 replicons.
 - **Weight perturbation sensitivity** (100 iterations, +/-30%): mean Spearman
   rho = 0.994, mean top-10 overlap = 9.2/10.
-- **External validation**: 40 independent NCBI plasmids correctly classified
-  (18/20 high-risk Grade A, 19/20 low-risk Grade D/E).
+- **External case-control challenge**: 367 independent plasmids (167 carrying
+  critical ARGs and 200 without ARG/VF), deduplicated at 95% ANI over 80%
+  coverage, were scored with labels derived only from abricate annotation;
+  AUC 0.998 (95% CI 0.994-1.000).
 
 ---
 

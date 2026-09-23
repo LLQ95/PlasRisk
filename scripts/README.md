@@ -161,16 +161,16 @@ results/
 
 | Dimension | Weight | Interpretation |
 |-----------|--------|----------------|
-| S_ARG | 0.2448 | ARG burden (incl. WHO high-priority bonus) |
-| S_BM | 0.2112 | Biocide/metal resistance (co-selection) |
-| S_MOB | 0.2041 | Mobility/conjugation machinery |
-| S_SIZE | 0.1808 | Plasmid size (logistic sigmoid) |
-| S_VF | 0.1096 | Virulence factor burden |
-| S_HOST | 0.0282 | Host range |
-| S_GROW | 0.0147 | Epidemic growth rate |
-| S_REP | 0.0030 | Replicon type prior |
-| S_HAB | 0.0022 | Habitat breadth |
-| S_GEO | 0.0015 | Geographic spread |
+| S_ARG | 0.2374 | ARG burden (incl. WHO high-priority bonus) |
+| S_BM | 0.2225 | Biocide/metal resistance (co-selection) |
+| S_MOB | 0.1887 | Mobility/conjugation machinery |
+| S_SIZE | 0.1642 | Plasmid size (logistic sigmoid) |
+| S_VF | 0.1263 | Virulence factor burden |
+| S_HOST | 0.0300 | Host range |
+| S_HAB | 0.0193 | Habitat breadth |
+| S_GEO | 0.0048 | Geographic spread |
+| S_REP | 0.0043 | Replicon type prior |
+| S_GROW | 0.0024 | Epidemic growth rate |
 
 ## R Package Dependencies
 

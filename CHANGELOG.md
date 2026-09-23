@@ -2,6 +2,18 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.1.2] - 2026-09-23
+
+### Fixed
+- Package weight constants now match the locked consensus weights released
+  in data/locked_v1.1.1 and reported in manuscript Table 1 (S_ARG 0.237,
+  S_BM 0.222, S_MOB 0.189, S_SIZE 0.164, S_VF 0.126, S_HOST 0.030,
+  S_HAB 0.019, S_GEO 0.005, S_REP 0.004, S_GROW 0.002). Package builds
+  1.1.0 and 1.1.1 carried the pre-lock weights.
+- Terms in all lite and full formulas are listed in descending weight
+  order. Lite weights are 0.253 (S_ARG), 0.237 (S_BM), 0.201 (S_MOB),
+  0.175 (S_SIZE), and 0.135 (S_VF).
+
 ## [1.1.1] - 2026-09-21
 
 ### Changed

@@ -24,36 +24,36 @@ import pandas as pd
 # optimization on 792,964 PIPdb PSCs; normalized to sum = 1.0)
 # ---------------------------------------------------------------------------
 RISK_WEIGHTS: Dict[str, float] = {
-    "S_ARG":  0.2448,  # Antimicrobial resistance gene burden
-    "S_VF":   0.1096,  # Virulence factor burden
-    "S_MOB":  0.2041,  # Mobility / conjugation potential
-    "S_HOST": 0.0282,  # Host range breadth
-    "S_REP":  0.0030,  # Replicon-specific risk prior
-    "S_SIZE": 0.1808,  # Plasmid size (cargo capacity)
-    "S_BM":   0.2112,  # Biocide / metal resistance (co-selection)
-    "S_GEO":  0.0015,  # Geographic spread
-    "S_HAB":  0.0022,  # Habitat breadth (One Health)
-    "S_GROW": 0.0147,  # Temporal growth rate
+    "S_ARG":  0.237407560,  # Antimicrobial resistance gene burden
+    "S_BM":   0.222474567,  # Biocide / metal resistance (co-selection)
+    "S_MOB":  0.188667866,  # Mobility / conjugation potential
+    "S_SIZE": 0.164241191,  # Plasmid size (cargo capacity)
+    "S_VF":   0.126322075,  # Virulence factor burden
+    "S_HOST": 0.030023037,  # Host range breadth
+    "S_HAB":  0.019285441,  # Habitat breadth (One Health)
+    "S_GEO":  0.004837394,  # Geographic spread
+    "S_REP":  0.004300076,  # Replicon-specific risk prior
+    "S_GROW": 0.002440791,  # Temporal growth rate
 }
 
 WEIGHT_SUM = sum(RISK_WEIGHTS.values())  # 1.0001 ≈ 1.0
 
 # ---------------------------------------------------------------------------
-# Lite mode: 5-dimension core (S_ARG + S_VF + S_MOB + S_SIZE + S_BM)
+# Lite mode: 5-dimension core (S_ARG + S_BM + S_MOB + S_SIZE + S_VF)
 # Renormalized from the full consensus weights; captures >=99.9% of mean AUC
-# (0.920 vs 0.920 for 10-dim at 3 decimal places).
+# (0.919 vs 0.919 for 10-dim at 3 decimal places).
 # Derived from all-subsets dimensionality analysis (pipdb_20, 5-fold CV):
-#   k=5 mean CV AUC = 0.9201 vs k=10 = 0.9203 (difference 0.0002, NS).
-# Includes S_VF because it raises MDR-VF fusion AUC from 0.943 to 0.963.
+#   k=5 mean AUC = 0.919 vs k=10 = 0.919 (difference < 0.001, NS).
+# Includes S_VF because it raises MDR-VF fusion AUC from 0.945 to 0.967.
 # Overfitting analysis (pipdb_21) confirmed no train-test gap for either model.
 # ---------------------------------------------------------------------------
-LITE_DIMENSIONS = ("S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BM")
+LITE_DIMENSIONS = ("S_ARG", "S_BM", "S_MOB", "S_SIZE", "S_VF")
 LITE_WEIGHTS_RAW = {k: RISK_WEIGHTS[k] for k in LITE_DIMENSIONS}
-LITE_WEIGHT_SUM = sum(LITE_WEIGHTS_RAW.values())  # 0.9505
+LITE_WEIGHT_SUM = sum(LITE_WEIGHTS_RAW.values())  # 0.9391
 RISK_WEIGHTS_LITE: Dict[str, float] = {
     k: v / LITE_WEIGHT_SUM for k, v in LITE_WEIGHTS_RAW.items()
 }
-# S_ARG=0.2576, S_VF=0.1153, S_MOB=0.2147, S_SIZE=0.1902, S_BM=0.2222
+# S_ARG=0.2528, S_BM=0.2369, S_MOB=0.2009, S_SIZE=0.1749, S_VF=0.1345
 
 # ---------------------------------------------------------------------------
 # Risk grade thresholds (on normalized S_norm in [0, 1])
@@ -321,7 +321,7 @@ class PlasRiskScorer:
                     (S_ARG, S_VF, S_MOB, S_SIZE, S_BM), reproducing 92.7%
                     of full-model grades exactly and 100% within one grade,
                     with equivalent mean AUC to the full model.
-                    Renormalized weights: 0.258/0.115/0.215/0.190/0.222.
+                    Renormalized weights: 0.253/0.237/0.201/0.175/0.135.
             "full": 10-dimension model; the five contextual dimensions
                     (S_HOST, S_REP, S_GEO, S_HAB, S_GROW) require PIPdb-style
                     metadata and are imputed from replicon priors otherwise.
