@@ -6,6 +6,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
 
+![PlasRisk graphical abstract](docs/graphical_abstract.svg)
+
 PlasRisk computes a composite risk score for bacterial plasmids based on
 biologically motivated dimensions: antimicrobial resistance gene (ARG) burden,
 virulence factors (VFs), mobility/conjugation potential, host range, replicon
@@ -133,7 +135,7 @@ metadata are required. The full 10-dimension model is available with
 | Dimensions | S_ARG, S_BM, S_MOB, S_SIZE, S_VF | S_ARG, S_BM, S_MOB, S_SIZE, S_VF, S_HOST, S_HAB, S_GEO, S_REP, S_GROW |
 | Weights | 0.253, 0.237, 0.201, 0.175, 0.135 | 0.237, 0.222, 0.189, 0.164, 0.126, 0.030, 0.019, 0.005, 0.004, 0.002 |
 | Mean AUC (4 outcomes) | 0.919 | 0.919 |
-| Grade agreement | 98.2% exact / 100% within one grade vs. full | reference |
+| Grade agreement | 92.7% exact / 100% within one grade vs. full | reference |
 | Required annotations | ARG + VF + mobility + length + BacMet | ARG + VF + mobility + replicon + BacMet + metadata |
 | Use case | Rapid FASTA-only screening, resource-limited settings | Comprehensive risk assessment with epidemiological context |
 
