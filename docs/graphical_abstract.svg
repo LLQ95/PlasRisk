@@ -588,24 +588,24 @@
         <text class="st25" transform="translate(135.46 170.1)"><tspan x="0" y="0">.030</tspan></text>
       </g>
       <g>
-        <text class="st5" transform="translate(109.72 177.09)"><tspan x="0" y="0">S_GROW</tspan></text>
-        <rect class="st96" x="127.75" y="173.75" width="0.52" height="3.95" rx=".91" ry=".91"/>
-        <text class="st25" transform="translate(129.57 177.09)"><tspan x="0" y="0">.002</tspan></text>
+        <text class="st5" transform="translate(113.97 177.09)"><tspan x="0" y="0">S_HAB</tspan></text>
+        <rect class="st96" x="127.75" y="173.75" width="4.12" height="3.95" rx=".91" ry=".91"/>
+        <text class="st25" transform="translate(133.17 177.09)"><tspan x="0" y="0">.019</tspan></text>
       </g>
       <g>
-        <text class="st5" transform="translate(113.97 184.07)"><tspan x="0" y="0">S_REP</tspan></text>
-        <rect class="st96" x="127.75" y="180.73" width="0.92" height="3.95" rx=".3" ry=".3"/>
-        <text class="st25" transform="translate(129.97 184.07)"><tspan x="0" y="0">.004</tspan></text>
+        <text class="st5" transform="translate(113.36 184.07)"><tspan x="0" y="0">S_GEO</tspan></text>
+        <rect class="st96" x="127.75" y="180.73" width="1.03" height="3.95" rx=".3" ry=".3"/>
+        <text class="st25" transform="translate(130.08 184.07)"><tspan x="0" y="0">.005</tspan></text>
       </g>
       <g>
-        <text class="st5" transform="translate(113.36 191.06)"><tspan x="0" y="0">S_GEO</tspan></text>
-        <rect class="st96" x="127.75" y="187.72" width="1.03" height="3.94" rx=".3" ry=".3"/>
-        <text class="st25" transform="translate(130.08 191.06)"><tspan x="0" y="0">.005</tspan></text>
+        <text class="st5" transform="translate(113.97 191.06)"><tspan x="0" y="0">S_REP</tspan></text>
+        <rect class="st96" x="127.75" y="187.72" width="0.92" height="3.94" rx=".3" ry=".3"/>
+        <text class="st25" transform="translate(129.97 191.06)"><tspan x="0" y="0">.004</tspan></text>
       </g>
       <g>
-        <text class="st5" transform="translate(113.97 198.04)"><tspan x="0" y="0">S_HAB</tspan></text>
-        <rect class="st96" x="127.75" y="194.7" width="4.12" height="3.94" rx=".91" ry=".91"/>
-        <text class="st25" transform="translate(133.17 198.04)"><tspan x="0" y="0">.019</tspan></text>
+        <text class="st5" transform="translate(109.72 198.04)"><tspan x="0" y="0">S_GROW</tspan></text>
+        <rect class="st96" x="127.75" y="194.7" width="0.52" height="3.94" rx=".91" ry=".91"/>
+        <text class="st25" transform="translate(129.57 198.04)"><tspan x="0" y="0">.002</tspan></text>
       </g>
       <line class="st42" x1="127.75" y1="200.47" x2="179.98" y2="200.47"/>
       <line class="st42" x1="127.75" y1="200.47" x2="127.75" y2="201.69"/>
@@ -687,7 +687,7 @@
     <g>
       <text class="st13" transform="translate(218.25 188.93)"><tspan x="0" y="0">Lite ≈ Full</tspan></text>
       <text class="st36" transform="translate(218.25 196.83)"><tspan x="0" y="0">|ΔAUC| ≤ 0.001 on all outcomes</tspan></text>
-      <text class="st36" transform="translate(218.25 203.51)"><tspan x="0" y="0">98.2% grade agreement</tspan></text>
+      <text class="st36" transform="translate(218.25 203.51)"><tspan x="0" y="0">92.7% grade agreement</tspan></text>
       <text class="st36" transform="translate(218.25 210.19)"><tspan x="0" y="0">plateau at k = 5 of 1,023 subsets</tspan></text>
     </g>
     <text class="st7" transform="translate(213.39 225.98)"><tspan x="0" y="0">Full adds epidemiological context for</tspan></text>
@@ -778,7 +778,7 @@
     <line class="st46" x1="312.4" y1="187.72" x2="393.8" y2="187.72"/>
     <text class="st21" transform="translate(312.4 195.61)"><tspan x="0" y="0">Deployment</tspan></text>
     <rect class="st86" x="312.4" y="199.26" width="81.39" height="13.97" rx="2.73" ry="2.73"/>
-    <text class="st29" transform="translate(316.65 205.33)"><tspan x="0" y="0">$ plasrisk run *.fasta</tspan></text>
+    <text class="st29" transform="translate(316.65 205.33)"><tspan x="0" y="0">$ plasrisk *.fasta</tspan></text>
     <text class="st27" transform="translate(316.65 210.8)"><tspan x="0" y="0"># scores, grade, percentile (TSV/JSON)</tspan></text>
     <g>
       <g>
