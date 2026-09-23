@@ -85,43 +85,43 @@
   <text x="55" y="185" font-size="10" font-weight="bold" fill="#333">Final weights:</text>
   <rect x="55" y="193" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="55" y="193" width="186" height="16" rx="3" fill="#d73027" opacity="0.85"/>
-  <text x="62" y="205" font-size="9" fill="#fff" font-weight="bold">S_ARG 0.245</text>
+  <text x="62" y="205" font-size="9" fill="#fff" font-weight="bold">S_ARG 0.237</text>
   <rect x="55" y="212" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="55" y="212" width="160" height="16" rx="3" fill="#fc8d59" opacity="0.85"/>
-  <text x="62" y="224" font-size="9" fill="#fff" font-weight="bold">S_BM 0.211</text>
+  <text x="62" y="224" font-size="9" fill="#fff" font-weight="bold">S_BM 0.222</text>
   <rect x="55" y="231" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="55" y="231" width="155" height="16" rx="3" fill="#fee08b" opacity="0.9"/>
-  <text x="62" y="243" font-size="9" fill="#333" font-weight="bold">S_MOB 0.204</text>
+  <text x="62" y="243" font-size="9" fill="#333" font-weight="bold">S_MOB 0.189</text>
   <rect x="55" y="250" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="55" y="250" width="137" height="16" rx="3" fill="#d9ef8b" opacity="0.9"/>
-  <text x="62" y="262" font-size="9" fill="#333" font-weight="bold">S_SIZE 0.181</text>
+  <text x="62" y="262" font-size="9" fill="#333" font-weight="bold">S_SIZE 0.164</text>
   <rect x="55" y="269" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="55" y="269" width="84" height="16" rx="3" fill="#91cf60" opacity="0.85"/>
-  <text x="62" y="281" font-size="9" fill="#333" font-weight="bold">S_VF 0.110</text>
+  <text x="62" y="281" font-size="9" fill="#333" font-weight="bold">S_VF 0.126</text>
 
   <rect x="265" y="193" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="265" y="193" width="21" height="16" rx="3" fill="#1a9850" opacity="0.7"/>
-  <text x="291" y="205" font-size="9" fill="#333">S_HOST 0.028</text>
+  <text x="291" y="205" font-size="9" fill="#333">S_HOST 0.030</text>
   <rect x="265" y="212" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="265" y="212" width="11" height="16" rx="3" fill="#4575b4" opacity="0.6"/>
-  <text x="281" y="224" font-size="9" fill="#333">S_GROW 0.015</text>
+  <text x="281" y="224" font-size="9" fill="#333">S_GROW 0.002</text>
   <rect x="265" y="231" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="265" y="231" width="3" height="16" rx="2" fill="#54278f" opacity="0.5"/>
-  <text x="273" y="243" font-size="9" fill="#333">S_REP 0.003</text>
+  <text x="273" y="243" font-size="9" fill="#333">S_REP 0.004</text>
   <rect x="265" y="250" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="265" y="250" width="2" height="16" rx="2" fill="#54278f" opacity="0.4"/>
-  <text x="272" y="262" font-size="9" fill="#333">S_HAB 0.002</text>
+  <text x="272" y="262" font-size="9" fill="#333">S_HAB 0.019</text>
   <rect x="265" y="269" width="190" height="16" rx="3" fill="#f0f0f0" stroke="#ddd" stroke-width="0.5"/>
   <rect x="265" y="269" width="2" height="16" rx="2" fill="#54278f" opacity="0.4"/>
-  <text x="272" y="281" font-size="9" fill="#333">S_GEO 0.002</text>
+  <text x="272" y="281" font-size="9" fill="#333">S_GEO 0.005</text>
 
   <rect x="500" y="185" width="300" height="110" rx="8" fill="#f7f7f7" stroke="#bbb" stroke-width="1" stroke-dasharray="4,2"/>
   <text x="650" y="203" text-anchor="middle" font-size="10" font-weight="bold" fill="#333">5-fold CV validation (4 outcomes)</text>
-  <text x="512" y="220" font-size="9.5" fill="#333">● High-risk ARG: AUC = 0.958</text>
-  <text x="512" y="234" font-size="9.5" fill="#333">● MDR–VF fusion: AUC = 0.964</text>
-  <text x="512" y="248" font-size="9.5" fill="#333">● Conjugative: AUC = 0.856</text>
-  <text x="512" y="262" font-size="9.5" fill="#333">● Biocide/metal: AUC = 0.903</text>
-  <text x="512" y="276" font-size="9.5" fill="#333">● Mean AUC = 0.920 · LORO-CV = 0.962</text>
+  <text x="512" y="220" font-size="9.5" fill="#333">● High-risk ARG: AUC = 0.955</text>
+  <text x="512" y="234" font-size="9.5" fill="#333">● MDR–VF fusion: AUC = 0.967</text>
+  <text x="512" y="248" font-size="9.5" fill="#333">● Conjugative: AUC = 0.846</text>
+  <text x="512" y="262" font-size="9.5" fill="#333">● Biocide/metal: AUC = 0.910</text>
+  <text x="512" y="276" font-size="9.5" fill="#333">● Mean AUC = 0.919 · LORO-CV = 0.962</text>
   <text x="512" y="290" font-size="9" fill="#555">● ±30% perturbation: Spearman ρ = 0.995</text>
 
   <rect x="840" y="185" width="305" height="110" rx="8" fill="#fafafa" stroke="#999" stroke-width="1"/>
@@ -174,7 +174,7 @@
   <text x="660" y="509" font-size="9.5" font-weight="bold" fill="#3182bd">S_GEO</text><text x="705" y="509" font-size="8.5" fill="#555">Geographic spread</text>
   <rect x="518" y="522" width="239" height="42" rx="4" fill="#fff" stroke="#a1d99b" stroke-width="1" stroke-dasharray="3,2"/>
   <text x="637" y="537" text-anchor="middle" font-size="9" font-weight="bold" fill="#238b45">Lite mode (--mode lite): S_ARG + S_VF + S_MOB + S_SIZE + S_BM</text>
-  <text x="637" y="552" text-anchor="middle" font-size="8.5" fill="#555">Renormalized weights: 0.258 / 0.115 / 0.215 / 0.190 / 0.222</text>
+  <text x="637" y="552" text-anchor="middle" font-size="8.5" fill="#555">Renormalized weights: 0.253 / 0.135 / 0.201 / 0.175 / 0.237</text>
   <text x="637" y="562" text-anchor="middle" font-size="8.5" fill="#555">Equivalent mean AUC to full model (0.920 vs 0.920)</text>
 
   <line x1="455" y1="454" x2="500" y2="460" stroke="#555" stroke-width="1.5" marker-end="url(#arrow)"/>
@@ -305,25 +305,25 @@
   <text x="1080" y="912" font-size="8" fill="#888">Δ</text>
   <line x1="600" y1="917" x2="1140" y2="917" stroke="#ddd" stroke-width="0.5"/>
   <text x="610" y="932" font-size="8.5" fill="#333">High-risk ARG AUC</text>
-  <text x="800" y="932" font-size="8.5" fill="#08519c">0.958</text>
-  <text x="970" y="932" font-size="8.5" fill="#006d2c">0.958</text>
+  <text x="800" y="932" font-size="8.5" fill="#08519c">0.955</text>
+  <text x="970" y="932" font-size="8.5" fill="#006d2c">0.955</text>
   <text x="1080" y="932" font-size="8" fill="#888">0.000</text>
   <text x="610" y="947" font-size="8.5" fill="#333">MDR–VF fusion AUC</text>
-  <text x="800" y="947" font-size="8.5" fill="#08519c">0.964</text>
-  <text x="970" y="947" font-size="8.5" fill="#006d2c">0.963</text>
+  <text x="800" y="947" font-size="8.5" fill="#08519c">0.967</text>
+  <text x="970" y="947" font-size="8.5" fill="#006d2c">0.966</text>
   <text x="1080" y="947" font-size="8" fill="#888">−0.001</text>
   <text x="610" y="962" font-size="8.5" fill="#333">Conjugative AUC</text>
-  <text x="800" y="962" font-size="8.5" fill="#08519c">0.856</text>
-  <text x="970" y="962" font-size="8.5" fill="#006d2c">0.856</text>
+  <text x="800" y="962" font-size="8.5" fill="#08519c">0.846</text>
+  <text x="970" y="962" font-size="8.5" fill="#006d2c">0.845</text>
   <text x="1080" y="962" font-size="8" fill="#888">0.000</text>
   <text x="610" y="977" font-size="8.5" fill="#333">Biocide/metal AUC</text>
-  <text x="800" y="977" font-size="8.5" fill="#08519c">0.903</text>
-  <text x="970" y="977" font-size="8.5" fill="#006d2c">0.904</text>
+  <text x="800" y="977" font-size="8.5" fill="#08519c">0.910</text>
+  <text x="970" y="977" font-size="8.5" fill="#006d2c">0.911</text>
   <text x="1080" y="977" font-size="8" fill="#888">+0.001</text>
   <line x1="600" y1="984" x2="1140" y2="984" stroke="#ddd" stroke-width="0.5"/>
   <text x="610" y="999" font-size="9" font-weight="bold" fill="#333">Mean AUC (4 outcomes)</text>
-  <text x="800" y="999" font-size="9" font-weight="bold" fill="#08519c">0.920</text>
-  <text x="970" y="999" font-size="9" font-weight="bold" fill="#006d2c">0.920</text>
+  <text x="800" y="999" font-size="9" font-weight="bold" fill="#08519c">0.919</text>
+  <text x="970" y="999" font-size="9" font-weight="bold" fill="#006d2c">0.919</text>
   <text x="1080" y="999" font-size="8" fill="#006d2c">equivalent</text>
   <text x="610" y="1016" font-size="8.5" fill="#555">Required annotations</text>
   <text x="800" y="1016" font-size="8" fill="#555">ARG+VF+MOB+REP+BM+meta</text>
