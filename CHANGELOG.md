@@ -2,6 +2,20 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.3.0] - 2026-09-24
+
+### Added
+- The original PIPdb 8-item ordinal index is now exposed as a third mode,
+  `--mode ordinal` (grades 1–5), alongside the default continuous lite
+  core (`--mode lite`) and the 10-dimension full model (`--mode full`).
+  The Python factory accepts it as `get_scorer("plasrisk", mode="ordinal")`
+  in addition to `get_scorer("pipdb")` and the `PIPdbScorer` class.
+
+### Deprecated
+- The separate `--model {plasrisk,pipdb}` flag is deprecated; `--model
+  pipdb` continues to work and is equivalent to `--mode ordinal`. Mode
+  selection should use `--mode {lite,full,ordinal}`.
+
 ## [1.2.0] - 2026-09-24
 
 ### Changed

@@ -1120,12 +1120,13 @@ def get_scorer(model: str = "plasrisk", mode: str = "lite",
     ----------
     model : str
         ``"plasrisk"`` (default) — weighted continuous model; ``mode``
-        selects the 5-dimension FASTA-only lite core (default) or the
-        10-dimension full model.
+        selects the 5-dimension FASTA-only lite core (default), the
+        10-dimension full model, or ``"ordinal"`` (the original PIPdb
+        8-item ordinal index, equivalent to ``model="pipdb"``).
         ``"pipdb"`` — original PIPdb 8-item ordinal model.
     mode : str
-        For PlasRisk: ``"lite"`` (5-dim core, default; FASTA-only) or
-        ``"full"`` (10-dim). Ignored for PIPdb.
+        For PlasRisk: ``"lite"`` (5-dim core, default; FASTA-only),
+        ``"full"`` (10-dim) or ``"ordinal"`` (PIPdb 8-item index).
     replicon_lookup : pd.DataFrame, optional
         Replicon empirical prior table (PlasRisk only).
 
@@ -1134,7 +1135,11 @@ def get_scorer(model: str = "plasrisk", mode: str = "lite",
     PlasRiskScorer or PIPdbScorer
     """
     model = model.lower().strip()
+    if mode is not None:
+        mode = mode.lower().strip()
     if model in ("plasrisk", "plasrisk10", "10dim", "10-dim"):
+        if mode == "ordinal":
+            return PIPdbScorer()
         return PlasRiskScorer(replicon_lookup=replicon_lookup, mode=mode)
     elif model in ("pipdb", "ordinal", "pipdb-original"):
         return PIPdbScorer()

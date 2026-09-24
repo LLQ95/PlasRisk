@@ -11,12 +11,13 @@ S = 0.253*S_ARG + 0.237*S_BMG + 0.201*S_MOB + 0.175*S_SIZE + 0.135*S_VF
 
 The full 10-dimension model (--mode full) adds S_HOST, S_REP, S_GEO,
 S_HAB and S_GROW, which require PIPdb-style metadata and are otherwise
-imputed from replicon priors.
+imputed from replicon priors. The original PIPdb 8-item ordinal index
+is available with --mode ordinal.
 
 Reference: [to be updated upon publication]
 """
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 __author__ = "PlasRisk Team"
 
 from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,

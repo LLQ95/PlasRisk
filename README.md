@@ -1,7 +1,7 @@
 # PlasRisk
 
 **Data-driven weighted risk assessment for bacterial plasmids from FASTA sequences**
-**(5-dimension FASTA-only lite core by default; 10-dimension full model available)**
+**(three modes: 5-dimension FASTA-only lite core by default, 10-dimension full model, and the original PIPdb ordinal index)**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
@@ -31,6 +31,17 @@ S_full = 0.237*S_ARG + 0.222*S_BMG + 0.189*S_MOB + 0.164*S_SIZE
 Weights derived by data-driven consensus (Random Forest MDG, LASSO, and
 grid-search optimization) on 792,964 PIPdb PSCs; sum ≈ 1.0.
 ```
+
+The original PIPdb ordinal index (`--mode ordinal`) reproduces the published
+8-item formula (Zhu et al., 2025, Table 1):
+
+```
+CRI = clamp(Round((pathogenic_phylum + pathogenic_species + habitats
+      + ARGs + VFGs + 2*WHO_ARGs + ISs + growth_rate)/8 + 0.6), 1, 5)
+```
+
+Each item is binned to an ordinal value of 1–5; the index runs from 1
+(Minimal) to 5 (Very High), with a normalized value of (CRI−1)/4.
 
 Risk grades: **A** (Very High, S >= 0.60), **B** (High, >= 0.45),
 **C** (Moderate, >= 0.30), **D** (Low, >= 0.15), **E** (Minimal, < 0.15).
@@ -119,25 +130,31 @@ plasrisk --json -o results plasmid.fasta
 # Full 10-dimension model with epidemiological context (default is lite)
 plasrisk --mode full *.fasta
 
+# Original PIPdb 8-item ordinal index (grades 1-5)
+plasrisk --mode ordinal *.fasta
+
 # Verify that the package S_SIZE transform and the discovery-pipeline
 # transform rank plasmids identically (writes rank_concordance.tsv)
 plasrisk --rank-concordance *.fasta
 ```
 
-### Lite (default) vs. Full mode
+### Lite (default), Full and Ordinal modes
 
 The default output is the 5-dimension FASTA-only lite core; no PIPdb-style
 metadata are required. The full 10-dimension model is available with
-`--mode full`.
+`--mode full`, and the original PIPdb 8-item ordinal index with
+`--mode ordinal`.
 
-| | Lite (5-dim, default) | Full (10-dim) |
-|---|---|---|
-| Dimensions | S_ARG, S_BMG, S_MOB, S_SIZE, S_VF | S_ARG, S_BMG, S_MOB, S_SIZE, S_VF, S_HOST, S_HAB, S_GEO, S_REP, S_GROW |
-| Weights | 0.253, 0.237, 0.201, 0.175, 0.135 | 0.237, 0.222, 0.189, 0.164, 0.126, 0.030, 0.019, 0.005, 0.004, 0.002 |
-| Mean AUC (4 outcomes) | 0.919 | 0.919 |
-| Grade agreement | 92.7% exact / 100% within one grade vs. full | reference |
-| Required annotations | ARG + VF + mobility + length + BacMet | ARG + VF + mobility + replicon + BacMet + metadata |
-| Use case | Rapid FASTA-only screening, resource-limited settings | Comprehensive risk assessment with epidemiological context |
+| | Lite (default) | Full | Ordinal |
+|---|---|---|---|
+| Flag | `--mode lite` | `--mode full` | `--mode ordinal` |
+| Output scale | continuous 0–1, grades A–E | continuous 0–1, grades A–E | ordinal index 1–5 |
+| Components | S_ARG, S_BMG, S_MOB, S_SIZE, S_VF | lite 5 plus S_HOST, S_HAB, S_GEO, S_REP, S_GROW | pathogenic phylum/species, habitats, ARGs, VFGs, WHO ARGs (2×), ISs, growth rate |
+| Weights / bins | 0.253, 0.237, 0.201, 0.175, 0.135 | 0.237, 0.222, 0.189, 0.164, 0.126, 0.030, 0.019, 0.005, 0.004, 0.002 | published PIPdb ordinal bins, 1–5 per item |
+| Mean AUC (4 outcomes) | 0.919 | 0.919 | CRI AUC 0.81–0.83 (internal consistency) |
+| Grade agreement | 92.7% exact / 100% within one grade vs. full | reference | not applicable |
+| Required annotations | ARG + VF + mobility + length + BacMet | ARG + VF + mobility + replicon + BacMet + metadata | ARG + VF + WHO ARG + IS counts; unknown metadata default to bin 1 |
+| Use case | Rapid FASTA-only screening, resource-limited settings | Comprehensive risk assessment with epidemiological context | Reproducing the published PIPdb index for direct comparison |
 
 ### S_SIZE normalization and rank-concordance check
 
@@ -198,6 +215,13 @@ print(df[["seq_id", "S_norm", "grade", "high_risk_genes"]])
 scorer_full = PlasRiskScorer(replicon_lookup=lookup, mode="full")
 df_full = scorer_full.score_dataframe(result.features)
 
+# Original PIPdb 8-item ordinal index (three ways to obtain it)
+from plasrisk import PIPdbScorer, get_scorer
+scorer_ord = PIPdbScorer()                       # direct class
+scorer_ord = get_scorer("pipdb")                 # factory, model name
+scorer_ord = get_scorer("plasrisk", mode="ordinal")  # factory, mode
+df_ord = scorer_ord.score_dataframe(result.features)
+
 # S_SIZE rank-concordance check (package sigmoid vs pipeline log-ratio)
 from plasrisk import size_rank_concordance
 print(size_rank_concordance([f.length_bp for f in result.features]))
@@ -253,8 +277,11 @@ options:
   --min-id FLOAT        Minimum abricate identity % (default: 75)
   --min-cov FLOAT       Minimum abricate coverage % (default: 50)
   --no-abricate         Skip abricate; sequence-only scoring
-  --mode {lite,full}    Scoring mode: lite (5-dim FASTA-only core, default)
-                        or full (10-dim)
+  --mode {lite,full,ordinal}
+                        Scoring mode: lite (5-dim FASTA-only core, default),
+                        full (10-dim weighted), or ordinal (PIPdb 8-item index)
+  --model {plasrisk,pipdb}
+                        Deprecated alias; pipdb is equivalent to --mode ordinal
   --rank-concordance    Verify S_SIZE rank concordance (sigmoid vs log-ratio)
   --db LIST             Comma-separated abricate databases (default: auto)
   --json                Also write JSON output

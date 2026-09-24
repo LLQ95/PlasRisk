@@ -13,10 +13,11 @@ Options:
     --min-id FLOAT       Minimum abricate identity % (default: 75)
     --min-cov FLOAT      Minimum abricate coverage % (default: 50)
     --no-abricate        Skip abricate; sequence-only scoring
-    --model MODEL        Scoring model: 'plasrisk' (weighted, default) or
-                         'pipdb' (original PIPdb 8-item ordinal)
-    --mode MODE          PlasRisk mode: 'lite' (5-dim FASTA-only core,
-                         default) or 'full' (10-dim; ignored for --model pipdb)
+    --mode MODE          Scoring mode: 'lite' (5-dim FASTA-only core,
+                         default), 'full' (10-dim), or 'ordinal'
+                         (original PIPdb 8-item ordinal index)
+    --model MODEL        Deprecated alias: 'plasrisk' (default) or 'pipdb'
+                         (equivalent to --mode ordinal)
     --rank-concordance   Also verify that the package sigmoid S_SIZE and the
                          pipeline log-ratio S_SIZE give identical rankings on
                          the input sequences (writes rank_concordance.tsv)
@@ -64,8 +65,9 @@ def parse_args(argv=None):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  plasrisk plasmid.fasta                  # lite (5-dim, FASTA-only), default
-  plasrisk --mode full plasmid.fasta      # full 10-dim with replicon priors
+  plasrisk plasmid.fasta                   # lite (5-dim, FASTA-only), default
+  plasrisk --mode full plasmid.fasta       # full 10-dim with replicon priors
+  plasrisk --mode ordinal plasmid.fasta    # original PIPdb 8-item ordinal index
   plasrisk -o results *.fasta
   plasrisk /data/plasmids/
   plasrisk --db card,vfdb,plasmidfinder plasmid.fasta
@@ -87,12 +89,13 @@ Examples:
                         help="Skip abricate annotation; sequence-only scoring")
     parser.add_argument("--model", choices=["plasrisk", "pipdb"],
                         default="plasrisk",
-                        help="Scoring model: 'plasrisk' (weighted continuous, "
-                             "default) or 'pipdb' (original PIPdb 8-item ordinal)")
-    parser.add_argument("--mode", choices=["lite", "full"], default="lite",
-                        help="PlasRisk mode: 'lite' (5-dim FASTA-only core, "
-                             "default) or 'full' (10-dim; ignored when "
-                             "--model pipdb)")
+                        help="Deprecated alias: 'plasrisk' (default) or "
+                             "'pipdb' (equivalent to --mode ordinal)")
+    parser.add_argument("--mode", choices=["lite", "full", "ordinal"],
+                        default="lite",
+                        help="Scoring mode: 'lite' (5-dim FASTA-only core, "
+                             "default), 'full' (10-dim weighted), or "
+                             "'ordinal' (original PIPdb 8-item ordinal index)")
     parser.add_argument("--rank-concordance", action="store_true",
                         help="Verify rank concordance between package sigmoid "
                              "S_SIZE and pipeline log-ratio S_SIZE on the "
@@ -141,18 +144,18 @@ def collect_fasta_files(inputs: List[str]) -> List[str]:
     return unique
 
 
-def print_banner(args):
-    if args.model == "pipdb":
-        model_str = "PIPdb original (8-item ordinal)"
+def print_banner(args, mode):
+    if mode == "ordinal":
+        model_str = "ORDINAL (PIPdb original 8-item index)"
     else:
-        model_str = "LITE (5-dim core)" if args.mode == "lite" else "FULL (10-dim)"
+        model_str = "LITE (5-dim core)" if mode == "lite" else "FULL (10-dim)"
     print("=" * 68)
     print("  PlasRisk v%s - Plasmid Risk Assessment" % __version__)
-    print("  Model: %s" % model_str)
+    print("  Mode: %s" % model_str)
     print("=" * 68)
     if not args.quiet:
-        if args.model == "plasrisk":
-            w = RISK_WEIGHTS_LITE if args.mode == "lite" else RISK_WEIGHTS
+        if mode != "ordinal":
+            w = RISK_WEIGHTS_LITE if mode == "lite" else RISK_WEIGHTS
             ws = sum(w.values())
             print("  Weights: %s" % ", ".join(
                 "%s=%.3f" % (k, v) for k, v in w.items()))
@@ -175,7 +178,9 @@ def print_banner(args):
 
 def main(argv=None):
     args = parse_args(argv)
-    print_banner(args)
+    # Effective mode: legacy --model pipdb maps to --mode ordinal
+    mode = "ordinal" if args.model == "pipdb" else args.mode
+    print_banner(args, mode)
 
     # Collect input files
     fasta_files = collect_fasta_files(args.inputs)
@@ -192,7 +197,7 @@ def main(argv=None):
     # Optional: S_SIZE rank-concordance check (package sigmoid vs pipeline
     # log-ratio). Both transforms are strictly monotonic, so Spearman rho
     # must be 1.0; see Supplementary Text S1.
-    if args.rank_concordance and args.model == "plasrisk":
+    if args.rank_concordance and mode != "ordinal":
         lengths = []
         for fp in fasta_files:
             try:
@@ -222,7 +227,7 @@ def main(argv=None):
 
     # Load replicon lookup and create scorer
     lookup = load_replicon_lookup()
-    scorer = get_scorer(model=args.model, mode=args.mode,
+    scorer = get_scorer(model="plasrisk", mode=mode,
                         replicon_lookup=lookup)
 
     # Determine abricate databases
@@ -270,20 +275,20 @@ def main(argv=None):
 
         # Per-file summary
         if len(df) > 0:
-            is_pipdb = args.model == "pipdb"
-            score_col = "risk_index_normalized" if is_pipdb else "S_norm"
+            is_ordinal = mode == "ordinal"
+            score_col = "risk_index_normalized" if is_ordinal else "S_norm"
             grade_col = "grade"
-            if is_pipdb:
+            if is_ordinal:
                 grade_list = ["5", "4", "3", "2", "1"]
-                n_bm = 0  # PIPdb model does not report BM separately
-                n_hr = 0  # PIPdb model does not report high_risk_genes
+                n_bm = 0  # ordinal model does not report BM separately
+                n_hr = 0  # ordinal model does not report high_risk_genes
             else:
                 grade_list = ["A", "B", "C", "D", "E"]
                 n_bm = int((df["n_BM"] > 0).sum()) if "n_BM" in df.columns else 0
                 n_hr = int((df["high_risk_genes"] != "").sum()) if "high_risk_genes" in df.columns else 0
             file_summaries.append({
                 "file": os.path.basename(fasta_path),
-                "model": args.model,
+                "model": mode,
                 "n_sequences": len(df),
                 "n_ARG_positive": int((df["n_ARG"] > 0).sum()),
                 "n_VF_positive": int((df["n_VF"] > 0).sum()),
@@ -298,7 +303,7 @@ def main(argv=None):
 
         if not args.quiet:
             top = df.iloc[0]
-            score_col = "risk_index_normalized" if args.model == "pipdb" else "S_norm"
+            score_col = "risk_index_normalized" if mode == "ordinal" else "S_norm"
             print("    %d sequences scored | top: %s (score=%.3f, grade %s)" % (
                 len(df), top["seq_id"], top[score_col], top["grade"]))
 
@@ -341,8 +346,8 @@ def main(argv=None):
     print("-" * 68)
 
     # Grade distribution
-    is_pipdb = args.model == "pipdb"
-    if is_pipdb:
+    is_ordinal = mode == "ordinal"
+    if is_ordinal:
         grade_order = ["5", "4", "3", "2", "1"]
         score_col = "risk_index_normalized"
     else:
@@ -361,7 +366,7 @@ def main(argv=None):
         print("\n  Top 10 highest-risk plasmids:")
         top10 = combined.nsmallest(10, "rank") if "rank" in combined.columns else combined.head(10)
         for _, row in top10.head(10).iterrows():
-            if is_pipdb:
+            if is_ordinal:
                 extra = "index=%s" % row.get("combined_risk_index", "?")
             else:
                 hr = row.get("high_risk_genes", "")

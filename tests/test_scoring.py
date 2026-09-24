@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from plasrisk.scoring import (
     PlasRiskScorer,
+    PIPdbScorer,
     PlasmidFeatures,
     RISK_WEIGHTS,
     RISK_WEIGHTS_LITE,
@@ -210,6 +211,34 @@ def test_size_rank_concordance():
     assert abs(res["kendall_tau"] - 1.0) < 1e-9
 
 
+def test_ordinal_factory():
+    """All three entry paths must return the PIPdb ordinal scorer."""
+    assert isinstance(get_scorer("pipdb"), PIPdbScorer)
+    assert isinstance(get_scorer("ordinal"), PIPdbScorer)
+    assert isinstance(get_scorer("plasrisk", mode="ordinal"), PIPdbScorer)
+    assert isinstance(PIPdbScorer(), PIPdbScorer)
+
+
+def test_ordinal_scoring():
+    """Ordinal index must stay within 1-5 and rise with gene content."""
+    scorer = PIPdbScorer()
+    empty = PlasmidFeatures(seq_id="empty", length_bp=5000)
+    r0 = scorer.score(empty)
+    assert 1 <= r0["combined_risk_index"] <= 5
+    assert r0["grade"] in ("1", "2", "3", "4", "5")
+    assert 0.0 <= r0["risk_index_normalized"] <= 1.0
+    loaded = PlasmidFeatures(
+        seq_id="loaded", length_bp=120000,
+        arg_names=["NDM-1", "CTX-M-15", "mcr-1", "TEM-1"],
+        vf_names=["aerobactin", "iroN"],
+        has_t4cp=True, has_relaxase=True,
+    )
+    r1 = scorer.score(loaded)
+    assert r1["combined_risk_index"] >= r0["combined_risk_index"]
+    assert abs(r1["risk_index_normalized"]
+               - (r1["combined_risk_index"] - 1) / 4) < 0.001
+
+
 if __name__ == "__main__":
     test_weight_sum()
     test_empty_plasmid()
@@ -225,4 +254,6 @@ if __name__ == "__main__":
     test_default_mode_is_lite()
     test_size_logratio_matches_pipeline()
     test_size_rank_concordance()
+    test_ordinal_factory()
+    test_ordinal_scoring()
     print("All tests passed.")
