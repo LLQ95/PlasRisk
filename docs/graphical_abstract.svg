@@ -563,7 +563,7 @@
         <text class="st25" transform="translate(179.74 135.17)"><tspan x="0" y="0">.237</tspan></text>
       </g>
       <g>
-        <text class="st0" transform="translate(116 142.16)"><tspan x="0" y="0">S_BM</tspan></text>
+        <text class="st0" transform="translate(116 142.16)"><tspan x="0" y="0">S_BMG</tspan></text>
         <rect class="st83" x="127.75" y="138.82" width="47.5" height="3.95" rx=".91" ry=".91"/>
         <text class="st25" transform="translate(176.55 142.16)"><tspan x="0" y="0">.222</tspan></text>
       </g>
@@ -618,7 +618,7 @@
     <rect class="st57" x="111.95" y="212.62" width="81.99" height="16.15" rx="2.74" ry="2.74"/>
     <g>
       <text class="st1" transform="translate(116.2 219.3)"><tspan x="0" y="0">Departs from expert intuition</tspan></text>
-      <text class="st2" transform="translate(116.2 225.98)"><tspan x="0" y="0">S_BM ≈ 3× expert; S_GEO/S_HAB/S_REP ≈ 0</tspan></text>
+      <text class="st2" transform="translate(116.2 225.98)"><tspan x="0" y="0">S_BMG ≈ 3× expert; S_GEO/S_HAB/S_REP ≈ 0</tspan></text>
     </g>
     <text class="st7" transform="translate(111.95 240.56)"><tspan x="0" y="0">Equal-vote consensus; no method dominates</tspan></text>
     <text class="st7" transform="translate(111.95 246.03)"><tspan x="0" y="0">(pairwise DeLong). Weights fixed on train only.</tspan></text>

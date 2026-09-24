@@ -36,15 +36,15 @@ d[, S_VF := 0.0]
 d[n_vf > 0, S_VF := pmin(0.30 + pmin(n_vf * 0.03, 0.40) +
   0.15 * grepl("Exotoxin", vf_category) + 0.15 * grepl("Effector delivery", vf_category), 1.0)]
 
-# S_BM
+# S_BMG
 d[, has_mer := as.integer(grepl("mer|mercury", gene_bacmet, ignore.case = TRUE))]
 d[, has_qac := as.integer(grepl("qac|quaternary|disinfectant", gene_bacmet, ignore.case = TRUE))]
 d[, has_ars := as.integer(grepl("ars|cop|sil|czc|cad|pco", gene_bacmet, ignore.case = TRUE))]
 d[is.na(has_mer), has_mer := 0L]; d[is.na(has_qac), has_qac := 0L]; d[is.na(has_ars), has_ars := 0L]
-d[, S_BM := 0.0]
-d[n_metal > 0, S_BM := pmin(0.25 + pmin(n_metal * 0.04, 0.35) + 0.15 * has_mer + 0.15 * has_qac + 0.10 * has_ars, 1.0)]
+d[, S_BMG := 0.0]
+d[n_metal > 0, S_BMG := pmin(0.25 + pmin(n_metal * 0.04, 0.35) + 0.15 * has_mer + 0.15 * has_qac + 0.10 * has_ars, 1.0)]
 
-comp_cols <- c("S_ARG","S_VF","S_MOB","S_HOST","S_REP","S_SIZE","S_BM","S_GEO","S_HAB","S_GROW")
+comp_cols <- c("S_ARG","S_VF","S_MOB","S_HOST","S_REP","S_SIZE","S_BMG","S_GEO","S_HAB","S_GROW")
 for (cc in comp_cols) d[[cc]] <- fifelse(is.na(d[[cc]]), 0.0, as.numeric(d[[cc]]))
 
 d[, y_highrisk := as.integer(n_high_risk_arg > 0)]
@@ -56,7 +56,7 @@ dd <- copy(d[!is.na(S_ARG) & !is.na(S_VF) & !is.na(S_MOB) & !is.na(S_HOST) &
   !is.na(S_REP) & !is.na(S_SIZE) & !is.na(S_GEO) & !is.na(S_HAB) & !is.na(S_GROW)])
 cat(sprintf("  %d PSCs with complete component data\n", nrow(dd)))
 
-expert_w <- c(S_ARG=0.30, S_VF=0.30, S_MOB=0.20, S_HOST=0.15, S_REP=0.10, S_SIZE=0.10, S_BM=0.10, S_GEO=0.05, S_HAB=0.05, S_GROW=0.05)
+expert_w <- c(S_ARG=0.30, S_VF=0.30, S_MOB=0.20, S_HOST=0.15, S_REP=0.10, S_SIZE=0.10, S_BMG=0.10, S_GEO=0.05, S_HAB=0.05, S_GROW=0.05)
 expert_w_norm <- expert_w / sum(expert_w)
 
 # 1. RF MDG

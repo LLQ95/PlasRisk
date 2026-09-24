@@ -3,7 +3,7 @@
 # pipdb_20_dimensionality_analysis.R
 #
 # Addresses the question: "How many dimensions are optimal for PlasRisk?"
-# Compares the parsimonious 5-dim lite model (S_ARG+S_VF+S_MOB+S_SIZE+S_BM)
+# Compares the parsimonious 5-dim lite model (S_ARG+S_VF+S_MOB+S_SIZE+S_BMG)
 # against the full 10-dim model, using all-subsets evaluation.
 #
 # Analyses:
@@ -68,7 +68,7 @@ theme_pub <- theme_bw(base_size = 11) +
 cat("=== Loading data ===\n")
 
 comp_cols <- c("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_REP", "S_SIZE",
-               "S_BM", "S_GEO", "S_HAB", "S_GROW")
+               "S_BMG", "S_GEO", "S_HAB", "S_GROW")
 
 # Load final weights
 wf <- file.path(tab_dir, "tab_weight_comparison.csv")
@@ -79,7 +79,7 @@ if (file.exists(wf)) {
   cat("Loaded final weights from tab_weight_comparison.csv\n")
 } else {
   W <- c(S_ARG=0.2448, S_VF=0.1096, S_MOB=0.2041, S_HOST=0.0282,
-         S_REP=0.0030, S_SIZE=0.1808, S_BM=0.2112, S_GEO=0.0015,
+         S_REP=0.0030, S_SIZE=0.1808, S_BMG=0.2112, S_GEO=0.0015,
          S_HAB=0.0022, S_GROW=0.0147)
   cat("Using built-in final weights\n")
 }
@@ -94,7 +94,7 @@ if (!file.exists(score_file)) stop("Cannot find psc_risk_scores.tsv or tab_psc_f
 d <- fread(score_file, na.strings = c("\\N", "", "NA"))
 cat(sprintf("  %d PSCs loaded, %d columns\n", nrow(d), ncol(d)))
 
-# Compute S_VF and S_BM if not present
+# Compute S_VF and S_BMG if not present
 if (!"S_VF" %in% names(d) && "n_vf" %in% names(d)) {
   cat("Computing S_VF ...\n")
   d[, n_vf := fifelse(is.na(n_vf), 0L, n_vf)]
@@ -107,10 +107,10 @@ if (!"S_VF" %in% names(d) && "n_vf" %in% names(d)) {
     d[n_vf > 0, S_VF := pmin(0.30 + pmin(n_vf * 0.03, 0.40), 1.0)]
   }
 }
-if (!"S_BM" %in% names(d) && "n_metal" %in% names(d)) {
-  cat("Computing S_BM ...\n")
+if (!"S_BMG" %in% names(d) && "n_metal" %in% names(d)) {
+  cat("Computing S_BMG ...\n")
   d[, n_metal := fifelse(is.na(n_metal), 0L, n_metal)]
-  d[, S_BM := 0.0]
+  d[, S_BMG := 0.0]
   if ("gene_bacmet" %in% names(d)) {
     d[, has_mer := as.integer(grepl("\\bmer[A-Za-z]?\\b|mercury", gene_bacmet, ignore.case = TRUE))]
     d[, has_qac := as.integer(grepl("qac|quaternary|disinfectant", gene_bacmet, ignore.case = TRUE))]
@@ -118,10 +118,10 @@ if (!"S_BM" %in% names(d) && "n_metal" %in% names(d)) {
     d[is.na(has_mer), has_mer := 0L]
     d[is.na(has_qac), has_qac := 0L]
     d[is.na(has_ars), has_ars := 0L]
-    d[n_metal > 0, S_BM := pmin(0.25 + pmin(n_metal * 0.04, 0.35) +
+    d[n_metal > 0, S_BMG := pmin(0.25 + pmin(n_metal * 0.04, 0.35) +
         0.15 * has_mer + 0.15 * has_qac + 0.10 * has_ars, 1.0)]
   } else {
-    d[n_metal > 0, S_BM := pmin(0.25 + pmin(n_metal * 0.04, 0.35), 1.0)]
+    d[n_metal > 0, S_BMG := pmin(0.25 + pmin(n_metal * 0.04, 0.35), 1.0)]
   }
 }
 
@@ -216,7 +216,7 @@ for (mask in 1:(n_subsets - 1)) {
   results_all[[idx]] <- data.table(
     mask = mask, k = k, subset = paste(subset, collapse = "+"),
     has_ARG = as.integer("S_ARG" %in% subset),
-    has_BM  = as.integer("S_BM" %in% subset),
+    has_BM  = as.integer("S_BMG" %in% subset),
     has_VF  = as.integer("S_VF" %in% subset),
     has_MOB = as.integer("S_MOB" %in% subset),
     test_AUC_highrisk = aucs_test["y_highrisk"],
@@ -396,7 +396,7 @@ cat("\n=== DeLong test: 5-dim lite vs 10-dim full ===\n")
 w10 <- W / sum(W)
 sc10 <- as.numeric(X_test %*% w10)
 
-lite_dims <- c("S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BM")
+lite_dims <- c("S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BMG")
 w5 <- W[lite_dims]; w5 <- w5 / sum(w5)
 sc5 <- as.numeric(X_test[, lite_dims] %*% w5)
 
@@ -604,7 +604,7 @@ p5 <- ggplot(dilution_long, aes(x = component, y = weight, fill = model)) +
   geom_text(aes(label = ifelse(weight > 0, sprintf("%.3f", weight), "")),
             position = position_dodge(0.8), vjust = -0.3, size = 2.8) +
   labs(title = "Weight distribution: 5-dim lite vs 10-dim full model",
-       subtitle = "Lite model retains the 5 highest-weight dimensions (S_ARG, S_VF, S_MOB, S_SIZE, S_BM)",
+       subtitle = "Lite model retains the 5 highest-weight dimensions (S_ARG, S_VF, S_MOB, S_SIZE, S_BMG)",
        x = NULL, y = "Normalized weight") +
   theme_pub +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),

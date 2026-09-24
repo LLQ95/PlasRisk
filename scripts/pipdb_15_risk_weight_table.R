@@ -2,7 +2,7 @@
 # =============================================================================
 # pipdb_15_risk_weight_table.R
 # Per-replicon composite risk table with data-driven final weights (10 dimensions).
-# Includes: S_VF, S_BM computation, RF feature-importance validation,
+# Includes: S_VF, S_BMG computation, RF feature-importance validation,
 #           weight sensitivity analysis, logistic regression, visualization.
 # =============================================================================
 suppressPackageStartupMessages({
@@ -25,14 +25,14 @@ save_plot <- function(plot, name, w=10, h=8) {
 }
 theme_pub <- theme_bw(base_size=11) + theme(panel.grid.minor=element_blank(), strip.background=element_rect(fill="grey90", colour=NA))
 
-comp_cols <- c("S_ARG","S_VF","S_MOB","S_HOST","S_REP","S_SIZE","S_BM","S_GEO","S_HAB","S_GROW")
+comp_cols <- c("S_ARG","S_VF","S_MOB","S_HOST","S_REP","S_SIZE","S_BMG","S_GEO","S_HAB","S_GROW")
 wf <- file.path(tab_dir, "tab_weight_comparison.csv")
 if (file.exists(wf)) {
   wc <- fread(wf); W <- wc$Final; names(W) <- wc$Component
   cat("Loaded data-driven final weights from tab_weight_comparison.csv\n")
 } else {
   W <- c(S_ARG=0.2448, S_VF=0.1096, S_MOB=0.2041, S_HOST=0.0282, S_REP=0.0030,
-         S_SIZE=0.1808, S_BM=0.2112, S_GEO=0.0015, S_HAB=0.0022, S_GROW=0.0147)
+         S_SIZE=0.1808, S_BMG=0.2112, S_GEO=0.0015, S_HAB=0.0022, S_GROW=0.0147)
   cat("Using built-in final consensus weights\n")
 }
 W_norm <- W / sum(W)
@@ -62,20 +62,20 @@ d[, vf_category_bonus := 0.15*has_exotoxin + 0.15*has_effector]
 d[, S_VF := pmin(vf_base + vf_count_bonus + vf_category_bonus, 1.0)]
 d[n_vf==0 | is.na(n_vf), S_VF := 0.0]
 
-# S_BM
-cat("Computing S_BM ...\n")
+# S_BMG
+cat("Computing S_BMG ...\n")
 d[, n_metal := fifelse(is.na(n_metal), 0L, n_metal)]
 d[, has_mer := as.integer(grepl("mer|mercury", gene_bacmet, ignore.case=TRUE))]
 d[, has_qac := as.integer(grepl("qac|quaternary|disinfectant", gene_bacmet, ignore.case=TRUE))]
 d[, has_ars := as.integer(grepl("ars|cop|sil|czc|cad|pco", gene_bacmet, ignore.case=TRUE))]
 d[is.na(has_mer), has_mer := 0L]; d[is.na(has_qac), has_qac := 0L]; d[is.na(has_ars), has_ars := 0L]
-d[, S_BM := 0.0]
-d[n_metal > 0, S_BM := pmin(0.25 + pmin(n_metal*0.04, 0.35) + 0.15*has_mer + 0.15*has_qac + 0.10*has_ars, 1.0)]
+d[, S_BMG := 0.0]
+d[n_metal > 0, S_BMG := pmin(0.25 + pmin(n_metal*0.04, 0.35) + 0.15*has_mer + 0.15*has_qac + 0.10*has_ars, 1.0)]
 
 # Composite S
 for (col in comp_cols) d[is.na(get(col)), (col):=0]
 d[, S_total_raw := S_ARG*W["S_ARG"] + S_VF*W["S_VF"] + S_MOB*W["S_MOB"] + S_HOST*W["S_HOST"] +
-  S_REP*W["S_REP"] + S_SIZE*W["S_SIZE"] + S_BM*W["S_BM"] + S_GEO*W["S_GEO"] + S_HAB*W["S_HAB"] + S_GROW*W["S_GROW"]]
+  S_REP*W["S_REP"] + S_SIZE*W["S_SIZE"] + S_BMG*W["S_BMG"] + S_GEO*W["S_GEO"] + S_HAB*W["S_HAB"] + S_GROW*W["S_GROW"]]
 d[, S_total_norm := S_total_raw / sum(W)]
 
 # Per-replicon table
@@ -90,7 +90,7 @@ rep_table <- dt[, .(n_PSC=.N, n_plasmid=uniqueN(plasmid_acc), n_species=uniqueN(
   mean_growth=mean(annual_growth_rate,na.rm=TRUE),
   S_ARG=mean(S_ARG,na.rm=TRUE), S_VF=mean(S_VF,na.rm=TRUE), S_MOB=mean(S_MOB,na.rm=TRUE),
   S_HOST=mean(S_HOST,na.rm=TRUE), S_REP=mean(S_REP,na.rm=TRUE), S_SIZE=mean(S_SIZE,na.rm=TRUE),
-  S_BM=mean(S_BM,na.rm=TRUE), S_GEO=mean(S_GEO,na.rm=TRUE), S_HAB=mean(S_HAB,na.rm=TRUE), S_GROW=mean(S_GROW,na.rm=TRUE),
+  S_BMG=mean(S_BMG,na.rm=TRUE), S_GEO=mean(S_GEO,na.rm=TRUE), S_HAB=mean(S_HAB,na.rm=TRUE), S_GROW=mean(S_GROW,na.rm=TRUE),
   S_total_norm=mean(S_total_norm,na.rm=TRUE)), by=replicon_primary]
 setorder(rep_table, -S_total_norm)
 rep_table[, rank := NA_integer_]; rep_table[n_PSC >= 50, rank := .I]; rep_table[, major := n_PSC >= 50]
@@ -121,24 +121,24 @@ save_plot(p21c, "fig21b_risk_stacked_bar", 10, 10)
 
 # ML validation
 cat("\n=== ML validation ===\n")
-ml_dt <- dt[!is.na(S_ARG), .(S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE, S_BM, S_GEO, S_HAB, S_GROW,
+ml_dt <- dt[!is.na(S_ARG), .(S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE, S_BMG, S_GEO, S_HAB, S_GROW,
   n_high_risk_arg, n_arg, n_vf, mobility_class,
   highrisk=factor(ifelse(n_high_risk_arg>0, "Yes", "No")), mdr_vf=factor(ifelse(n_arg>0 & n_vf>0, "Yes", "No")))]
 ml_dt <- ml_dt[complete.cases(ml_dt)]
 set.seed(42); ml_sample <- ml_dt[sample(.N, min(100000, .N))]
 cat("  Training RF (high-risk ARG)...\n")
-rf1 <- randomForest(highrisk ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BM + S_GEO + S_HAB + S_GROW,
+rf1 <- randomForest(highrisk ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BMG + S_GEO + S_HAB + S_GROW,
                     data=ml_sample, ntree=300, importance=TRUE)
 rf1_auc <- as.numeric(auc(roc(ml_sample$highrisk, predict(rf1, type="prob")[, 2], quiet=TRUE)))
 cat(sprintf("  RF high-risk ARG AUC = %.3f\n", rf1_auc))
 cat("  Training RF (MDR-VF)...\n")
-rf2 <- randomForest(mdr_vf ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BM + S_GEO + S_HAB + S_GROW,
+rf2 <- randomForest(mdr_vf ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BMG + S_GEO + S_HAB + S_GROW,
                     data=ml_sample, ntree=300, importance=TRUE)
 rf2_auc <- as.numeric(auc(roc(ml_sample$mdr_vf, predict(rf2, type="prob")[, 2], quiet=TRUE)))
 cat(sprintf("  RF MDR-VF AUC = %.3f\n", rf2_auc))
 ml_sample[, conj := factor(ifelse(mobility_class %in% c("conjugative_complete","conjugative_likely"),"Yes","No"))]
 cat("  Training RF (conjugative)...\n")
-rf3 <- randomForest(conj ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BM + S_GEO + S_HAB + S_GROW,
+rf3 <- randomForest(conj ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BMG + S_GEO + S_HAB + S_GROW,
                     data=ml_sample, ntree=300, importance=TRUE)
 rf3_auc <- as.numeric(auc(roc(ml_sample$conj, predict(rf3, type="prob")[, 2], quiet=TRUE)))
 cat(sprintf("  RF conjugative AUC = %.3f\n", rf3_auc))
@@ -172,7 +172,7 @@ fwrite(sens_dt, file.path(tab_dir,"tab_weight_sensitivity.csv"))
 
 # Logistic regression
 cat("\n=== Logistic regression ===\n")
-glm1 <- glm(highrisk ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BM + S_GEO + S_HAB + S_GROW,
+glm1 <- glm(highrisk ~ S_ARG + S_VF + S_MOB + S_HOST + S_REP + S_SIZE + S_BMG + S_GEO + S_HAB + S_GROW,
             data=ml_sample, family=binomial)
 glm_coef <- as.data.table(summary(glm1)$coefficients, keep.rownames="feature")
 setnames(glm_coef, c("feature","Estimate","Std.Error","z","p"))

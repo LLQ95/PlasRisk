@@ -51,7 +51,7 @@ tail -n +2 -q predictions/plasrisk_train_predictions_part*.csv >> train_predicti
 | `S_HOST` | host-range component | 0–1 |
 | `S_REP` | replicon-type component | 0–1 |
 | `S_SIZE` | plasmid-size component (sigmoid centred at 30 kb) | 0–1 |
-| `S_BM` | biocide/metal-resistance component | 0–1 |
+| `S_BMG` | biocide/metal-resistance component | 0–1 |
 | `S_GEO` | geographic-spread component | 0–1 |
 | `S_HAB` | habitat-breadth component | 0–1 |
 | `S_GROW` | isolate-record-growth component | 0–1 |
@@ -59,7 +59,7 @@ tail -n +2 -q predictions/plasrisk_train_predictions_part*.csv >> train_predicti
 ### Prediction files
 
 `S_full` is the consensus ten-dimension score; `S_lite` is the FASTA-only
-five-dimension score (S_ARG, S_VF, S_MOB, S_SIZE, S_BM). Grades use fixed
+five-dimension score (S_ARG, S_VF, S_MOB, S_SIZE, S_BMG). Grades use fixed
 thresholds: **A ≥ 0.60, B ≥ 0.45, C ≥ 0.30, D ≥ 0.15, E below 0.15**.
 The four labels are `y_highrisk` (critical ARG carriage), `y_fusion`
 (ARG–VF fusion), `y_conj` (complete conjugative apparatus) and `y_bm`
@@ -80,8 +80,8 @@ m = pd.concat([pd.read_csv(f) for f in
               ignore_index=True)
 w = pd.read_csv("locked_weight_vectors.csv").set_index("component")
 comps = ["S_ARG","S_VF","S_MOB","S_HOST","S_REP","S_SIZE",
-         "S_BM","S_GEO","S_HAB","S_GROW"]
-lite5 = ["S_ARG","S_VF","S_MOB","S_SIZE","S_BM"]
+         "S_BMG","S_GEO","S_HAB","S_GROW"]
+lite5 = ["S_ARG","S_VF","S_MOB","S_SIZE","S_BMG"]
 
 S_full = sum(m[c] * w.loc[c, "consensus"] for c in comps)
 S_lite = sum(m[c] * w.loc[c, "lite"]      for c in lite5)

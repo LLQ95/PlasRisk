@@ -144,7 +144,7 @@ pD <- ggplot(pareto, aes(test_AUC_highrisk, test_AUC_bm)) +
 
 # ---- (E) Weight distribution comparison ----
 wfull <- fread(file.path(tdir, "tab_weight_comparison.csv"))
-lite_dims <- c("S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BM")
+lite_dims <- c("S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BMG")
 wlite <- wfull[Component %in% lite_dims, .(Component, Weight = Final)]
 wlite[, Weight := Weight / sum(Weight)]
 wlite[, Model := "Lite (5D)"]

@@ -7,7 +7,7 @@ derived on 792,964 PIPdb PSCs (Random Forest MDG, LASSO, and grid-search
 consensus weights).
 
 Default output is the 5-dimension FASTA-only lite core:
-S = 0.253*S_ARG + 0.237*S_BM + 0.201*S_MOB + 0.175*S_SIZE + 0.135*S_VF
+S = 0.253*S_ARG + 0.237*S_BMG + 0.201*S_MOB + 0.175*S_SIZE + 0.135*S_VF
 
 The full 10-dimension model (--mode full) adds S_HOST, S_REP, S_GEO,
 S_HAB and S_GROW, which require PIPdb-style metadata and are otherwise
@@ -16,7 +16,7 @@ imputed from replicon priors.
 Reference: [to be updated upon publication]
 """
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 __author__ = "PlasRisk Team"
 
 from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,

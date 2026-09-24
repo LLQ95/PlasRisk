@@ -51,7 +51,7 @@ about:
   description: |
     PlasRisk provides two scoring models for bacterial plasmid risk assessment.
     The default output is a FASTA-only 5-dimension lite core (S_ARG, S_VF,
-    S_MOB, S_SIZE, S_BM) with equivalent discrimination to the full model;
+    S_MOB, S_SIZE, S_BMG) with equivalent discrimination to the full model;
     --mode full adds host range (S_HOST), replicon type (S_REP), geographic
     spread (S_GEO), habitat breadth (S_HAB), and temporal growth rate (S_GROW).
     Weights were derived by data-driven consensus (Random Forest MDG, LASSO,

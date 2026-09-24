@@ -36,7 +36,7 @@ theme_pub <- theme_classic(base_size = 10) +
   )
 
 model_colors <- c("PlasRisk (10D)" = "#E76F51", "PIPdb ordinal" = "#F4A261",
-                  "S_ARG only" = "#2A9D8F", "S_BM only" = "#6D4C41")
+                  "S_ARG only" = "#2A9D8F", "S_BMG only" = "#6D4C41")
 grade_colors <- c("A" = "#9C2C2C", "B" = "#E76F51", "C" = "#F4A261",
                   "D" = "#A8DADC", "E" = "#2A9D8F")
 
@@ -61,7 +61,7 @@ pA <- ggplot(qg_long, aes(Q, Percent, fill = Feature)) +
 # ---- (B) ROC comparison ----
 psc <- fread(file.path(tdir, "tab_psc_final_scores.csv"),
              select = c("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_HAB",
-                        "S_SIZE", "S_BM", "S_GROW", "S_final",
+                        "S_SIZE", "S_BMG", "S_GROW", "S_final",
                         "y_highrisk", "y_fusion"))
 set.seed(42)
 test_idx <- sample(seq_len(nrow(psc)), size = floor(0.2 * nrow(psc)))
@@ -73,7 +73,7 @@ roc_models <- list(
   "PlasRisk (10D)" = pst$S_final,
   "PIPdb ordinal"  = pst$pipdb_raw,
   "S_ARG only"     = pst$S_ARG,
-  "S_BM only"      = pst$S_BM
+  "S_BMG only"      = pst$S_BMG
 )
 roc_df <- rbindlist(lapply(names(roc_models), function(nm) {
   r <- roc(pst$y_fusion, roc_models[[nm]], quiet = TRUE)
@@ -163,7 +163,7 @@ pD <- ggplot(gd_long, aes(grade, Percent, fill = grade, alpha = Metric)) +
 
 # ---- (E) Case study radar ----
 cs <- fread(file.path(tdir, "tab_case_study_scores.csv"))
-radar_dims <- c("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_SIZE", "S_BM", "S_GROW")
+radar_dims <- c("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_SIZE", "S_BMG", "S_GROW")
 cs_long <- melt(cs, id.vars = c("seq_id", "grade"), measure.vars = radar_dims,
                 variable.name = "Dimension", value.name = "Score")
 cs_long[, Dimension := gsub("S_", "", Dimension)]

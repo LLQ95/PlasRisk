@@ -25,7 +25,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 RISK_WEIGHTS: Dict[str, float] = {
     "S_ARG":  0.237407560,  # Antimicrobial resistance gene burden
-    "S_BM":   0.222474567,  # Biocide / metal resistance (co-selection)
+    "S_BMG":   0.222474567,  # Biocide / metal resistance (co-selection)
     "S_MOB":  0.188667866,  # Mobility / conjugation potential
     "S_SIZE": 0.164241191,  # Plasmid size (cargo capacity)
     "S_VF":   0.126322075,  # Virulence factor burden
@@ -39,7 +39,7 @@ RISK_WEIGHTS: Dict[str, float] = {
 WEIGHT_SUM = sum(RISK_WEIGHTS.values())  # 1.0001 ≈ 1.0
 
 # ---------------------------------------------------------------------------
-# Lite mode: 5-dimension core (S_ARG + S_BM + S_MOB + S_SIZE + S_VF)
+# Lite mode: 5-dimension core (S_ARG + S_BMG + S_MOB + S_SIZE + S_VF)
 # Renormalized from the full consensus weights; captures >=99.9% of mean AUC
 # (0.919 vs 0.919 for 10-dim at 3 decimal places).
 # Derived from all-subsets dimensionality analysis (pipdb_20, 5-fold CV):
@@ -47,13 +47,13 @@ WEIGHT_SUM = sum(RISK_WEIGHTS.values())  # 1.0001 ≈ 1.0
 # Includes S_VF because it raises MDR-VF fusion AUC from 0.945 to 0.967.
 # Overfitting analysis (pipdb_21) confirmed no train-test gap for either model.
 # ---------------------------------------------------------------------------
-LITE_DIMENSIONS = ("S_ARG", "S_BM", "S_MOB", "S_SIZE", "S_VF")
+LITE_DIMENSIONS = ("S_ARG", "S_BMG", "S_MOB", "S_SIZE", "S_VF")
 LITE_WEIGHTS_RAW = {k: RISK_WEIGHTS[k] for k in LITE_DIMENSIONS}
 LITE_WEIGHT_SUM = sum(LITE_WEIGHTS_RAW.values())  # 0.9391
 RISK_WEIGHTS_LITE: Dict[str, float] = {
     k: v / LITE_WEIGHT_SUM for k, v in LITE_WEIGHTS_RAW.items()
 }
-# S_ARG=0.2528, S_BM=0.2369, S_MOB=0.2009, S_SIZE=0.1749, S_VF=0.1345
+# S_ARG=0.2528, S_BMG=0.2369, S_MOB=0.2009, S_SIZE=0.1749, S_VF=0.1345
 
 # ---------------------------------------------------------------------------
 # Risk grade thresholds (on normalized S_norm in [0, 1])
@@ -199,7 +199,7 @@ GLOBAL_MEDIANS = {
     "S_HOST": 0.760,
     "S_REP":  0.300,
     "S_SIZE": 0.609,
-    "S_BM":   0.000,
+    "S_BMG":   0.000,
     "S_GEO":  0.000,
     "S_HAB":  0.000,
     "S_GROW": 0.000,
@@ -313,12 +313,12 @@ class PlasRiskScorer:
         replicon_lookup : pd.DataFrame, optional
             Lookup table with columns:
             replicon_primary, S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE,
-            S_BM, S_GEO, S_HAB, S_GROW, n_PSC
+            S_BMG, S_GEO, S_HAB, S_GROW, n_PSC
             Empirical medians from 792,964 PIPdb PSCs.
             If None, built-in global medians are used.
         mode : str
             "lite" (default): 5-dimension FASTA-only core
-                    (S_ARG, S_VF, S_MOB, S_SIZE, S_BM), reproducing 92.7%
+                    (S_ARG, S_VF, S_MOB, S_SIZE, S_BMG), reproducing 92.7%
                     of full-model grades exactly and 100% within one grade,
                     with equivalent mean AUC to the full model.
                     Renormalized weights: 0.253/0.237/0.201/0.175/0.135.
@@ -564,9 +564,9 @@ class PlasRiskScorer:
         return float(min(1.0, max(0.0, z)))
 
     @staticmethod
-    def score_bm(feat: PlasmidFeatures) -> float:
+    def score_bmg(feat: PlasmidFeatures) -> float:
         """
-        S_BM: biocide/metal resistance (co-selection potential).
+        S_BMG: biocide/metal resistance (co-selection potential).
         0 if no BMRGs.
         0.25 base + min(n_bm*0.04, 0.35) + 0.15*mer + 0.15*qac + 0.10*ars/cop/sil.
 
@@ -692,7 +692,7 @@ class PlasRiskScorer:
         Compute component scores and the composite.
 
         In full mode, all 10 components are computed.
-        In lite mode, only the 5 core components (S_ARG, S_VF, S_MOB, S_SIZE, S_BM)
+        In lite mode, only the 5 core components (S_ARG, S_VF, S_MOB, S_SIZE, S_BMG)
         are computed; other S_* fields are reported as None.
 
         When sequence-derived dimensions cannot be determined (abricate not
@@ -713,7 +713,7 @@ class PlasRiskScorer:
             "S_HOST": self.score_host(feat),
             "S_REP":  self.score_rep(feat),
             "S_SIZE": self.score_size(feat.length_bp),
-            "S_BM":   self.score_bm(feat),
+            "S_BMG":   self.score_bmg(feat),
             "S_GEO":  self.score_geo(feat),
             "S_HAB":  self.score_hab(feat),
             "S_GROW": self.score_grow(feat),

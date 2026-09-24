@@ -32,7 +32,7 @@ def test_empty_plasmid():
     result = scorer.score(feat)
     assert result["S_ARG"] == 0.0
     assert result["S_VF"] == 0.0
-    assert result["S_BM"] == 0.0
+    assert result["S_BMG"] == 0.0
     assert result["grade"] in ("D", "E")
     assert result["S_norm"] < 0.3
 
@@ -56,7 +56,7 @@ def test_high_risk_plasmid():
     result = scorer.score(feat)
     assert result["S_ARG"] > 0.7
     assert result["S_VF"] > 0.5
-    assert result["S_BM"] > 0.5
+    assert result["S_BMG"] > 0.5
     assert result["S_MOB"] >= 0.9
     assert result["S_SIZE"] > 0.9
     assert result["grade"] in ("A", "B")
@@ -93,12 +93,12 @@ def test_mobility_classes():
 
 
 def test_bm_scoring():
-    """S_BM should detect mer and qac bonuses."""
+    """S_BMG should detect mer and qac bonuses."""
     scorer = PlasRiskScorer()
     no_bm = PlasmidFeatures(length_bp=5000, bm_gene_names=[])
     mer_only = PlasmidFeatures(length_bp=5000, bm_gene_names=["merA", "merR", "merD"])
-    assert scorer.score_bm(no_bm) == 0.0
-    assert scorer.score_bm(mer_only) >= 0.5
+    assert scorer.score_bmg(no_bm) == 0.0
+    assert scorer.score_bmg(mer_only) >= 0.5
 
 
 def test_grade_thresholds():
@@ -130,7 +130,7 @@ def test_dataframe_output():
 def test_lite_weights():
     """Lite weights should sum to 1.0 and contain 5 core dimensions."""
     assert abs(sum(RISK_WEIGHTS_LITE.values()) - 1.0) < 0.001
-    assert set(RISK_WEIGHTS_LITE.keys()) == {"S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BM"}
+    assert set(RISK_WEIGHTS_LITE.keys()) == {"S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BMG"}
 
 
 def test_lite_mode_scoring():
@@ -150,7 +150,7 @@ def test_lite_mode_scoring():
     assert result["S_VF"] is not None
     assert result["S_MOB"] is not None
     assert result["S_SIZE"] is not None
-    assert result["S_BM"] is not None
+    assert result["S_BMG"] is not None
     assert result["S_HOST"] is None
     assert result["grade"] in ("A", "B", "C")
 

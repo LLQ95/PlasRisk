@@ -49,7 +49,7 @@ about:
     The default PlasRisk model computes a composite score from ten dimensions:
     antimicrobial resistance gene burden (S_ARG), virulence factors (S_VF),
     mobility/conjugation potential (S_MOB), host range (S_HOST), replicon type
-    (S_REP), plasmid size (S_SIZE), biocide/metal resistance (S_BM), geographic
+    (S_REP), plasmid size (S_SIZE), biocide/metal resistance (S_BMG), geographic
     spread (S_GEO), habitat breadth (S_HAB), and temporal growth rate (S_GROW).
     Weights were derived by data-driven consensus (Random Forest MDG, LASSO,
     grid-search optimization) on 792,964 PIPdb plasmid sequence clusters.

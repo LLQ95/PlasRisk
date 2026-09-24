@@ -4,7 +4,7 @@
 #
 # Purpose: Assess overfitting of the full 10-dimension PlasRisk model relative
 #          to the parsimonious 5-dimension lite model (S_ARG + S_VF + S_MOB +
-#          S_SIZE + S_BM), and formally test their equivalence.
+#          S_SIZE + S_BMG), and formally test their equivalence.
 #
 # Analyses:
 #   1. Train vs test AUC gap for k = 1..10 (overfitting diagnostic)
@@ -97,9 +97,9 @@ if ("vf_category" %in% names(d)) {
   d[n_vf > 0, S_VF := pmin(0.30 + pmin(n_vf * 0.03, 0.40), 1.0)]
 }
 
-# --- Compute S_BM (vectorised — NO by= grouping, fixes the data.table error) ---
-cat("Computing S_BM ...\n")
-if (!"S_BM" %in% names(d)) d[, S_BM := 0.0]
+# --- Compute S_BMG (vectorised — NO by= grouping, fixes the data.table error) ---
+cat("Computing S_BMG ...\n")
+if (!"S_BMG" %in% names(d)) d[, S_BMG := 0.0]
 d[, n_metal := fifelse(is.na(n_metal), 0L, n_metal)]
 if ("gene_bacmet" %in% names(d)) {
   d[, has_mer := as.integer(grepl("\\bmer[A-Za-z]?\\b|mercury", gene_bacmet, ignore.case = TRUE))]
@@ -108,10 +108,10 @@ if ("gene_bacmet" %in% names(d)) {
   d[is.na(has_mer), has_mer := 0L]
   d[is.na(has_qac), has_qac := 0L]
   d[is.na(has_ars), has_ars := 0L]
-  d[n_metal > 0, S_BM := pmin(0.25 + pmin(n_metal * 0.04, 0.35) +
+  d[n_metal > 0, S_BMG := pmin(0.25 + pmin(n_metal * 0.04, 0.35) +
       0.15 * has_mer + 0.15 * has_qac + 0.10 * has_ars, 1.0)]
 } else {
-  d[n_metal > 0, S_BM := pmin(0.25 + pmin(n_metal * 0.04, 0.35), 1.0)]
+  d[n_metal > 0, S_BMG := pmin(0.25 + pmin(n_metal * 0.04, 0.35), 1.0)]
 }
 
 # --- Outcomes ---
@@ -126,8 +126,8 @@ d[, `:=`(
 
 # All 10 dimensions
 all_dims <- c("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_REP",
-              "S_SIZE", "S_BM", "S_GEO", "S_HAB", "S_GROW")
-lite_dims <- c("S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BM")
+              "S_SIZE", "S_BMG", "S_GEO", "S_HAB", "S_GROW")
+lite_dims <- c("S_ARG", "S_VF", "S_MOB", "S_SIZE", "S_BMG")
 
 # Ensure all component columns exist and are numeric
 for (cc in all_dims) {
@@ -154,7 +154,7 @@ if (file.exists(weight_file)) {
   }
 } else {
   weights <- c(S_ARG=0.2448, S_VF=0.1096, S_MOB=0.2041, S_HOST=0.0282,
-               S_REP=0.0030, S_SIZE=0.1808, S_BM=0.2112, S_GEO=0.0015,
+               S_REP=0.0030, S_SIZE=0.1808, S_BMG=0.2112, S_GEO=0.0015,
                S_HAB=0.0022, S_GROW=0.0147)
 }
 weights <- weights[all_dims]
@@ -203,13 +203,13 @@ cat("\n=== Train vs test AUC gap (overfitting diagnostic) ===\n")
 best_subsets <- list(
   "1"  = c("S_ARG"),
   "2"  = c("S_ARG", "S_SIZE"),
-  "3"  = c("S_ARG", "S_MOB", "S_BM"),
-  "4"  = c("S_ARG", "S_MOB", "S_SIZE", "S_BM"),
+  "3"  = c("S_ARG", "S_MOB", "S_BMG"),
+  "4"  = c("S_ARG", "S_MOB", "S_SIZE", "S_BMG"),
   "5"  = lite_dims,
-  "6"  = c("S_ARG", "S_VF", "S_MOB", "S_REP", "S_SIZE", "S_BM"),
-  "7"  = c("S_ARG", "S_VF", "S_MOB", "S_REP", "S_SIZE", "S_BM", "S_GROW"),
-  "8"  = c("S_ARG", "S_VF", "S_MOB", "S_REP", "S_SIZE", "S_BM", "S_HAB", "S_GROW"),
-  "9"  = c("S_ARG", "S_VF", "S_MOB", "S_REP", "S_SIZE", "S_BM", "S_GEO", "S_HAB", "S_GROW"),
+  "6"  = c("S_ARG", "S_VF", "S_MOB", "S_REP", "S_SIZE", "S_BMG"),
+  "7"  = c("S_ARG", "S_VF", "S_MOB", "S_REP", "S_SIZE", "S_BMG", "S_GROW"),
+  "8"  = c("S_ARG", "S_VF", "S_MOB", "S_REP", "S_SIZE", "S_BMG", "S_HAB", "S_GROW"),
+  "9"  = c("S_ARG", "S_VF", "S_MOB", "S_REP", "S_SIZE", "S_BMG", "S_GEO", "S_HAB", "S_GROW"),
   "10" = all_dims
 )
 
@@ -523,7 +523,7 @@ cat("   -> 5-dim and 10-dim scores are nearly perfectly correlated.\n\n")
 cat("CONCLUSION:\n")
 cat("  The 10-dimension model does NOT overfit. The train-test gap is negligible\n")
 cat("  (< 0.003), bootstrap optimism is minimal (< 0.005), and learning curves\n")
-cat("  plateau by 50k PSCs. The 5-dim lite model (S_ARG+S_VF+S_MOB+S_SIZE+S_BM)\n")
+cat("  plateau by 50k PSCs. The 5-dim lite model (S_ARG+S_VF+S_MOB+S_SIZE+S_BMG)\n")
 cat("  achieves statistically equivalent mean AUC and is offered as the default\n")
 cat("  parsimonious option for routine screening. The 10-dim full model is\n")
 cat("  retained for comprehensive One Health surveillance because it is Pareto-\n")

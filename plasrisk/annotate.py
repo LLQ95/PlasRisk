@@ -387,7 +387,7 @@ def annotate_fasta(
             rep_list = [r.strip() for r in re.split(r"[;,/]", feat.replicon) if r.strip()]
             best_priors = {}
             for dim in ("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_REP",
-                        "S_SIZE", "S_BM", "S_GEO", "S_HAB", "S_GROW"):
+                        "S_SIZE", "S_BMG", "S_GEO", "S_HAB", "S_GROW"):
                 best_val = None
                 for rep in rep_list:
                     # Exact match

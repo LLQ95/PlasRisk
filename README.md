@@ -18,13 +18,13 @@ automatically annotates them using [abricate](https://github.com/tseemann/abrica
 The default output is the FASTA-only lite core:
 
 ```
-S_lite = 0.253*S_ARG + 0.237*S_BM + 0.201*S_MOB + 0.175*S_SIZE + 0.135*S_VF
+S_lite = 0.253*S_ARG + 0.237*S_BMG + 0.201*S_MOB + 0.175*S_SIZE + 0.135*S_VF
 ```
 
 The full 10-dimension model (`--mode full`) is:
 
 ```
-S_full = 0.237*S_ARG + 0.222*S_BM + 0.189*S_MOB + 0.164*S_SIZE
+S_full = 0.237*S_ARG + 0.222*S_BMG + 0.189*S_MOB + 0.164*S_SIZE
        + 0.126*S_VF + 0.030*S_HOST + 0.019*S_HAB + 0.005*S_GEO
        + 0.004*S_REP + 0.002*S_GROW
 
@@ -132,7 +132,7 @@ metadata are required. The full 10-dimension model is available with
 
 | | Lite (5-dim, default) | Full (10-dim) |
 |---|---|---|
-| Dimensions | S_ARG, S_BM, S_MOB, S_SIZE, S_VF | S_ARG, S_BM, S_MOB, S_SIZE, S_VF, S_HOST, S_HAB, S_GEO, S_REP, S_GROW |
+| Dimensions | S_ARG, S_BMG, S_MOB, S_SIZE, S_VF | S_ARG, S_BMG, S_MOB, S_SIZE, S_VF, S_HOST, S_HAB, S_GEO, S_REP, S_GROW |
 | Weights | 0.253, 0.237, 0.201, 0.175, 0.135 | 0.237, 0.222, 0.189, 0.164, 0.126, 0.030, 0.019, 0.005, 0.004, 0.002 |
 | Mean AUC (4 outcomes) | 0.919 | 0.919 |
 | Grade agreement | 92.7% exact / 100% within one grade vs. full | reference |
@@ -227,7 +227,7 @@ print(f"S_norm = {scores['S_norm']:.3f}, grade = {scores['grade']}")
 | Component | Weight | What it measures | Scoring basis |
 |-----------|--------|------------------|---------------|
 | **S_ARG** | 0.237 | ARG count, WHO-priority genes, high-risk genes (mcr, NDM, KPC, CTX-M, tetX, etc.) | Base + per-gene + high-risk bonuses |
-| **S_BM** | 0.222 | Biocide/metal resistance (mer, qac, ars/cop/sil), co-selection potential | Base + per-gene + family bonuses |
+| **S_BMG** | 0.222 | Biocide/metal resistance (mer, qac, ars/cop/sil), co-selection potential | Base + per-gene + family bonuses |
 | **S_MOB** | 0.189 | T4CP, relaxase, oriT, auxiliary transfer proteins | Element-based additive score |
 | **S_SIZE** | 0.164 | Plasmid length (cargo capacity) | Sigmoid: midpoint 30 kb |
 | **S_VF** | 0.126 | VF count, exotoxins, secretion systems (T3SS/T4SS) | Base + per-gene + category bonuses |
@@ -275,7 +275,7 @@ included:
   12.2% high-risk ARG rate, 13.3% conjugative rate (vs. 0% in Q4).
 - **Data-driven weights**: RF-MDG, LASSO, and grid-search optimization across four
   outcomes (high-risk ARG, MDR-VF fusion, conjugative capacity, BMRG carriage)
-  converged on S_ARG (0.237), S_BM (0.222), S_MOB (0.189), and S_SIZE (0.164)
+  converged on S_ARG (0.237), S_BMG (0.222), S_MOB (0.189), and S_SIZE (0.164)
   as dominant predictors.
 - **AUC validation**: Final weights achieved AUC 0.955 (high-risk ARG), 0.967
   (MDR-VF fusion), 0.846 (conjugation), 0.910 (BMRG); mean 0.919.

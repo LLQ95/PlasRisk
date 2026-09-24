@@ -215,7 +215,7 @@ evaluate_model <- function(scores, labels, model_name) {
 results_list <- list()
 results_list[[1]] <- evaluate_model(test$S_norm, test$y_highrisk, "PlasRisk (10-dim)")
 
-# 9-dim (no S_BM) - recompute from component columns if available
+# 9-dim (no S_BMG) - recompute from component columns if available
 comp9  <- c("S_ARG", "S_VF", "S_MOB", "S_HOST", "S_REP", "S_SIZE",
            "S_GEO", "S_HAB", "S_GROW")
 if (all(comp9 %in% names(test))) {
@@ -223,7 +223,7 @@ if (all(comp9 %in% names(test))) {
           S_REP=0.0030, S_SIZE=0.1808, S_GEO=0.0015, S_HAB=0.0022, S_GROW=0.0147)
   w9 <- w9 / sum(w9)
   test[, S9 := as.matrix(.SD) %*% w9, .SDcols = comp9]
-  results_list[[2]] <- evaluate_model(test$S9, test$y_highrisk, "PlasRisk (9-dim, no S_BM)")
+  results_list[[2]] <- evaluate_model(test$S9, test$y_highrisk, "PlasRisk (9-dim, no S_BMG)")
 }
 
 # S_ARG only

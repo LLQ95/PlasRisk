@@ -2,7 +2,7 @@
 lookup.py - Replicon-specific risk priors derived from PIPdb.
 
 The lookup table provides empirical median values for ALL ten risk
-dimensions (S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE, S_BM, S_GEO,
+dimensions (S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE, S_BMG, S_GEO,
 S_HAB, S_GROW) for known replicon types, based on analysis of
 792,964 PSCs in PIPdb.
 
@@ -24,7 +24,7 @@ _LOOKUP_FILE = os.path.join(_DATA_DIR, "replicon_lookup.csv")
 # All ten dimensions that may have replicon priors
 ALL_DIMENSIONS = (
     "S_ARG", "S_VF", "S_MOB", "S_HOST", "S_REP",
-    "S_SIZE", "S_BM", "S_GEO", "S_HAB", "S_GROW",
+    "S_SIZE", "S_BMG", "S_GEO", "S_HAB", "S_GROW",
 )
 
 

@@ -23,7 +23,7 @@ PIPdb database (792,964 PSCs)
   pipdb_15_risk_weight_table.R         -- Per-replicon risk table, RF validation
         |
         v
-  pipdb_16_risk_10dimensions.R         -- Add S_BM; 9-dim vs 10-dim comparison
+  pipdb_16_risk_10dimensions.R         -- Add S_BMG; 9-dim vs 10-dim comparison
         |
         v
   pipdb_17_weight_optimization.R       -- Data-driven weight determination
@@ -63,7 +63,7 @@ PIPdb database (792,964 PSCs)
 | `pipdb_13_descriptive_epidemiology.R` | R | Descriptive epidemiology: temporal trends, geographic maps, ARG burden, size evolution, high-risk ARGs, virulence, mobility, host range |
 | `pipdb_14_network_risk_hotspot.R` | R | ARG-replicon bipartite network, ARG-VF co-occurrence network, risk quartile validation, Getis-Ord Gi* spatial hotspots |
 | `pipdb_15_risk_weight_table.R` | R | Per-replicon 10-dimension risk table, RF feature importance, weight sensitivity, logistic regression |
-| `pipdb_16_risk_10dimensions.R` | R | Add S_BM (biocide/metal resistance), 9-dim vs 10-dim comparison, S_BM analysis |
+| `pipdb_16_risk_10dimensions.R` | R | Add S_BMG (biocide/metal resistance), 9-dim vs 10-dim comparison, S_BMG analysis |
 | `pipdb_17_weight_optimization.R` | R | **Data-driven weight determination**: RF-MDG, LASSO, entropy, grid search, LORO-CV; outputs `tab_weight_comparison.csv` with final consensus weights |
 | `pipdb_18_external_validation_benchmark.R` | R | External validation on 367 independent NCBI plasmids + ROC/PR benchmark vs PIPdb ordinal, raw ARG count, single-component models |
 | `pipdb_18_imbalanced_validation.R` | R | Natural-prevalence holdout (~3.1% high-risk), PR-AUC, decile calibration, decision-curve analysis |
@@ -84,7 +84,7 @@ These scripts consume the `tab_*.csv` tables produced by the pipeline above and 
 | `fig5_risk_stratification.R` | Figure 5 | Quartile characteristics, ROC benchmark, natural-prevalence PR curves, grade distribution, case-study radar, external validation ROC |
 | `fig6_highrisk_arg_replicon.R` | Figure 6 | High-risk ARG carriage across replicons, length-rate landscape, ARG-replicon network, family heatmap |
 | `fig7_fusion_plasmids.R` | Figure 7 | MDR-VF fusion rate and counts by replicon, fusion feature profile, ARG vs VF burden scatter |
-| `fig8_dimension_epidemiology.R` | Figure 8 | Dimension-score heatmap, temporal trends, dimension correlation, S_ARG-S_BM risk landscape |
+| `fig8_dimension_epidemiology.R` | Figure 8 | Dimension-score heatmap, temporal trends, dimension correlation, S_ARG-S_BMG risk landscape |
 | `fig9_global_outcomes_maps.R` | Figure 9 | Global country-level prevalence maps for the four outcomes (maps package) |
 | `fig10_grade_pie_map.R` | Figure 10 | World map with grade-distribution pies per country (hand-built pie grobs, no scatterpie) |
 | `fig11_conjugative_replicon.R` | Figure 11 | Top conjugative replicons and conjugative rate vs high-risk ARG/BMG cargo bubbles, plus four-outcome heatmap |
@@ -154,7 +154,7 @@ results/
 | `tab_psc_final_scores.csv` | Per-PSC final scores with four outcome labels (y_highrisk, y_fusion, y_conj, y_bm) |
 | `tab_replicon_summary.csv` | Per-replicon n, ARG/BMG/conjugative rates, mean length, mean risk |
 | `tab_case_study_summary.csv` | Case study plasmid scores |
-| `tab_SBM_weight_sensitivity.csv` | S_BM weight sensitivity analysis |
+| `tab_SBM_weight_sensitivity.csv` | S_BMG weight sensitivity analysis |
 | `tab_weight_sensitivity.csv` | +/-30% perturbation stability |
 
 ## Final Data-Driven Weights
@@ -162,7 +162,7 @@ results/
 | Dimension | Weight | Interpretation |
 |-----------|--------|----------------|
 | S_ARG | 0.2374 | ARG burden (incl. WHO high-priority bonus) |
-| S_BM | 0.2225 | Biocide/metal resistance (co-selection) |
+| S_BMG | 0.2225 | Biocide/metal resistance (co-selection) |
 | S_MOB | 0.1887 | Mobility/conjugation machinery |
 | S_SIZE | 0.1642 | Plasmid size (logistic sigmoid) |
 | S_VF | 0.1263 | Virulence factor burden |

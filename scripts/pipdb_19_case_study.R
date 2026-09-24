@@ -16,10 +16,10 @@ tab_dir <- file.path(res_dir, "tables")
 case_dir <- file.path(res_dir, "case_study")
 dir.create(fig_dir, showWarnings=FALSE, recursive=TRUE); dir.create(tab_dir, showWarnings=FALSE, recursive=TRUE); dir.create(case_dir, showWarnings=FALSE, recursive=TRUE)
 
-comp_cols <- c("S_ARG","S_VF","S_MOB","S_HOST","S_REP","S_SIZE","S_BM","S_GEO","S_HAB","S_GROW")
+comp_cols <- c("S_ARG","S_VF","S_MOB","S_HOST","S_REP","S_SIZE","S_BMG","S_GEO","S_HAB","S_GROW")
 wf <- file.path(tab_dir, "tab_weight_comparison.csv")
 if (file.exists(wf)) { wc <- fread(wf); final_w <- wc$Final; names(final_w) <- wc$Component
-} else { final_w <- c(S_ARG=0.2448, S_VF=0.1096, S_MOB=0.2041, S_HOST=0.0282, S_REP=0.0030, S_SIZE=0.1808, S_BM=0.2112, S_GEO=0.0015, S_HAB=0.0022, S_GROW=0.0147) }
+} else { final_w <- c(S_ARG=0.2448, S_VF=0.1096, S_MOB=0.2041, S_HOST=0.0282, S_REP=0.0030, S_SIZE=0.1808, S_BMG=0.2112, S_GEO=0.0015, S_HAB=0.0022, S_GROW=0.0147) }
 
 cat("=== PlasRisk case study ===\n")
 case1 <- data.table(seq_id="pNDM-1 (NC_019050)", length_bp=50000, n_arg=5, n_vf=0, n_bm=3, replicon="IncN",
@@ -55,15 +55,15 @@ score_case <- function(case, rep_lookup) {
   n_mob <- sum(c(case$has_t4cp, case$has_relaxase, case$has_oriT, case$has_aux))
   S_MOB <- c(0.05, 0.30, 0.55, 0.85, 1.0)[n_mob + 1]
   S_SIZE <- 1/(1+exp(-(case$length_bp/1000-30)/15))
-  S_BM <- if (case$n_bm==0) 0 else min(0.25 + min(case$n_bm*0.04, 0.35) + 0.15*(case$n_bm>=2), 1.0)
+  S_BMG <- if (case$n_bm==0) 0 else min(0.25 + min(case$n_bm*0.04, 0.35) + 0.15*(case$n_bm>=2), 1.0)
   comps <- c(S_ARG=S_ARG, S_VF=S_VF, S_MOB=S_MOB, S_HOST=rl$S_HOST, S_REP=rl$S_REP, S_SIZE=S_SIZE,
-    S_BM=S_BM, S_GEO=rl$S_GEO, S_HAB=rl$S_HAB, S_GROW=rl$S_GROW)
+    S_BMG=S_BMG, S_GEO=rl$S_GEO, S_HAB=rl$S_HAB, S_GROW=rl$S_GROW)
   S_norm <- sum(comps * final_w[names(comps)])
   grade <- if (S_norm>=0.60) c("A","Very High") else if (S_norm>=0.45) c("B","High") else if (S_norm>=0.30) c("C","Moderate") else if (S_norm>=0.15) c("D","Low") else c("E","Minimal")
   data.table(seq_id=case$seq_id, t(comps), S_norm=round(S_norm,4), grade=grade[1], grade_label=grade[2])
 }
 results <- rbindlist(lapply(seq_len(nrow(cases)), function(i) score_case(as.list(cases[i]), rep_lookup)))
-cat("\n  Case study results:\n"); print(results[, .(seq_id, S_ARG, S_VF, S_MOB, S_BM, S_REP, S_SIZE, S_norm, grade)])
+cat("\n  Case study results:\n"); print(results[, .(seq_id, S_ARG, S_VF, S_MOB, S_BMG, S_REP, S_SIZE, S_norm, grade)])
 fwrite(results, file.path(tab_dir, "tab_case_study_scores.csv"))
 
 # Population distribution
@@ -75,7 +75,7 @@ d[,n_vf:=fifelse(is.na(n_vf),0L,n_vf)]; d[,n_metal:=fifelse(is.na(n_metal),0L,n_
 d[,S_VF:=0.0]; d[n_vf>0,S_VF:=pmin(0.30+pmin(n_vf*0.03,0.40)+0.15*grepl("Exotoxin",vf_category)+0.15*grepl("Effector delivery",vf_category),1.0)]
 d[,has_mer:=as.integer(grepl("mer",gene_bacmet,ignore.case=TRUE))]; d[,has_qac:=as.integer(grepl("qac",gene_bacmet,ignore.case=TRUE))]; d[,has_ars:=as.integer(grepl("ars|cop|sil",gene_bacmet,ignore.case=TRUE))]
 d[is.na(has_mer),has_mer:=0L]; d[is.na(has_qac),has_qac:=0L]; d[is.na(has_ars),has_ars:=0L]
-d[,S_BM:=0.0]; d[n_metal>0,S_BM:=pmin(0.25+pmin(n_metal*0.04,0.35)+0.15*has_mer+0.15*has_qac+0.10*has_ars,1.0)]
+d[,S_BMG:=0.0]; d[n_metal>0,S_BMG:=pmin(0.25+pmin(n_metal*0.04,0.35)+0.15*has_mer+0.15*has_qac+0.10*has_ars,1.0)]
 for (cc in comp_cols) d[[cc]] <- fifelse(is.na(d[[cc]]),0.0,as.numeric(d[[cc]]))
 d[,S_norm:=as.matrix(.SD)%*%final_w[comp_cols],.SDcols=comp_cols]
 cat(sprintf("  Population: %d PSCs, median S_norm=%.3f\n", nrow(d), median(d$S_norm,na.rm=TRUE)))

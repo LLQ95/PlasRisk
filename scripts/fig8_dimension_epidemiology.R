@@ -4,7 +4,7 @@
 # (A) Heatmap of mean dimension scores across major replicons
 # (B) Temporal trends of ARG, BMG, and co-occurrence
 # (C) Dimension correlation across replicons
-# (D) Replicon risk landscape (S_ARG vs S_BM, labeled with ggrepel)
+# (D) Replicon risk landscape (S_ARG vs S_BMG, labeled with ggrepel)
 # =============================================================================
 
 suppressPackageStartupMessages({
@@ -38,8 +38,8 @@ bm_trend <- fread(file.path(tdir, "tab_temporal_bm_arg_trend.csv"))
 
 # ---- (A) Heatmap of dimension scores across replicons ----
 rep_top <- rep_risk[n_PSC >= 200][order(-S10_norm)][1:20]
-heat_dims <- c("mean_S_ARG", "mean_S_VF", "mean_S_MOB", "mean_S_BM")
-dim_labels <- c(S_ARG = "ARG", S_VF = "VF", S_MOB = "MOB", S_BM = "BM")
+heat_dims <- c("mean_S_ARG", "mean_S_VF", "mean_S_MOB", "mean_S_BMG")
+dim_labels <- c(S_ARG = "ARG", S_VF = "VF", S_MOB = "MOB", S_BMG = "BM")
 
 heat_long <- melt(rep_top, id.vars = "replicon_primary",
   measure.vars = heat_dims, variable.name = "Dimension", value.name = "Score")
@@ -77,9 +77,9 @@ pB <- ggplot(trend_long, aes(period_start, Percent, color = Metric, group = Metr
 
 # ---- (C) Dimension correlation ----
 rep_corr <- rep_risk[n_PSC >= 50, .(S_ARG = mean_S_ARG, S_VF = mean_S_VF,
-                                     S_MOB = mean_S_MOB, S_BM = mean_S_BM,
+                                     S_MOB = mean_S_MOB, S_BMG = mean_S_BMG,
                                      S_SIZE = mean_S_SIZE, S_HOST = mean_S_HOST)]
-cor_mat <- cor(rep_corr[, .(S_ARG, S_VF, S_MOB, S_BM, S_SIZE, S_HOST)],
+cor_mat <- cor(rep_corr[, .(S_ARG, S_VF, S_MOB, S_BMG, S_SIZE, S_HOST)],
                use = "pairwise.complete.obs")
 cor_dt <- as.data.table(as.table(cor_mat))
 setnames(cor_dt, c("V1", "V2", "r"))
@@ -100,14 +100,14 @@ pC <- ggplot(cor_dt, aes(V2, V1, fill = r)) +
 rep_land <- rep_risk[n_PSC >= 100]
 rep_land[, label := ifelse(n_PSC >= 1000 | mean_S_ARG > 0.5, replicon_primary, "")]
 
-pD <- ggplot(rep_land, aes(mean_S_ARG, mean_S_BM)) +
+pD <- ggplot(rep_land, aes(mean_S_ARG, mean_S_BMG)) +
   geom_point(aes(size = n_PSC, color = mean_S_MOB), alpha = 0.75) +
   geom_text_repel(aes(label = label), size = 2.5, max.overlaps = 30,
                   color = "#3E2723", box.padding = 0.35, min.segment.length = 0,
                   segment.color = "#BCAAA4", segment.size = 0.3) +
   scale_size_continuous(name = "n (PSC)", range = c(1.5, 6)) +
   scale_color_gradient(low = "#FFE8D6", high = "#E76F51", name = "Mean\nS_MOB") +
-  labs(x = "Mean S_ARG", y = "Mean S_BM", tag = "D") +
+  labs(x = "Mean S_ARG", y = "Mean S_BMG", tag = "D") +
   theme_pub +
   guides(size = guide_legend(nrow = 2), color = guide_colorbar(barwidth = 4))
 

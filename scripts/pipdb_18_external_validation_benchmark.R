@@ -41,11 +41,11 @@ score_ext <- function(annot, ep, cc, w) {
   if (!is.null(annot$plasmidfinder)) { rp <- annot$plasmidfinder[,.(replicon=GENE[1]),by=.(SEQUENCE=sub(" .*","",SEQUENCE))]; sc <- merge(sc,rp,by.x="accession",by.y="SEQUENCE",all.x=TRUE); sc[is.na(replicon),replicon:="Unknown"] } else sc[,replicon:="Unknown"]
   sc[,S_ARG:=pmin(0.25+pmin(n_arg*0.05,0.35)+0.20*(n_arg>0)+0.20*(n_highrisk>0),1.0)]
   sc[,S_VF:=0.0]; sc[n_vf>0,S_VF:=pmin(0.30+pmin(n_vf*0.03,0.40),1.0)]
-  sc[,`:=`(S_MOB=0.30,S_HOST=0.50,S_REP=0.30,S_SIZE=1/(1+exp(-(length_bp/1000-30)/15)),S_BM=0.0,S_GEO=0.30,S_HAB=0.30,S_GROW=0.30)]
+  sc[,`:=`(S_MOB=0.30,S_HOST=0.50,S_REP=0.30,S_SIZE=1/(1+exp(-(length_bp/1000-30)/15)),S_BMG=0.0,S_GEO=0.30,S_HAB=0.30,S_GROW=0.30)]
   sc[,S_final:=as.matrix(.SD)%*%w,.SDcols=cc]; merge(sc, ep[,.(accession,label,y)], by="accession")
 }
 wf <- file.path(tab_dir,"tab_weight_comparison.csv")
-if (file.exists(wf)) { wc <- fread(wf); final_w <- wc$Final; names(final_w) <- wc$Component } else final_w <- c(S_ARG=0.2448,S_VF=0.1096,S_MOB=0.2041,S_HOST=0.0282,S_REP=0.0030,S_SIZE=0.1808,S_BM=0.2112,S_GEO=0.0015,S_HAB=0.0022,S_GROW=0.0147)
+if (file.exists(wf)) { wc <- fread(wf); final_w <- wc$Final; names(final_w) <- wc$Component } else final_w <- c(S_ARG=0.2448,S_VF=0.1096,S_MOB=0.2041,S_HOST=0.0282,S_REP=0.0030,S_SIZE=0.1808,S_BMG=0.2112,S_GEO=0.0015,S_HAB=0.0022,S_GROW=0.0147)
 comp_cols <- names(final_w)
 if (file.exists(fasta_path) && Sys.which("abricate")!="") {
   annot <- annotate_ext(fasta_path, ext_dir); ext_scores <- score_ext(annot, external_plasmids, comp_cols, final_w)
@@ -62,12 +62,12 @@ d[,n_vf:=fifelse(is.na(n_vf),0L,n_vf)]; d[,n_metal:=fifelse(is.na(n_metal),0L,n_
 d[,S_VF:=0.0]; d[n_vf>0,S_VF:=pmin(0.30+pmin(n_vf*0.03,0.40)+0.15*grepl("Exotoxin",vf_category)+0.15*grepl("Effector delivery",vf_category),1.0)]
 d[,has_mer:=as.integer(grepl("mer",gene_bacmet,ignore.case=TRUE))]; d[,has_qac:=as.integer(grepl("qac",gene_bacmet,ignore.case=TRUE))]; d[,has_ars:=as.integer(grepl("ars|cop|sil",gene_bacmet,ignore.case=TRUE))]
 d[is.na(has_mer),has_mer:=0L]; d[is.na(has_qac),has_qac:=0L]; d[is.na(has_ars),has_ars:=0L]
-d[,S_BM:=0.0]; d[n_metal>0,S_BM:=pmin(0.25+pmin(n_metal*0.04,0.35)+0.15*has_mer+0.15*has_qac+0.10*has_ars,1.0)]
+d[,S_BMG:=0.0]; d[n_metal>0,S_BMG:=pmin(0.25+pmin(n_metal*0.04,0.35)+0.15*has_mer+0.15*has_qac+0.10*has_ars,1.0)]
 for (cc in comp_cols) d[[cc]] <- fifelse(is.na(d[[cc]]),0.0,as.numeric(d[[cc]]))
 d[,y_highrisk:=as.integer(n_high_risk_arg>0)]; d[,y_fusion:=as.integer(n_arg>0 & n_vf>0)]
 dd <- d[!is.na(S_ARG)]; set.seed(42); ti <- sample(seq_len(nrow(dd)),min(100000,nrow(dd))); dt <- dd[ti]
 Xc <- as.matrix(dt[,.SD,.SDcols=comp_cols])
-models <- list("PlasRisk (10-dim)"=Xc%*%final_w, "PlasRisk (9-dim)"={w9<-final_w; w9["S_BM"]<-0; w9<-w9/sum(w9); Xc%*%w9}, "PIPdb ordinal"=dt$risk_score/max(dt$risk_score,na.rm=TRUE), "S_ARG only"=dt$S_ARG, "S_MOB only"=dt$S_MOB, "ARG count"=dt$n_arg/max(dt$n_arg,na.rm=TRUE))
+models <- list("PlasRisk (10-dim)"=Xc%*%final_w, "PlasRisk (9-dim)"={w9<-final_w; w9["S_BMG"]<-0; w9<-w9/sum(w9); Xc%*%w9}, "PIPdb ordinal"=dt$risk_score/max(dt$risk_score,na.rm=TRUE), "S_ARG only"=dt$S_ARG, "S_MOB only"=dt$S_MOB, "ARG count"=dt$n_arg/max(dt$n_arg,na.rm=TRUE))
 rl <- list(); pl <- list(); ba <- data.table()
 for (nm in names(models)) {
   sc <- as.numeric(models[[nm]]); sc[is.na(sc)] <- 0
