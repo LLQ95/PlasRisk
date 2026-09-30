@@ -1,0 +1,31 @@
+Section,Antibiotic,ATC code
+6.1,Amikacin,J01GB06
+6.1,Amoxicillin,J01CA04
+6.1,Amoxicillin/clavulanic acid,J01CR02
+6.1,Ampicillin,J01CA01
+6.1,Benzathine benzylpenicillin,J01CE08
+6.1,Benzylpenicillin,J01CE01
+6.1,Cefazolin,J01DB04
+6.1,Cefalexin,J01DB01
+6.1,Cefixime,J01DD08
+6.1,Cefotaxime,J01DD01
+6.1,Ceftazidime,J01DD02
+6.1,Ceftriaxone,J01DD04
+6.1,Cefuroxime,J01DC02
+6.1,Chloramphenicol,J01BA01
+6.1,Ciprofloxacin,J01MA02
+6.1,Clarithromycin,J01FA09
+6.1,Clindamycin,J01FF01
+6.1,Cloxacillin,J01CF02
+6.1,Doxycycline,J01AA02
+6.1,Erythromycin,J01FA01
+6.1,Flucloxacillin,J01CF05
+6.1,Gentamicin,J01GB03
+6.1,Meropenem,J01DH02
+6.1,Metronidazole,J01XD01
+6.1,Nitrofurantoin,J01XE01
+6.1,Phenoxymethylpenicillin,J01CE02
+6.1,Procaine benzylpenicillin,J01CE09
+6.1,Sulfamethoxazole/trimethoprim,J01EE01
+6.1,Trimethoprim,J01EA01
+6.1,Vancomycin,J01XA01

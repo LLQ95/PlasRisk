@@ -1,0 +1,43 @@
+Section,Antibiotic,ATC code
+24.1,Amikacin,J01GB06
+24.1,Amoxicillin,J01CA04
+24.1,Amoxicillin/clavulanic acid,J01CR02
+24.1,Ampicillin,J01CA01
+24.1,Benzathine benzylpenicillin,J01CE08
+24.1,Benzylpenicillin,J01CE01
+24.1,Cefazolin,J01DB04
+24.1,Cefalexin,J01DB01
+24.1,Cefixime,J01DD08
+24.1,Cefotaxime,J01DD01
+24.1,Ceftazidime,J01DD02
+24.1,Ceftazidime/avibactam,J01DD52
+24.1,Ceftriaxone,J01DD04
+24.1,Cefuroxime,J01DC02
+24.1,Chloramphenicol,J01BA01
+24.1,Ciprofloxacin,J01MA02
+24.1,Clarithromycin,J01FA09
+24.1,Clindamycin,J01FF01
+24.1,Cloxacillin,J01CF02
+24.1,Doxycycline,J01AA02
+24.1,Flucloxacillin,J01CF05
+24.1,Gentamicin,J01GB03
+24.1,Imipenem/cilastatin,J01DH51
+24.1,Levofloxacin,J01MA12
+24.1,Linezolid,J01XX08
+24.1,Meropenem,J01DH02
+24.1,Meropenem/vaborbactam,J01DH52
+24.1,Metronidazole,J01XD01
+24.1,Nitrofurantoin,J01XE01
+24.1,Phenoxymethylpenicillin,J01CE02
+24.1,Piperacillin/tazobactam,J01CR05
+24.1,Plazomicin,J01GB14
+24.1,Procaine benzylpenicillin,J01CE09
+24.1,Spectinomycin,J01XX04
+24.1,Sulfamethoxazole/trimethoprim,J01EE01
+24.1,Tedizolid,J01XX11
+24.1,Trimethoprim,J01EA01
+24.1,Vancomycin,J01XA01
+24.2,Cefiderocol,J01DI04
+24.2,Ceftolozane/tazobactam,J01DI54
+24.2,Colistin,J01XB01
+24.2,Fosfomycin,J01XX01
