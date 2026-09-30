@@ -1200,17 +1200,17 @@ def get_scorer(model: str = "plasrisk", mode: str = "lite",
     model : str
         ``"plasrisk"`` (default) — weighted continuous model; ``mode``
         selects the 5-dimension FASTA-only lite core (default), the
-        10-dimension full model, or ``"ordinal"" (the original PIPdb
-        8-item ordinal index, equivalent to ``model="pipdb"").
-        ``"pipdb"" — original PIPdb 8-item ordinal model.
+        10-dimension full model, or ``"ordinal"`` (the original PIPdb
+        8-item ordinal index, equivalent to ``model="pipdb"``).
+        ``"pipdb"`` — original PIPdb 8-item ordinal model.
     mode : str
-        For PlasRisk: "lite" (5-dim core, default; FASTA-only),
-        "full" (10-dim) or "ordinal" (PIPdb 8-item index).
+        For PlasRisk: ``"lite"`` (5-dim core, default; FASTA-only),
+        ``"full"`` (10-dim) or ``"ordinal"`` (PIPdb 8-item index).
     replicon_lookup : pd.DataFrame, optional
         Replicon empirical prior table (PlasRisk only).
     aware_version : str
-        ``"legacy"" (default; mapping used for the frozen component matrix)
-        or "2025" (WHO AWaRe 2025 categories; sensitivity option).
+        ``"legacy"`` (default; mapping used for the frozen component matrix)
+        or ``"2025"`` (WHO AWaRe 2025 categories; sensitivity option).
         Ignored by the ordinal model.
 
     Returns
