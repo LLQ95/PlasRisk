@@ -1,0 +1,43 @@
+Antibiotic class / agents,Old mapping effective weight,2025 AWaRe category,Discrepancy
+"Carbapenems (imipenem, meropenem, ertapenem, doripenem, biapenem, panipenem, tebipenem)",Watch x1.5 = 3.0,Watch = 2,Over-weighted (1.5x)
+"Carbapenem/BLI combinations (imipenem/relebactam, meropenem/vaborbactam)",3.0,Reserve = 3,Same numeric
+Penems (faropenem),3.0,Reserve = 3,Same numeric
+"Monobactams (aztreonam, carumonam)",3.0,Reserve = 3,Same numeric
+Monobactam/BLI (aztreonam/avibactam),3.0,Reserve = 3,Same numeric
+"1st-generation cephalosporins (12 agents, e.g. cefazolin, cephalexin)",Watch = 2,Access = 1,Over-weighted
+2nd-generation cephalosporins (14 agents),Watch = 2,Watch = 2,Consistent
+3rd-generation cephalosporins (18 agents),Watch = 2,Watch = 2,Consistent
+Ceftazidime/avibactam,Watch = 2,Reserve = 3,Under-weighted
+4th-generation cephalosporins (4 agents),Watch = 2,Watch = 2,Consistent
+"5th-generation cephalosporins (ceftaroline, ceftobiprole, ceftolozane/tazobactam)",Watch = 2,Reserve = 3,Under-weighted
+Cefiderocol,Watch = 2,Reserve = 3,Under-weighted
+"Access penicillins (25 agents, e.g. amoxicillin, ampicillin, benzylpenicillin)",Access = 1,Access = 1,Consistent
+"Watch/anti-pseudomonal penicillins (10 agents, e.g. piperacillin, ticarcillin, temocillin)",Access = 1,Watch = 2,Under-weighted
+"Access BLI combinations (amoxicillin/clavulanate, ampicillin/sulbactam, sultamicillin)",Access = 1,Access = 1,Consistent
+Ticarcillin/clavulanate; piperacillin/tazobactam,Access = 1,Watch = 2,Under-weighted
+Sulbactam / tazobactam,Access = 1,Access 1 / Watch 2,Tazobactam under-weighted
+"Amikacin, gentamicin",Watch = 2,Access = 1,Over-weighted
+"Other aminoglycosides (17 agents, e.g. tobramycin, streptomycin, kanamycin)",Watch = 2,Watch = 2,Consistent
+Plazomicin,Watch = 2,Reserve = 3,Under-weighted
+"Macrolides (16 agents, e.g. azithromycin, erythromycin)",Watch = 2,Watch = 2,Consistent
+"Tetracycline, doxycycline",Access = 1,Access = 1,Consistent
+"Watch tetracyclines (10 agents, e.g. minocycline, oxytetracycline)",Access = 1,Watch = 2,Under-weighted
+"Reserve tetracyclines (eravacycline, omadacycline, minocycline IV)",Access = 1,Reserve = 3,Under-weighted
+Tigecycline (glycylcycline),Watch x1.5 = 3.0,Reserve = 3,Same numeric
+"Amphenicols (chloramphenicol, thiamphenicol)",Access = 1,Access = 1,Consistent
+Sulfonamides (20 agents),Access = 1,Access = 1,Consistent
+Trimethoprim,Access = 1,Access = 1,Consistent
+Iclaprim,Access = 1,Reserve = 3,Under-weighted
+Fluoroquinolones (24 agents),Watch = 2,Watch = 2,Consistent
+"Other quinolones (8 agents, e.g. nalidixic acid)",Watch = 2,Watch = 2,Consistent
+"Vancomycin, teicoplanin",Watch x1.5 = 3.0,Watch = 2,Over-weighted
+"Dalbavancin, oritavancin, telavancin",3.0,Reserve = 3,Same numeric
+"Oxazolidinones (linezolid, tedizolid)",Reserve x1.5 = 4.5,Reserve = 3,Over-weighted
+"Polymyxins (colistin, polymyxin B)",Reserve x1.5 = 4.5,Reserve = 3,Over-weighted
+Fosfomycin oral / IV,Reserve x1.5 = 4.5,Watch 2 / Reserve 3,Over-weighted
+"Rifamycins (rifampicin, rifabutin, rifaximin)",Watch = 2,Watch = 2,Consistent
+Nitroimidazoles / nitrofuran derivatives,Access = 1,Access = 1,Consistent
+Clindamycin / lincomycin,Access = 1,Access 1 / Watch 2,Lincomycin under-weighted
+Pristinamycin / quinupristin-dalfopristin,Access = 1,Watch 2 / Reserve 3,Under-weighted
+Daptomycin (lipopeptide),Access = 1 (via peptide rule),Reserve = 3,Under-weighted
+Disinfectant/antiseptic/biocide tokens,Watch = 2,Not an AWaRe antibiotic,Should be excluded from class weight
