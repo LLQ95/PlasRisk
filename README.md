@@ -46,6 +46,29 @@ Each item is binned to an ordinal value of 1–5; the index runs from 1
 Risk grades: **A** (Very High, S >= 0.60), **B** (High, >= 0.45),
 **C** (Moderate, >= 0.30), **D** (Low, >= 0.15), **E** (Minimal, < 0.15).
 
+### AWaRe category table for S_ARG
+
+S_ARG weights genes by the WHO AWaRe categories (Access, Watch, Reserve).
+The frozen component matrix used the legacy keyword mapping, which remains
+the default so published scores are exactly reproducible. The WHO AWaRe
+2025 table can be selected instead:
+
+```bash
+plasrisk --aware-version 2025 plasmid.fasta
+```
+
+```python
+scorer = PlasRiskScorer(mode="lite", aware_version="2025")
+```
+
+Under the 2025 mapping, biocide/metal genes contribute 0 to S_ARG because
+they are scored under S_BMG, and the separate 1.5x last-resort multiplier
+is not applied (Reserve already carries the highest weight). An audit of
+all 792,964 PSCs found that the 2025 mapping changes S_ARG by at least
+0.05 for 4.9% of PSCs and moves the high-risk-ARG AUC on the locked test
+from 0.9807 to 0.9789 (delta -0.0018); the frozen values are retained
+(see Method S14 and Table S56 in the Supplementary Materials).
+
 ---
 
 ## Installation

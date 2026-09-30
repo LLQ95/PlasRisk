@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plasrisk"
-version = "1.3.0"
+version = "1.4.0"
 description = "PlasRisk: data-driven weighted risk assessment for bacterial plasmids from FASTA sequences (three modes: lite 5-dim FASTA-only core by default, full 10-dim model, and original PIPdb ordinal index)"
 readme = "README.md"
 license = {text = "MIT"}

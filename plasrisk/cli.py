@@ -16,6 +16,9 @@ Options:
     --mode MODE          Scoring mode: 'lite' (5-dim FASTA-only core,
                          default), 'full' (10-dim), or 'ordinal'
                          (original PIPdb 8-item ordinal index)
+    --aware-version V    AWaRe category table for S_ARG: 'legacy'
+                         (default; mapping used for the frozen matrix) or
+                         '2025' (WHO AWaRe 2025; sensitivity option)
     --model MODEL        Deprecated alias: 'plasrisk' (default) or 'pipdb'
                          (equivalent to --mode ordinal)
     --rank-concordance   Also verify that the package sigmoid S_SIZE and the
@@ -68,6 +71,7 @@ Examples:
   plasrisk plasmid.fasta                   # lite (5-dim, FASTA-only), default
   plasrisk --mode full plasmid.fasta       # full 10-dim with replicon priors
   plasrisk --mode ordinal plasmid.fasta    # original PIPdb 8-item ordinal index
+  plasrisk --aware-version 2025 plasmid.fasta  # S_ARG with WHO AWaRe 2025
   plasrisk -o results *.fasta
   plasrisk /data/plasmids/
   plasrisk --db card,vfdb,plasmidfinder plasmid.fasta
@@ -96,6 +100,11 @@ Examples:
                         help="Scoring mode: 'lite' (5-dim FASTA-only core, "
                              "default), 'full' (10-dim weighted), or "
                              "'ordinal' (original PIPdb 8-item ordinal index)")
+    parser.add_argument("--aware-version", choices=["legacy", "2025"],
+                        default="legacy",
+                        help="AWaRe category table for S_ARG: 'legacy' "
+                             "(default; mapping used for the frozen matrix) "
+                             "or '2025' (WHO AWaRe 2025; sensitivity option)")
     parser.add_argument("--rank-concordance", action="store_true",
                         help="Verify rank concordance between package sigmoid "
                              "S_SIZE and pipeline log-ratio S_SIZE on the "
@@ -160,6 +169,9 @@ def print_banner(args, mode):
             print("  Weights: %s" % ", ".join(
                 "%s=%.3f" % (k, v) for k, v in w.items()))
             print("  Weight sum: %.4f" % ws)
+            print("  AWaRe table: %s" % (
+                "WHO AWaRe 2025" if args.aware_version == "2025"
+                else "legacy (frozen matrix)"))
         else:
             print("  Formula: Round((phylum+species+habitats+ARGs+VFGs")
             print("           +2*WHO_ARGs+ISs+growth)/8 + 0.6)")
@@ -228,7 +240,8 @@ def main(argv=None):
     # Load replicon lookup and create scorer
     lookup = load_replicon_lookup()
     scorer = get_scorer(model="plasrisk", mode=mode,
-                        replicon_lookup=lookup)
+                        replicon_lookup=lookup,
+                        aware_version=args.aware_version)
 
     # Determine abricate databases
     abricate_dbs = None

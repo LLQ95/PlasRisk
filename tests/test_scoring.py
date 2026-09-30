@@ -17,6 +17,7 @@ from plasrisk.scoring import (
     WEIGHT_SUM,
     get_scorer,
     size_rank_concordance,
+    _aware_category_2025,
 )
 
 
@@ -239,6 +240,54 @@ def test_ordinal_scoring():
                - (r1["combined_risk_index"] - 1) / 4) < 0.001
 
 
+def test_aware_2025_classifier():
+    """Gene families must follow the WHO AWaRe 2025 table."""
+    # Access
+    assert _aware_category_2025("blaTEM-1") == 1
+    assert _aware_category_2025("tetA") == 1
+    assert _aware_category_2025("dfrA1") == 1
+    assert _aware_category_2025("sul1") == 1
+    assert _aware_category_2025("catA1") == 1
+    # Watch (carbapenems, vancomycin and macrolides are Watch in 2025)
+    assert _aware_category_2025("NDM-1") == 2
+    assert _aware_category_2025("CTX-M-15") == 2
+    assert _aware_category_2025("vanA") == 2
+    assert _aware_category_2025("ermB") == 2
+    assert _aware_category_2025("strA") == 2
+    assert _aware_category_2025("aac(6')-Ib-cr") == 2
+    # Reserve (colistin, tigecycline, linezolid, fosfomycin IV, plazomicin)
+    assert _aware_category_2025("mcr-1") == 3
+    assert _aware_category_2025("tetX") == 3
+    assert _aware_category_2025("cfr") == 3
+    assert _aware_category_2025("optrA") == 3
+    assert _aware_category_2025("fosA") == 3
+    assert _aware_category_2025("rmtB") == 3
+    # Non-antibiotic genes score 0 (handled under S_BMG)
+    assert _aware_category_2025("qacEdelta1") == 0
+    assert _aware_category_2025("merA") == 0
+    assert _aware_category_2025("arsC") == 0
+
+
+def test_aware_2025_scorer():
+    """The scorer must accept and report the 2025 mapping."""
+    import pytest
+    scorer = PlasRiskScorer(aware_version="2025")
+    assert scorer.aware_version == "2025"
+    with pytest.raises(ValueError):
+        PlasRiskScorer(aware_version="2099")
+    # Biocide/metal-only plasmid must have S_ARG = 0 under 2025
+    feat = PlasmidFeatures(
+        seq_id="pBM", length_bp=5000,
+        arg_names=["qacEdelta1", "merA"],
+    )
+    result = scorer.score(feat)
+    assert result["S_ARG"] == 0.0
+    # Factory passes the option through
+    assert get_scorer(aware_version="2025").aware_version == "2025"
+    # Legacy default unchanged
+    assert PlasRiskScorer().aware_version == "legacy"
+
+
 if __name__ == "__main__":
     test_weight_sum()
     test_empty_plasmid()
@@ -256,4 +305,6 @@ if __name__ == "__main__":
     test_size_rank_concordance()
     test_ordinal_factory()
     test_ordinal_scoring()
+    test_aware_2025_classifier()
+    test_aware_2025_scorer()
     print("All tests passed.")

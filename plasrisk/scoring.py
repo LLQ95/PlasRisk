@@ -95,6 +95,60 @@ AWARE_WATCH_KEYWORDS = re.compile(
 )
 
 # ---------------------------------------------------------------------------
+# 2025 AWaRe gene-family classification (WHO AWaRe 2025 table, B09489)
+# Gene families map to the highest AWaRe category of the antibiotic they
+# defeat. Used only when aware_version="2025"; the frozen legacy mapping
+# above remains the default so published scores are exactly reproducible.
+# Audit: 2025 mapping changes S_ARG by >=0.05 for 4.9% of PSCs and moves the
+# high-risk-ARG AUC from 0.9807 to 0.9792 on the locked test (delta -0.0018).
+# ---------------------------------------------------------------------------
+A25_NON_ANTIBIOTIC = re.compile(
+    r"qac|mer[A-Z]?\b|mercury|ars[A-Z]?\b|\bcop[A-Z]?\b|\bsil[A-Z]?\b|"
+    r"czc|\bcad[A-Z]?\b|pco|\bter[A-Z]?\b|zin|"
+    r"biocide|disinfectant|metal|copper|silver|arsenic|cadmium|zinc|quaternary",
+    re.I)
+A25_ACCESS = re.compile(
+    r"blaTEM|blaSHV|blaOXA-?1\b|blaZ|"
+    r"\bcat[A-Z0-9]*\b|cml|floR|"
+    r"tet[A-M](?!\w*X)|"
+    r"dfr|\bsul[123]|"
+    r"aac\(3\)|aac\(6'\)-Ib(?!-cr)|aac\(6'\)-Ia",
+    re.I)
+A25_RESERVE = re.compile(
+    r"mcr|tet\(?X\)?|\bcfr\b|optrA|poxtA|"
+    r"rmt[A-H]|armA|npmA|"
+    r"fos[A-Z]?\d*|\bvat\b|vgb",
+    re.I)
+A25_WATCH = re.compile(
+    r"KPC|NDM|VIM|\bIMP|GES|SME|IMI|SPM|SIM|GIM|"
+    r"OXA-?\d{1,3}\b|"
+    r"CTX-M|CMY|DHA|FOX|MOX|LAT|ACC|MIR|ACT|MOR|CFE|ESBL|carbapenem|cephamycin|"
+    r"erm|mef|msr|mph|\blnu\b|lincomycin|vga|"
+    r"qnr|aac\(6'\)-Ib-cr|qepA|oqxa|gyrA|parC|"
+    r"strA|strB|ant\(3\)|aph\(3'\)|"
+    r"\bvan[A-Z]\b|fus|mec[A-C]?\b|pvl|mupA",
+    re.I)
+
+
+def _aware_category_2025(gene_name: str, product: str = "",
+                         resistance: str = "") -> int:
+    """AWaRe 2025 category for one gene: 1 Access, 2 Watch, 3 Reserve,
+    or 0 when the gene is not an antibiotic-resistance determinant
+    (biocide/metal genes are scored under S_BMG)."""
+    text = f"{gene_name},{product},{resistance}"
+    if A25_RESERVE.search(text):
+        return 3
+    if A25_ACCESS.search(text):
+        return 1
+    if A25_WATCH.search(text):
+        return 2
+    if A25_NON_ANTIBIOTIC.search(text):
+        return 0
+    # Unrecognized but plausibly clinical: default Watch, as in legacy
+    return 2
+
+
+# ---------------------------------------------------------------------------
 # High-risk ARG patterns (clinically critical gene families)
 # ---------------------------------------------------------------------------
 HIGH_RISK_ARG_PATTERNS = {
@@ -306,7 +360,7 @@ class PlasRiskScorer:
     """Compute PlasRisk scores for plasmids (10-dim full or 5-dim lite)."""
 
     def __init__(self, replicon_lookup: Optional[pd.DataFrame] = None,
-                 mode: str = "lite"):
+                 mode: str = "lite", aware_version: str = "legacy"):
         """
         Parameters
         ----------
@@ -325,10 +379,24 @@ class PlasRiskScorer:
             "full": 10-dimension model; the five contextual dimensions
                     (S_HOST, S_REP, S_GEO, S_HAB, S_GROW) require PIPdb-style
                     metadata and are imputed from replicon priors otherwise.
+        aware_version : str
+            "legacy" (default): the AWaRe keyword mapping used to build the
+                    frozen component matrix (includes the 1.5x last-resort
+                    multiplier); selected for exact reproduction.
+            "2025": categories taken from the WHO AWaRe 2025 table; no
+                    separate last-resort multiplier (Reserve already carries
+                    the highest weight) and biocide/metal genes contribute 0
+                    to S_ARG. Provided as a sensitivity option; the audit in
+                    Method S14 reports the negligible change in discrimination.
         """
         if mode not in ("full", "lite"):
             raise ValueError("mode must be 'full' or 'lite', got %r" % mode)
+        if aware_version not in ("legacy", "2025"):
+            raise ValueError(
+                "aware_version must be 'legacy' or '2025', got %r"
+                % aware_version)
         self.mode = mode
+        self.aware_version = aware_version
         self.weights = RISK_WEIGHTS_LITE if mode == "lite" else RISK_WEIGHTS
         self.weight_sum = sum(self.weights.values())
         self.active_dims = tuple(self.weights.keys())
@@ -368,13 +436,18 @@ class PlasRiskScorer:
         """
         S_ARG: AWaRe-weighted ARG hazard with log10 compression.
 
-        Each ARG contributes:
+        Legacy mapping (aware_version="legacy", used for the frozen matrix):
           base weight by AWaRe class (Access=1, Watch=2, Reserve=3)
           x1.5 if last-resort antibiotic class
           x1.3 per high-risk ARG (carbapenemase, mcr, tetX, van, cfr, optrA)
           x1.2 if WHO priority pathogen host
 
-        Raw hazard w is log10-compressed and normalized to 99th percentile:
+        2025 mapping (aware_version="2025", WHO AWaRe 2025 table):
+          base weight by 2025 class (Access=1, Watch=2, Reserve=3);
+          biocide/metal genes contribute 0 (scored under S_BMG);
+          the 1.5 last-resort multiplier is not applied.
+
+        Raw hazard w is log10-compressed and normalized to the cap:
           S_ARG = log10(1 + min(w, 30)) / log10(1 + 30)
 
         Housekeeping chromosomal genes (acrAB, tolC, etc.) are excluded.
@@ -392,12 +465,17 @@ class PlasRiskScorer:
             # Get product/resistance info from metadata if available
             product = feat.metadata.get("arg_products", {}).get(name, "")
             resistance = feat.metadata.get("arg_resistance", {}).get(name, "")
-            aware = self.classify_aware(name, product, resistance)
-            weight = float(aware)
-
-            # Last-resort multiplier
-            if LAST_RESORT_PATTERN.search(f"{name},{product},{resistance}"):
-                weight *= 1.5
+            if self.aware_version == "2025":
+                aware = _aware_category_2025(name, product, resistance)
+                weight = float(aware)
+                # Reserve already encodes last-resort status; no 1.5 multiplier
+            else:
+                aware = self.classify_aware(name, product, resistance)
+                weight = float(aware)
+                # Last-resort multiplier (frozen legacy mapping)
+                if LAST_RESORT_PATTERN.search(
+                        f"{name},{product},{resistance}"):
+                    weight *= 1.5
 
             hazard += weight
 
@@ -1112,7 +1190,8 @@ def size_rank_concordance(lengths_bp, max_length_bp: int = 1_000_000,
 
 
 def get_scorer(model: str = "plasrisk", mode: str = "lite",
-               replicon_lookup: Optional[pd.DataFrame] = None):
+               replicon_lookup: Optional[pd.DataFrame] = None,
+               aware_version: str = "legacy"):
     """
     Factory function to get a scorer by model name.
 
@@ -1129,6 +1208,10 @@ def get_scorer(model: str = "plasrisk", mode: str = "lite",
         ``"full"`` (10-dim) or ``"ordinal"`` (PIPdb 8-item index).
     replicon_lookup : pd.DataFrame, optional
         Replicon empirical prior table (PlasRisk only).
+    aware_version : str
+        ``"legacy"`` (default; mapping used for the frozen component matrix)
+        or ``"2025"`` (WHO AWaRe 2025 categories; sensitivity option).
+        Ignored by the ordinal model.
 
     Returns
     -------
@@ -1140,7 +1223,8 @@ def get_scorer(model: str = "plasrisk", mode: str = "lite",
     if model in ("plasrisk", "plasrisk10", "10dim", "10-dim"):
         if mode == "ordinal":
             return PIPdbScorer()
-        return PlasRiskScorer(replicon_lookup=replicon_lookup, mode=mode)
+        return PlasRiskScorer(replicon_lookup=replicon_lookup, mode=mode,
+                              aware_version=aware_version)
     elif model in ("pipdb", "ordinal", "pipdb-original"):
         return PIPdbScorer()
     else:
