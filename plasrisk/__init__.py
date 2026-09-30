@@ -14,10 +14,14 @@ S_HAB and S_GROW, which require PIPdb-style metadata and are otherwise
 imputed from replicon priors. The original PIPdb 8-item ordinal index
 is available with --mode ordinal.
 
+S_ARG can use the WHO AWaRe 2025 category table (--aware-version 2025);
+the legacy mapping used for the frozen component matrix remains the
+default (see Method S14, Table S56).
+
 Reference: [to be updated upon publication]
 """
 
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 __author__ = "PlasRisk Team"
 
 from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,

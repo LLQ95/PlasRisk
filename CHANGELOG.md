@@ -2,6 +2,20 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.4.0] - 2026-09-30
+
+### Added
+- S_ARG can use the WHO AWaRe 2025 category table, selected with
+  `--aware-version 2025` on the CLI or `aware_version="2025"` in
+  `PlasRiskScorer` / `get_scorer`. Under the 2025 mapping, biocide/metal
+  genes contribute 0 to S_ARG (they are scored under S_BMG) and the
+  separate 1.5x last-resort multiplier is not applied because Reserve
+  already carries the highest weight. The legacy mapping used for the
+  frozen component matrix remains the default. The audit in Method S14
+  shows that the 2025 mapping changes S_ARG by at least 0.05 for 4.9%
+  of PSCs and moves the high-risk-ARG AUC on the locked test from
+  0.9807 to 0.9789 (delta -0.0018); the frozen values are retained.
+
 ## [1.3.0] - 2026-09-24
 
 ### Added
