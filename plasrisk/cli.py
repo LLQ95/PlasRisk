@@ -30,7 +30,7 @@ Options:
     --tsv                Write per-sequence TSV (default)
     --summary            Write per-file summary TSV
     -q, --quiet          Suppress progress messages
-    -h, --help           Show help message
+    -h, --help           Show this help message
     -v, --version        Show version
 """
 
@@ -316,7 +316,7 @@ def main(argv=None):
 
         if not args.quiet:
             top = df.iloc[0]
-            score_col = "risk_index_normalized" if is_ordinal else "S_norm"
+            score_col = "risk_index_normalized" if mode == "ordinal" else "S_norm"
             print("    %d sequences scored | top: %s (score=%.3f, grade %s)" % (
                 len(df), top["seq_id"], top[score_col], top["grade"]))
 

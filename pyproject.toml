@@ -5,28 +5,41 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "plasrisk"
 version = "1.4.0"
-description = "Data-driven weighted risk assessment for bacterial plasmids (lite/full/ordinal modes)"
+description = "PlasRisk: data-driven weighted risk assessment for bacterial plasmids from FASTA sequences (three modes: lite 5-dim FASTA-only core by default, full 10-dim model, and original PIPdb ordinal index)"
 readme = "README.md"
-requires-python = ">=3.9"
 license = {text = "MIT"}
+requires-python = ">=3.8"
 authors = [
     {name = "PlasRisk Team"},
 ]
+maintainers = [
+    {name = "PlasRisk Team"},
+]
 keywords = [
+    "bioinformatics",
     "plasmid",
     "antimicrobial resistance",
+    "AMR",
     "risk assessment",
-    "bioinformatics",
+    "microbial genomics",
     "One Health",
-    "virulence factors",
-    "mobile genetic elements",
+    "biocide resistance",
+    "co-selection",
+    "horizontal gene transfer",
 ]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
 ]
 dependencies = [
     "pandas>=1.3",
@@ -34,19 +47,33 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-full = [
-    "abricate",
-]
-test = [
+dev = [
     "pytest>=7.0",
+    "pytest-cov",
+    "build",
+    "twine",
+]
+full = [
+    "biopython>=1.79",
 ]
 
 [project.scripts]
 plasrisk = "plasrisk.cli:main"
 
+[project.urls]
+Homepage = "https://github.com/LLQ95/PlasRisk"
+Repository = "https://github.com/LLQ95/PlasRisk"
+Issues = "https://github.com/LLQ95/PlasRisk/issues"
+Documentation = "https://github.com/LLQ95/PlasRisk#readme"
+Changelog = "https://github.com/LLQ95/PlasRisk/releases"
+
 [tool.setuptools.packages.find]
-where = ["."]
 include = ["plasrisk*"]
 
 [tool.setuptools.package-data]
-plasrisk = ["data/*.csv", "data/*.tsv", "data/*.txt"]
+plasrisk = ["data/*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

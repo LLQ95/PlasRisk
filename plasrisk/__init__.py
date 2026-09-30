@@ -12,11 +12,9 @@ S = 0.253*S_ARG + 0.237*S_BMG + 0.201*S_MOB + 0.175*S_SIZE + 0.135*S_VF
 The full 10-dimension model (--mode full) adds S_HOST, S_REP, S_GEO,
 S_HAB and S_GROW, which require PIPdb-style metadata and are otherwise
 imputed from replicon priors. The original PIPdb 8-item ordinal index
-is available with --mode ordinal.
-
-S_ARG can use the WHO AWaRe 2025 category table (--aware-version 2025);
-the legacy mapping used for the frozen component matrix remains the
-default (see Method S14, Table S56).
+is available with --mode ordinal. S_ARG can optionally use the WHO
+AWaRe 2025 category table (--aware-version 2025); the legacy mapping
+used for the frozen matrix remains the default.
 
 Reference: [to be updated upon publication]
 """
