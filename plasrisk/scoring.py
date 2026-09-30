@@ -1,12 +1,22 @@
+#!/usr/bin/env python3
 """
-scoring.py - Ten-dimension plasmid risk scoring model.
+scoring.py - Risk scoring functions for PlasRisk.
 
-Each component S_i is normalized to [0, 1].
-Composite score:  S = sum(w_i * S_i), normalized by sum(w_i).
+Implements 10 dimensions:
+  S_ARG  - Antimicrobial resistance gene burden (WHO AWaRe weighted)
+  S_VF   - Virulence factor burden
+  S_MOB  - Mobility / conjugative potential
+  S_HOST - Host range
+  S_REP  - Replicon type
+  S_SIZE - Plasmid size
+  S_BMG  - Biocide/metal resistance
+  S_GEO  - Geographic spread
+  S_HAB  - Habitat breadth
+  S_GROW - Temporal growth rate
 
-When sequence-derived dimensions cannot be computed (e.g., abricate not
-available or no mobility genes detected), replicon-specific empirical
-medians from 792,964 PIPdb PSCs are used as fallback priors.
+Default scorer is the 5-dimension FASTA-only lite core; the full 10-dimension
+model is selected with mode="full". The original PIPdb 8-item ordinal index
+is provided as PIPdbScorer / mode="ordinal".
 """
 
 from __future__ import annotations
@@ -14,50 +24,41 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 import pandas as pd
 
-# ---------------------------------------------------------------------------
-# Weight scheme (data-driven consensus weights from RF-MDG / LASSO / grid-search
-# optimization on 792,964 PIPdb PSCs; normalized to sum = 1.0)
-# ---------------------------------------------------------------------------
+# =====================================================================
+# Final consensus weights (locked; manuscript Table 1)
+# Order: descending weight
+# =====================================================================
 RISK_WEIGHTS: Dict[str, float] = {
-    "S_ARG":  0.237407560,  # Antimicrobial resistance gene burden
-    "S_BMG":   0.222474567,  # Biocide / metal resistance (co-selection)
-    "S_MOB":  0.188667866,  # Mobility / conjugation potential
-    "S_SIZE": 0.164241191,  # Plasmid size (cargo capacity)
-    "S_VF":   0.126322075,  # Virulence factor burden
-    "S_HOST": 0.030023037,  # Host range breadth
-    "S_HAB":  0.019285441,  # Habitat breadth (One Health)
-    "S_GEO":  0.004837394,  # Geographic spread
-    "S_REP":  0.004300076,  # Replicon-specific risk prior
-    "S_GROW": 0.002440791,  # Temporal growth rate
+    "S_ARG":  0.237,
+    "S_BMG":  0.222,
+    "S_MOB":  0.189,
+    "S_SIZE": 0.164,
+    "S_VF":   0.126,
+    "S_HOST": 0.030,
+    "S_HAB":  0.019,
+    "S_GEO":  0.005,
+    "S_REP":  0.004,
+    "S_GROW": 0.002,
 }
 
-WEIGHT_SUM = sum(RISK_WEIGHTS.values())  # 1.0001 ≈ 1.0
-
-# ---------------------------------------------------------------------------
-# Lite mode: 5-dimension core (S_ARG + S_BMG + S_MOB + S_SIZE + S_VF)
-# Renormalized from the full consensus weights; captures >=99.9% of mean AUC
-# (0.919 vs 0.919 for 10-dim at 3 decimal places).
-# Derived from all-subsets dimensionality analysis (pipdb_20, 5-fold CV):
-#   k=5 mean AUC = 0.919 vs k=10 = 0.919 (difference < 0.001, NS).
-# Includes S_VF because it raises MDR-VF fusion AUC from 0.945 to 0.967.
-# Overfitting analysis (pipdb_21) confirmed no train-test gap for either model.
-# ---------------------------------------------------------------------------
-LITE_DIMENSIONS = ("S_ARG", "S_BMG", "S_MOB", "S_SIZE", "S_VF")
-LITE_WEIGHTS_RAW = {k: RISK_WEIGHTS[k] for k in LITE_DIMENSIONS}
-LITE_WEIGHT_SUM = sum(LITE_WEIGHTS_RAW.values())  # 0.9391
+# Lite 5-dimension FASTA-only weights (renormalized from full weights over
+# the five sequence-derived dimensions; manuscript Table 6)
 RISK_WEIGHTS_LITE: Dict[str, float] = {
-    k: v / LITE_WEIGHT_SUM for k, v in LITE_WEIGHTS_RAW.items()
+    "S_ARG":  0.253,
+    "S_BMG":  0.237,
+    "S_MOB":  0.201,
+    "S_SIZE": 0.175,
+    "S_VF":   0.135,
 }
-# S_ARG=0.2528, S_BMG=0.2369, S_MOB=0.2009, S_SIZE=0.1749, S_VF=0.1345
 
-# ---------------------------------------------------------------------------
-# Risk grade thresholds (on normalized S_norm in [0, 1])
-# ---------------------------------------------------------------------------
+WEIGHT_SUM = sum(RISK_WEIGHTS.values())
+
+# Risk grade thresholds (score, grade, label); manuscript Table 5
 RISK_GRADES = [
     (0.60, "A", "Very High"),
     (0.45, "B", "High"),
@@ -66,1083 +67,572 @@ RISK_GRADES = [
     (0.00, "E", "Minimal"),
 ]
 
-# ---------------------------------------------------------------------------
-# AWaRe classification mapping (WHO Access, Watch, Reserve groups)
-# Used for S_ARG hazard weighting, matching pipdb_02_risk_score.py logic.
-# Keywords in gene/product/resistance names map to AWaRe categories.
-# ---------------------------------------------------------------------------
+# =====================================================================
+# WHO AWaRe classification patterns (legacy mapping used for the frozen
+# component matrix; gene-name based)
+# =====================================================================
 AWARE_ACCESS = re.compile(
-    r"blaTEM|blaSHV|blaOXA-?1\b|ampC|cat|cml|floR|tet[A-M]|dfrA|sul[123]|"
-    r"erm[A-T]|mef[A-E]|msr[A-E]|mph[A-E]|lnu[A-C]|vat|vga|vgb|"
-    r"aac\(3\)|aac\(6'\)-I[abd]|ant\(3\)|aph\(3'\)-III|strA|strB|"
-    r"blaCMY-?2\b|blaDHA-?1\b|fosA[0-9]?|qnrD",
-    re.I,
+    r"^(bla)?(TEM|SHV|OXA-1|blaZ|LEN|LAP)"
+    r"|cat[ABC]?|cmlA|floR"
+    r"|tet[ABCDEFGHIJKLMYZ]?|tet[S]?"
+    r"|dfr[A-Z]?|sul[123]?"
+    r"|aac(3|6\x27)?-?(I[ab]?|II|III|VI|APH|ANT)"
+    r"|str[AB]|ant(3|6)?|aph(3|6)?"
+    r"|erm[A-F]?|mef[AB]?|msr[ABCD]?|mph[ABCDE]?"
+    r"|lnu[A-F]?|vga[ABCDE]?|vgb[ABC]?"
+    r"|fus[ABC]?|mec[ABC]?"
+    r"|qnr[A-DS]?|qepA|oqxA?B?"
+    r"|aac\(6\x27\)-Ib"
+    r"|bla[A-Z]{3,}?",
+    re.IGNORECASE,
 )
+
 AWARE_RESERVE = re.compile(
-    r"mcr|NDM|KPC|OXA-?48|OXA-?181|OXA-?232|OXA-?244|VIM|IMP|GES|SPM|"
-    r"GIM|SIM|DIM|AIM|SMB|KHM|FRI|TMB|FRI-|tet\(?X\)?|van[ABC]|cfr|optrA|poxtA|"
-    r"rmt[A-H]|armA|npmA",
-    re.I,
-)
-# Everything else clinically relevant defaults to Watch
-AWARE_WATCH_KEYWORDS = re.compile(
-    r"CTX-M|CMY|DHA|FOX|MOX|LAT|ACC|MIR|ACT|MOR|CFE|ESBL|carbapenem|"
-    r"qnr[A-CS]|aac\(6'\)-Ib-cr|qepA|oqxAB|gyrA|parC|"
-    r"blaPER|blaVEB|blaGES|blaBEL|blaTLA|blaSCO|blaBIC|blaIMI|blaSME|blaNMC|"
-    r"blaZ|mecA|mecC|pbp2a|pbp2|mupA|fusB|ileS|"
-    r"blaOXA-?(2|9|10|23|24|40|58|72|113|143|181|235|239|244|245|247|253|255|258|259|276|347|437|488|514|515|517|546|547|552|553|554|555|556|557|558|559|560|561|562|563|564|565|566|567|568|569|570|571|572|573|574|575|576|577|578|579|580|581|582|583|584|585|586|587|588|589|590|591|592|593|594|595|596|597|598|599|600|601|602|603|604|605|606|607|608|609|610|611|612|613|614|615|616|617|618|619|620|621|622|623|624|625|626|627|628|629|630|631|632|633|634|635|636|637|638|639|640|641|642|643|644|645|646|647|648|649|650|651|652|653|654|655|656|657|658|659|660|661|662|663|664|665|666|667|668|669|670|671|672|673|674|675|676|677|678|679|680|681|682|683|684|685|686|687|688|689|690|691|692|693|694|695|696|697|698|699|700|701|702|703|704|705|706|707|708|709|710|711|712|713|714|715|716|717|718|719|720|721|722|723|724|725|726|727|728|729|730|731|732|733|734|735|736|737|738|739|740|741|742|743|744|745|746|747|748|749|750|751|752|753|754|755|756|757|758|759|760|761|762|763|764|765|766|767|768|769|770|771|772|773|774|775|776|777|778|779|780|781|782|783|784|785|786|787|788|789|790|791|792|793|794|795|796|797|798|799|800|801|802|803|804|805|806|807|808|809|810|811|812|813|814|815|816|817|818|819|820|821|822|823|824|825|826|827|828|829|830|831|832|833|834|835|836|837|838|839|840|841|842|843|844|845|846|847|848|849|850|851|852|853|854|855|856|857|858|859|860|861|862|863|864|865|866|867|868|869|870|871|872|873|874|875|876|877|878|879|880|881|882|883|884|885|886|887|888|889|890|891|892|893|894|895|896|897|898|899|900)",
-    re.I,
+    r"mcr-?[0-9]|tetX[0-9]?|cfr|optrA|poxtA|van[A-Z]?"
+    r"|rmt[A-H]?|armA|npmA"
+    r"|fos[A-Z]?|blaKPC|blaNDM|blaVIM|blaIMP|blaGES"
+    r"|blaOXA-?(23|24|48|58)|blaSME|blaIMI|blaSPM|blaSIM|blaGIM"
+    r"|vat[A-E]?|vgb[ABC]?",
+    re.IGNORECASE,
 )
 
-# ---------------------------------------------------------------------------
-# High-risk ARG patterns (clinically critical gene families)
-# ---------------------------------------------------------------------------
-HIGH_RISK_ARG_PATTERNS = {
-    "mcr":       re.compile(r"mcr", re.I),
-    "blaNDM":    re.compile(r"NDM", re.I),
-    "blaKPC":    re.compile(r"KPC", re.I),
-    "blaOXA48":  re.compile(r"OXA-?(48|181|232|244)", re.I),
-    "blaCTX-M":  re.compile(r"CTX-M", re.I),
-    "tetX":      re.compile(r"tet\(?X\)?", re.I),
-    "van":       re.compile(r"van[A-Z]", re.I),
-    "cfr":       re.compile(r"\bcfr\b", re.I),
-    "optrA":     re.compile(r"optrA", re.I),
-    "poxtA":     re.compile(r"poxtA", re.I),
-    "blaIMP":    re.compile(r"\bIMP", re.I),
-    "blaVIM":    re.compile(r"\bVIM", re.I),
-    "rmt":       re.compile(r"rmt[A-H]", re.I),
-}
-
-# WHO-priority ARG indicator (broad set of clinically important families)
-WHO_ARG_PATTERNS = re.compile(
-    r"mcr|NDM|KPC|OXA-?48|CTX-M|CMY|DHA|VIM|IMP|tet\(?X\)?|van|"
-    r"cfr|optrA|poxtA|qnr|aac.6.-Ib-cr|rmt|fos[A-Z]|SHV|TEM|PER|VEB|GES",
-    re.I,
+# =====================================================================
+# WHO AWaRe 2025 category table (B09489; sensitivity option).
+# Returns 0 = not an antibiotic (scored under S_BMG), 1 = Access,
+# 2 = Watch, 3 = Reserve.
+# =====================================================================
+A25_ACCESS = re.compile(
+    r"^(bla)?(TEM|SHV|OXA-1|blaZ|LEN|LAP)"
+    r"|^cat[ABC]?[0-9]*$|^cmlA|^floR"
+    r"|^tet[A-M][0-9]*$|^dfr[A-Z]?[0-9]*$|^sul[123]?[0-9]*$"
+    r"|^aac3|^aac6\x27?(?!.*cr)|^ant(3|6)|^aph(3|6)"
+    r"|^str[AB][0-9]*$|^blaCM[YT]|^blaROB|^blaBRO|^blaOXA[2-9]?(?!48|23|24|58)",
+    re.IGNORECASE,
+)
+A25_RESERVE = re.compile(
+    r"mcr-?[0-9]|tetX[0-9]?|^cfr|optrA|poxtA"
+    r"|rmt[A-H]?|armA|npmA|^fos[A-Z]?[0-9]*$"
+    r"|^vat[A-E]?|^vgb[ABC]?|linezolid|^optr|^cfr[ABC]?",
+    re.IGNORECASE,
+)
+A25_WATCH = re.compile(
+    r"blaKPC|blaNDM|blaVIM|blaIMP|blaGES|blaSME|blaIMI|blaSPM|blaSIM|blaGIM"
+    r"|blaOXA-?(23|24|48|58)|^van[A-Z]|^erm[A-F]?[0-9]*$|^mef[AB]?"
+    r"|^msr[ABCD]?|^mph[A-E]?|^lnu[A-F]?|^vga[ABCDE]?|^fus[ABC]?"
+    r"|^mec[ABC]?|qnr[A-DS]?|qepA|^oqxA?B?|aac\(6\x27\)-Ib-cr"
+    r"|^bla(CTX|CMY|DHA|FOX|MOX|ACC|ACT|MIR|CFM|CRO|CAZ|CTX|FEP|CPO)"
+    r"|^aac(?!3)|^aad|^aph(?!3)|^ant(?!3)|^sxt|^bla[A-Z]{3,}",
+    re.IGNORECASE,
+)
+A25_NON_ANTIBIOTIC = re.compile(
+    r"qac|^mer[A-Z]?[0-9]*$|^ars[A-Z]?[0-9]*$|^cop[A-Z]?[0-9]*$"
+    r"|^sil[A-Z]?[0-9]*$|^czc[A-Z]?[0-9]*$|^cad[A-Z]?[0-9]*$"
+    r"|^pco[A-Z]?[0-9]*$|^ter[A-Z]?[0-9]*$|^zin[T]?"
+    r"|^bfp|^iut|^iro|^fim|^pil|^pap|^fep|^ent|^ybt|^irp"
+    r"|^clp|^hly|^stx|^ipa|^vir|^esp|^eae|^tir|^lee|^chu|^sit",
+    re.IGNORECASE,
 )
 
-# Last-resort antibiotic classes (1.5x multiplier)
-LAST_RESORT_PATTERN = re.compile(
-    r"carbapenem|colistin|polymyxin|glycopeptide|vancomycin|tigecycline|"
-    r"linezolid|ceftazidime-avibactam|meropenem-vaborbactam|NDM|KPC|"
-    r"mcr|van[ABC]|tet\(?X\)?|cfr|optrA|poxtA|oxazolidinone|phenicol.*last",
-    re.I,
+
+def _aware_category_2025(gene_name: str) -> int:
+    """Classify one gene name under the WHO AWaRe 2025 table.
+
+    Returns 0 (not an antibiotic), 1 (Access), 2 (Watch), 3 (Reserve).
+    Non-antibiotic resistance genes (biocide/metal) are scored under
+    S_BMG and contribute 0 to S_ARG under the 2025 mapping.
+    """
+    g = gene_name.strip()
+    if not g:
+        return 0
+    if A25_NON_ANTIBIOTIC.search(g):
+        return 0
+    if A25_RESERVE.search(g):
+        return 3
+    if A25_ACCESS.search(g):
+        return 1
+    if A25_WATCH.search(g):
+        return 2
+    # Unrecognized but plausible clinical resistance gene: default Watch
+    if re.search(r"bla|aac|aph|ant|aad|erm|tet|dfr|sul|cat|cml|flo|mcr|van"
+                 r"|rRNA|methyl|oxa|carbapenem", g, re.IGNORECASE):
+        return 2
+    return 0
+
+
+# =====================================================================
+# High-risk gene patterns (manuscript Method S2; hazard multipliers)
+# =====================================================================
+HIGH_RISK_PATTERNS = re.compile(
+    r"mcr-?[0-9]|blaKPC|blaNDM|blaVIM|blaIMP|blaGES"
+    r"|blaOXA-?(23|24|48|58)|blaSME|blaIMI|blaSPM|blaSIM|blaGIM"
+    r"|tetX[0-9]?|^cfr|optrA|poxtA|van[A-Z]?"
+    r"|qnr[A-DS]?|aac\(6\x27\)-Ib-cr|qepA|oqxA?B?"
+    r"|rmt[A-H]?|armA|npmA|^fos[A-Z]?|^CTX-M|mec[ABC]?",
+    re.IGNORECASE,
 )
 
-# WHO critical-priority pathogen association (1.2x multiplier)
-WHO_PATHOGEN_PATTERN = re.compile(
-    r"escherichia|klebsiella|enterobacter|salmonella|acinetobacter|"
-    r"pseudomonas|staphylococcus|enterococcus|neisseria|haemophilus",
-    re.I,
-)
-
-# Chromosomal housekeeping genes that should NOT count as plasmid-borne ARGs
-# These are multi-drug efflux pumps / porins that abricate CARD may annotate
-# but are not horizontally transferred resistance determinants.
+# Housekeeping / chromosomal genes excluded from FASTA-only ARG hazard
 HOUSEKEEPING_GENES = re.compile(
-    r"^(acr[ABEF]|tolC|mdfA|mdt[A-Z0-9]*|emr[A-Z0-9]*|msbA|acrD|acrEF|"
-    r"ampC|ampH|ampG|nfxB|mex[A-Z0-9]*|oprM|oprJ|mexR|nalC|nalD|"
-    r"ade[A-Z0-9]*|adeR|adeS|cmeABC|cmeR|ceoAB|opcR|amrAB|amrR|"
-    r"farAB|rosAB|mtrRCDE|norM|norA|bmr|bmrA|bmr3|blt|bmrR|"
-    r"patAB|pmrA|carO|oprD|omp[A-Z0-9]*|ompF|ompC|ompK3[56]|"
-    r"gyrA|parC|parE|folA|folP|rpoB|rpsL|kasA|inhA|embB|pncA|"
-    r"ald|aldH|gidB|tlyA|rrs|rrl|rpl[A-Z]|rps[A-Z]|rpm[A-Z])$",
-    re.I,
+    r"^(omp|por|fhu|sdh|mdh|gyr|par|rpo|rpl|rps|inf|dna|rec|uvr)"
+    r"|AcrAB-TolC|MexAB-OprM|AdeFGH|EmhABC|MdtEF|RosAB|Fsr|KdpE|TelAB"
+    r"|MFS|SMC|EmrE|QacE$|sugE|NorM|DinF|H-NS|arcA|marA|soxS|ramA",
+    re.IGNORECASE,
 )
 
-# ---------------------------------------------------------------------------
-# Mobility gene markers (keyword-based detection in annotation)
-# ---------------------------------------------------------------------------
-T4CP_PATTERN = re.compile(
-    r"\b(traD|traG|virD4|trwB|T4CP|coupling)\b", re.I)
-RELAXASE_PATTERN = re.compile(
-    r"\b(traI|mobA|nikB|traA|relaxase|traH|traJ_rel|mobC|virD2)\b", re.I)
-ORIT_PATTERN = re.compile(
-    r"\b(oriT|nic|traI_rel|mob)\b", re.I)
-AUX_PATTERN = re.compile(
-    r"\b(traJ|traK|traM|traY|traN|traO|traP|trb[A-Z]|Pil|taxC)\b", re.I)
-
-# ---------------------------------------------------------------------------
-# Biocide / metal resistance patterns
-# ---------------------------------------------------------------------------
-MER_PATTERN = re.compile(r"\bmer[A-Z]?\b|mercury", re.I)
-QAC_PATTERN = re.compile(r"qac|quaternary|disinfectant", re.I)
-ARS_COP_PATTERN = re.compile(
-    r"\bars[A-Z]?\b|\bcop[A-Z]?\b|\bsil[A-Z]?\b|czc[A-Z]?|cad[A-Z]?|pco[A-Z]",
-    re.I,
+# =====================================================================
+# Mobility element patterns
+# =====================================================================
+T4CP_PATTERNS = re.compile(
+    r"T4CP|T4CP\.|coupling protein|VirD4|TraD|Tcp"
+    r"|relaxosome coupling|Tic?P|Tra[GS]|Cpl?",
+    re.IGNORECASE,
 )
-# CARD-based biocide/metal gene fallback (when BacMet database unavailable)
-CARD_BM_PATTERN = re.compile(
-    r"qac[A-Z]?|mer[A-Z]?|ars[A-Z]?|cop[A-Z]?|sil[A-Z]?|czc[A-Z]?|"
-    r"cad[A-Z]?|pco[A-Z]|ter[A-Z]?|zin[TAB]|nim[A-Z]?|ncc[A-Z]?|"
-    r"chr[A-Z]?|act[A-Z]?|mdt[A-Z]?|emr[A-Z]?|mex[A-Z]?|ade[A-Z]?|"
-    r"acr[ABEF]|tolC|mdfA|ceo[A-Z]|amr[A-Z]|far[A-Z]|ros[AB]|"
-    r"bmr|blt|nor[AM]|patAB|mep[A-Z]|sugE|betA|opr|mtrR|"
-    r"biocide|disinfectant|metal|copper|silver|arsenic|cadmium|zinc",
-    re.I,
+RELAXASE_PATTERNS = re.compile(
+    r"relaxase|helicase|TraI|VirD2|Mob[ABCDEFGH]?|NikB"
+    r"|Tral|TraI|relaxase|MobF|MobC|TraW|TraH|TraJ|Sog",
+    re.IGNORECASE,
+)
+ORIT_PATTERNS = re.compile(
+    r"oriT|origin of transfer|nic site|bom|rlx",
+    re.IGNORECASE,
+)
+MPF_PATTERNS = re.compile(
+    r"T4SS|type IV secretion|VirB[1-9]?|Tra[ABCDEFGHKLMNUVWXY]?"
+    r"|Trb[A-Z]?|T4[PB]|Pil[LTWXYZ]?|Cpa|Cag|Dot/Icm|VirD4"
+    r"|mpf|T2SS|conjugative|mating pair",
+    re.IGNORECASE,
 )
 
-# VF category bonuses
-EXOTOXIN_PATTERN = re.compile(r"exotoxin|toxin|enterotoxin|hemolysin|cytolysin", re.I)
-EFFECTOR_PATTERN = re.compile(r"effector delivery|type III|type IV|T3SS|T4SS|secretion", re.I)
-
-# PIPdb 99th percentile ARG hazard cap (from pipdb_02 analysis)
-ARG_HAZARD_CAP = 30.0
-# Maximum plasmid length for S_SIZE normalization (1 Mb)
-MAX_PLASMID_LENGTH = 1_000_000
-
-# PIPdb global medians (used as defaults when replicon is unknown)
-# Computed from 792,964 PSCs in tab_psc_final_scores.csv
-GLOBAL_MEDIANS = {
-    "S_ARG":  0.000,
-    "S_VF":   0.000,
-    "S_MOB":  0.085,
-    "S_HOST": 0.760,
-    "S_REP":  0.300,
-    "S_SIZE": 0.609,
-    "S_BMG":   0.000,
-    "S_GEO":  0.000,
-    "S_HAB":  0.000,
-    "S_GROW": 0.000,
+# =====================================================================
+# VF category weights
+# =====================================================================
+VF_CATEGORY_WEIGHTS = {
+    "Exotoxin": 0.45,
+    "Type III secretion system": 0.40,
+    "T3SS effector": 0.35,
+    "Type IV secretion system": 0.30,
+    "Adherence": 0.25,
+    "Invasion": 0.30,
+    "Serum resistance": 0.30,
+    "Nutritional/Metabolic factor": 0.20,
+    "Immune evasion": 0.30,
+    "Biofilm": 0.20,
+    "Capsule": 0.20,
+    "Protease": 0.20,
+    "Toxin": 0.40,
+    "Hemolysin": 0.35,
 }
 
+# =====================================================================
+# Biocide/metal family bonuses
+# =====================================================================
+BMG_FAMILY_BONUS = {
+    "mer": 0.35,   # mercury operon
+    "qac": 0.25,   # quaternary ammonium compounds
+    "ars": 0.25,   # arsenic
+    "cop": 0.20,   # copper
+    "sil": 0.20,   # silver
+    "pco": 0.20,   # copper plasmid-borne
+    "czc": 0.20,   # cadmium/zinc/cobalt
+    "cad": 0.15,
+    "ter": 0.15,   # tellurium
+    "zin": 0.10,
+}
 
-# ---------------------------------------------------------------------------
-# Data class for plasmid features
-# ---------------------------------------------------------------------------
+ARG_HAZARD_CAP = 30.0
+BMG_HAZARD_CAP = 20.0
+
+
 @dataclass
 class PlasmidFeatures:
-    """Container for all features needed to score a single plasmid."""
-
-    # Sequence
-    seq_id: str = ""
-    length_bp: int = 0
-
-    # Annotation counts
+    """Container for plasmid annotation features."""
+    seq_id: str
+    length_bp: int
     arg_names: List[str] = field(default_factory=list)
     vf_names: List[str] = field(default_factory=list)
     vf_categories: List[str] = field(default_factory=list)
     bm_gene_names: List[str] = field(default_factory=list)
-
-    # Replicon
     replicon: str = ""
-
-    # Mobility elements (booleans)
-    has_t4cp: Optional[bool] = None
-    has_relaxase: Optional[bool] = None
-    has_oriT: Optional[bool] = None
-    has_auxiliary: Optional[bool] = None
-    has_integron: Optional[bool] = None
-    n_is: int = 0  # insertion sequence count
-    mobility_class: str = ""  # if pre-classified
-
-    # Host range (if known; otherwise None -> use replicon lookup)
-    n_host_genera: Optional[int] = None
-    n_countries: Optional[int] = None
-    n_habitats: Optional[int] = None
-    annual_growth_rate: Optional[float] = None
-
-    # PIPdb original model fields (pathogenic host metadata)
-    n_pathogenic_phylum: Optional[int] = None
-    n_pathogenic_species: Optional[int] = None
-
-    # Replicon lookup priors (filled by scorer if not provided)
-    s_rep_prior: Optional[float] = None
-    s_geo_prior: Optional[float] = None
-    s_hab_prior: Optional[float] = None
-    s_grow_prior: Optional[float] = None
-    s_host_prior: Optional[float] = None
-    s_mob_prior: Optional[float] = None
-
-    # Whether mobility was directly assessed from sequence
-    # If False and no mobility genes found, S_MOB will use replicon prior
-    mobility_annotated: bool = False
-
-    # WHO pathogen association (for S_ARG 1.2x bonus)
-    host_is_who_priority: bool = False
-
-    # Convenience: any extra metadata
-    metadata: Dict = field(default_factory=dict)
-
-    @property
-    def n_arg(self) -> int:
-        return len(self.arg_names)
-
-    @property
-    def n_vf(self) -> int:
-        return len(self.vf_names)
-
-    @property
-    def n_bm(self) -> int:
-        return len(self.bm_gene_names)
-
-    @property
-    def high_risk_args(self) -> List[str]:
-        hits = []
-        for name in self.arg_names:
-            for label, pat in HIGH_RISK_ARG_PATTERNS.items():
-                if pat.search(name):
-                    hits.append(label)
-                    break
-        return hits
-
-    @property
-    def has_who_arg(self) -> bool:
-        return any(WHO_ARG_PATTERNS.search(n) for n in self.arg_names)
-
-    @property
-    def n_who_arg(self) -> int:
-        """Count of ARGs on the WHO priority pathogen list."""
-        return sum(1 for n in self.arg_names if WHO_ARG_PATTERNS.search(n))
-
-    @property
-    def has_high_risk_arg(self) -> bool:
-        return len(self.high_risk_args) > 0
+    host_genera: Optional[List[str]] = None
+    countries: Optional[List[str]] = None
+    habitats: Optional[List[str]] = None
+    collection_year: Optional[int] = None
+    has_t4cp: bool = False
+    has_relaxase: bool = False
+    has_oriT: bool = False
+    has_auxiliary: bool = False
 
 
-# ---------------------------------------------------------------------------
-# Scorer
-# ---------------------------------------------------------------------------
 class PlasRiskScorer:
-    """Compute PlasRisk scores for plasmids (10-dim full or 5-dim lite)."""
+    """Compute PlasRisk component scores and the composite risk score."""
 
-    def __init__(self, replicon_lookup: Optional[pd.DataFrame] = None,
-                 mode: str = "lite"):
-        """
-        Parameters
-        ----------
-        replicon_lookup : pd.DataFrame, optional
-            Lookup table with columns:
-            replicon_primary, S_ARG, S_VF, S_MOB, S_HOST, S_REP, S_SIZE,
-            S_BMG, S_GEO, S_HAB, S_GROW, n_PSC
-            Empirical medians from 792,964 PIPdb PSCs.
-            If None, built-in global medians are used.
-        mode : str
-            "lite" (default): 5-dimension FASTA-only core
-                    (S_ARG, S_VF, S_MOB, S_SIZE, S_BMG), reproducing 92.7%
-                    of full-model grades exactly and 100% within one grade,
-                    with equivalent mean AUC to the full model.
-                    Renormalized weights: 0.253/0.237/0.201/0.175/0.135.
-            "full": 10-dimension model; the five contextual dimensions
-                    (S_HOST, S_REP, S_GEO, S_HAB, S_GROW) require PIPdb-style
-                    metadata and are imputed from replicon priors otherwise.
-        """
-        if mode not in ("full", "lite"):
-            raise ValueError("mode must be 'full' or 'lite', got %r" % mode)
+    def __init__(
+        self,
+        mode: str = "lite",
+        replicon_lookup: Optional[Dict] = None,
+        aware_version: str = "legacy",
+    ):
+        if mode not in ("lite", "full"):
+            raise ValueError("mode must be 'lite' or 'full' for PlasRiskScorer")
+        if aware_version not in ("legacy", "2025"):
+            raise ValueError("aware_version must be 'legacy' or '2025'")
         self.mode = mode
-        self.weights = RISK_WEIGHTS_LITE if mode == "lite" else RISK_WEIGHTS
-        self.weight_sum = sum(self.weights.values())
-        self.active_dims = tuple(self.weights.keys())
+        self.aware_version = aware_version
+        self.weights = RISK_WEIGHTS if mode == "full" else RISK_WEIGHTS_LITE
+        self.replicon_lookup = replicon_lookup or {}
 
-        if replicon_lookup is not None:
-            self.lookup = replicon_lookup.set_index("replicon_primary")
-        else:
-            self.lookup = None
-
-        # Default priors for unknown replicons: PIPdb global medians
-        self.defaults = dict(GLOBAL_MEDIANS)
-
-    # ------------------------------------------------------------------
-    # AWaRe classification helper
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def classify_aware(gene_name: str, product: str = "",
-                       resistance: str = "") -> int:
-        """
-        Classify an ARG into WHO AWaRe category.
-        Returns 1 (Access), 2 (Watch), or 3 (Reserve).
-        """
-        text = f"{gene_name},{product},{resistance}"
-        if AWARE_RESERVE.search(text):
+    # -----------------------------------------------------------------
+    # S_ARG
+    # -----------------------------------------------------------------
+    def classify_aware(self, gene_name: str) -> int:
+        """Legacy AWaRe classification: 1 Access, 2 Watch, 3 Reserve."""
+        g = gene_name.strip()
+        if AWARE_RESERVE.search(g):
             return 3
-        if AWARE_ACCESS.search(text):
+        if AWARE_ACCESS.search(g):
             return 1
-        # Default to Watch for unrecognized but clinically relevant genes
         return 2
 
-    # ------------------------------------------------------------------
-    # Individual component scorers
-    # ------------------------------------------------------------------
-
     def score_arg(self, feat: PlasmidFeatures) -> float:
-        """
-        S_ARG: AWaRe-weighted ARG hazard with log10 compression.
-
-        Each ARG contributes:
-          base weight by AWaRe class (Access=1, Watch=2, Reserve=3)
-          x1.5 if last-resort antibiotic class
-          x1.3 per high-risk ARG (carbapenemase, mcr, tetX, van, cfr, optrA)
-          x1.2 if WHO priority pathogen host
-
-        Raw hazard w is log10-compressed and normalized to 99th percentile:
-          S_ARG = log10(1 + min(w, 30)) / log10(1 + 30)
-
-        Housekeeping chromosomal genes (acrAB, tolC, etc.) are excluded.
-        """
-        # Filter out housekeeping genes
-        arg_names = [g for g in feat.arg_names
-                     if not HOUSEKEEPING_GENES.match(g.split("_")[0].split("-")[0])]
-        n = len(arg_names)
-        if n == 0:
+        """WHO AWaRe-weighted ARG burden with high-risk multipliers."""
+        genes = [g for g in feat.arg_names if not HOUSEKEEPING_GENES.search(g)]
+        if not genes:
             return 0.0
-
         hazard = 0.0
-        n_highrisk = len(feat.high_risk_args)
-        for name in arg_names:
-            # Get product/resistance info from metadata if available
-            product = feat.metadata.get("arg_products", {}).get(name, "")
-            resistance = feat.metadata.get("arg_resistance", {}).get(name, "")
-            aware = self.classify_aware(name, product, resistance)
-            weight = float(aware)
+        n_highrisk = 0
+        for g in genes:
+            if self.aware_version == "2025":
+                cat = _aware_category_2025(g)
+            else:
+                cat = self.classify_aware(g)
+            hazard += float(cat)
+            if HIGH_RISK_PATTERNS.search(g):
+                n_highrisk += 1
+        if n_highrisk:
+            hazard *= 1.3 ** n_highrisk
+        if self.aware_version == "legacy":
+            hazard = min(hazard, ARG_HAZARD_CAP)
+            s = math.log10(1 + hazard) / math.log10(1 + ARG_HAZARD_CAP)
+        else:
+            # 2025: non-antibiotic genes already contribute 0; Reserve is
+            # the top category so no separate 1.5x last-resort multiplier
+            hazard = min(hazard, ARG_HAZARD_CAP)
+            s = math.log10(1 + hazard) / math.log10(1 + ARG_HAZARD_CAP)
+        return float(min(1.0, s))
 
-            # Last-resort multiplier
-            if LAST_RESORT_PATTERN.search(f"{name},{product},{resistance}"):
-                weight *= 1.5
-
-            hazard += weight
-
-        # High-risk ARG multiplier (1.3x per high-risk gene)
-        if n_highrisk > 0:
-            hazard *= (1.3 ** n_highrisk)
-
-        # WHO priority pathogen bonus
-        if feat.host_is_who_priority:
-            hazard *= 1.2
-
-        # Log10 compression to 99th percentile cap
-        hazard = min(hazard, ARG_HAZARD_CAP)
-        return float(math.log10(1 + hazard) / math.log10(1 + ARG_HAZARD_CAP))
-
-    @staticmethod
-    def score_vf(feat: PlasmidFeatures) -> float:
-        """
-        S_VF: virulence factor burden.
-        0 if no VFs.
-        0.30 base + min(n_vf*0.03, 0.40) + 0.15*exotoxin + 0.15*effector, cap 1.0.
-        """
-        n = feat.n_vf
-        if n == 0:
+    # -----------------------------------------------------------------
+    # S_VF
+    # -----------------------------------------------------------------
+    def score_vf(self, feat: PlasmidFeatures) -> float:
+        if not feat.vf_names:
             return 0.0
-        base = 0.30
-        count_bonus = min(n * 0.03, 0.40)
-        cat_text = ",".join(feat.vf_categories) if feat.vf_categories else ""
-        name_text = ",".join(feat.vf_names)
-        all_text = cat_text + "," + name_text
-        exo_bonus = 0.15 if EXOTOXIN_PATTERN.search(all_text) else 0.0
-        eff_bonus = 0.15 if EFFECTOR_PATTERN.search(all_text) else 0.0
-        return min(base + count_bonus + exo_bonus + eff_bonus, 1.0)
+        hazard = 0.0
+        for name in feat.vf_names:
+            hazard += 0.3
+        for cat in set(feat.vf_categories):
+            for key, w in VF_CATEGORY_WEIGHTS.items():
+                if key.lower() in cat.lower():
+                    hazard += w
+                    break
+        return float(min(1.0, hazard / 3.0))
 
+    # -----------------------------------------------------------------
+    # S_MOB
+    # -----------------------------------------------------------------
     def score_mob(self, feat: PlasmidFeatures) -> float:
-        """
-        S_MOB: mobility and MGE plasticity score.
-        Base conjugative apparatus class + integron bonus,
-        plus IS density bonus (up to +0.30).
+        score = 0.0
+        if feat.has_relaxase:
+            score += 0.35
+        if feat.has_t4cp:
+            score += 0.30
+        if feat.has_oriT:
+            score += 0.15
+        if feat.has_auxiliary:
+            score += 0.20
+        return float(min(1.0, score))
 
-        Class bases: conjugative_complete=1.0, conjugative_likely=0.85,
-                     mobilizable=0.6, non-mobilizable=0.1.
-        Integron bonus: +0.10 if integron present.
-        IS bonus: 0.30 * min(n_is / (length_kb), 2.0) / 2.0.
+    def score_mob_from_names(self, gene_names: List[str]) -> float:
+        """Infer mobility score from annotated gene names."""
+        text = " ".join(gene_names)
+        score = 0.0
+        if RELAXASE_PATTERNS.search(text):
+            score += 0.35
+        if T4CP_PATTERNS.search(text):
+            score += 0.30
+        if ORIT_PATTERNS.search(text):
+            score += 0.15
+        if MPF_PATTERNS.search(text):
+            score += 0.20
+        return float(min(1.0, score))
 
-        When mobility cannot be assessed from sequence (no mobility genes
-        detected and no IS elements, or mobility databases not run), the
-        replicon-specific empirical median S_MOB from PIPdb is used as a
-        prior. This is critical for external validation where MOB-suite is
-        not available and abricate CARD does not detect T4CP/relaxase.
-        """
-        # If mobility was not annotated AND no mobility evidence exists,
-        # use replicon prior. But if T4CP/relaxase/oriT/IS are explicitly
-        # set (even without abricate), use that evidence.
-        has_any_evidence = (bool(feat.has_t4cp) or bool(feat.has_relaxase) or
-                            bool(feat.has_oriT) or bool(feat.has_auxiliary) or
-                            bool(feat.has_integron) or feat.n_is > 0 or
-                            bool(feat.mobility_class))
-        if not feat.mobility_annotated and not has_any_evidence:
-            if feat.s_mob_prior is not None:
-                return float(feat.s_mob_prior)
-            return self._lookup_prior(feat.replicon, "S_MOB")
-
-        # Determine mobility class base score
-        if feat.mobility_class:
-            mc = feat.mobility_class.lower()
-            if "complete" in mc:
-                mob_base = 1.0
-            elif "likely" in mc:
-                mob_base = 0.85
-            elif "mobilizable" in mc:
-                mob_base = 0.6
-            else:
-                mob_base = 0.1
-        else:
-            # Infer from element booleans
-            has_t4cp = bool(feat.has_t4cp)
-            has_rel = bool(feat.has_relaxase)
-            has_oriT = bool(feat.has_oriT)
-
-            if has_t4cp and has_rel and has_oriT:
-                mob_base = 1.0  # conjugative_complete
-            elif has_t4cp and has_rel:
-                mob_base = 0.85  # conjugative_likely
-            elif has_rel or has_oriT:
-                mob_base = 0.6  # mobilizable
-            else:
-                # No mobility genes detected from sequence.
-                # If ISfinder found IS elements, give partial credit for
-                # MGE plasticity; otherwise fall back to replicon prior
-                # rather than assuming non-mobilizable (abricate CARD/VFDB
-                # do not detect T4CP/relaxase/oriT reliably).
-                if feat.n_is > 0:
-                    mob_base = 0.1  # non-mobilizable but has IS plasticity
-                elif feat.s_mob_prior is not None:
-                    return float(feat.s_mob_prior)
-                else:
-                    return self._lookup_prior(feat.replicon, "S_MOB")
-
-        # Integron bonus
-        integron_bonus = 0.10 if feat.has_integron else 0.0
-        mob_component = min(mob_base + integron_bonus, 1.0)
-
-        # IS density bonus (up to +0.30)
-        length_kb = feat.length_bp / 1000.0 if feat.length_bp > 0 else 1.0
-        is_density = feat.n_is / length_kb if length_kb > 0 else 0.0
-        is_bonus = 0.30 * min(is_density, 2.0) / 2.0
-
-        return float(np.clip(mob_component + is_bonus, 0.0, 1.0))
-
-    @staticmethod
-    def _has_mobility_evidence(feat: PlasmidFeatures) -> bool:
-        """Check if any mobility-related annotation was attempted."""
-        return any(v is not None for v in [
-            feat.has_t4cp, feat.has_relaxase, feat.has_oriT,
-            feat.has_auxiliary, feat.has_integron
-        ]) or feat.n_is > 0
-
-    @staticmethod
-    def score_size(length_bp: int) -> float:
-        """
-        S_SIZE: sigmoidal plasmid length score (released package form).
-
-        A monotonic logistic function on log10(length), centered at 30 kb
-        with steepness k=4:
-
-            S_SIZE = 1 / (1 + exp(-4 * (log10(L) - log10(30,000))))
-
-        This gives:
-          ~1 kb  -> ~0.05
-          ~30 kb -> ~0.50
-          ~120 kb-> ~0.92
-          ~200 kb-> ~0.97
-
-        The discovery pipeline used the log-ratio transform
-        log10(L)/log10(1,000,000) clipped to [0,1]. Both transforms are
-        strictly monotonic in L and therefore give identical plasmid
-        rankings (Spearman rho = 1.000 over the 792,964 PIPdb PSCs;
-        see size_rank_concordance and Supplementary Text S1). The sigmoid
-        better separates the biologically informative 5-100 kb cargo range
-        while compressing extreme megaplasmid lengths.
-        """
-        if length_bp <= 0:
-            return 0.0
-        log_len = math.log10(length_bp)
-        log_center = math.log10(30000)  # 30 kb midpoint
-        return float(1.0 / (1.0 + math.exp(-4.0 * (log_len - log_center))))
-
-    @staticmethod
-    def score_size_logratio(length_bp: int,
-                            max_length_bp: int = 1_000_000) -> float:
-        """
-        S_SIZE as computed in the discovery analysis pipeline:
-
-            S_SIZE = clip(log10(L) / log10(max_length_bp), 0, 1)
-
-        Retained for exact reproduction of the manuscript's weight-fitting
-        analyses. The released CLI uses score_size (sigmoid); the two are
-        rank-identical (see size_rank_concordance).
-        """
-        if length_bp <= 0:
-            return 0.0
-        z = math.log10(length_bp) / math.log10(max_length_bp)
-        return float(min(1.0, max(0.0, z)))
-
-    @staticmethod
-    def score_bmg(feat: PlasmidFeatures) -> float:
-        """
-        S_BMG: biocide/metal resistance (co-selection potential).
-        0 if no BMRGs.
-        0.25 base + min(n_bm*0.04, 0.35) + 0.15*mer + 0.15*qac + 0.10*ars/cop/sil.
-
-        When BacMet annotation is unavailable (bm_gene_names empty), falls back
-        to detecting biocide/metal genes from ARG names (CARD/ResFinder hits).
-        """
-        # Collect BM gene names; if empty, try CARD-based fallback
-        bm_names = list(feat.bm_gene_names)
-        if not bm_names and feat.arg_names:
-            # Fallback: scan ARG names for biocide/metal resistance genes
-            for name in feat.arg_names:
-                if CARD_BM_PATTERN.search(name):
-                    bm_names.append(name)
-
-        n = len(bm_names)
-        if n == 0:
-            return 0.0
-        base = 0.25
-        count_bonus = min(n * 0.04, 0.35)
-        bm_text = ",".join(bm_names)
-        mer_bonus = 0.15 if MER_PATTERN.search(bm_text) else 0.0
-        qac_bonus = 0.15 if QAC_PATTERN.search(bm_text) else 0.0
-        ars_bonus = 0.10 if ARS_COP_PATTERN.search(bm_text) else 0.0
-        return min(base + count_bonus + mer_bonus + qac_bonus + ars_bonus, 1.0)
-
+    # -----------------------------------------------------------------
+    # S_HOST
+    # -----------------------------------------------------------------
     def score_host(self, feat: PlasmidFeatures) -> float:
-        """
-        S_HOST: host range breadth.
-        If n_host_genera known, map to [0,1].
-        Otherwise use replicon lookup prior (PIPdb empirical median).
-        """
-        if feat.n_host_genera is not None:
-            n = feat.n_host_genera
-            if n <= 1:
-                return 0.20
-            elif n <= 3:
-                return 0.50
-            elif n <= 10:
-                return 0.75
-            else:
-                return 1.00
-        if feat.s_host_prior is not None:
-            return float(feat.s_host_prior)
-        return self._lookup_prior(feat.replicon, "S_HOST")
+        if feat.host_genera:
+            n = len(feat.host_genera)
+            return float(min(1.0, n / 10.0))
+        if feat.replicon and feat.replicon in self.replicon_lookup:
+            info = self.replicon_lookup[feat.replicon]
+            if isinstance(info, dict):
+                return float(info.get("host_range_score", 0.5))
+        return 0.5
 
+    # -----------------------------------------------------------------
+    # S_REP
+    # -----------------------------------------------------------------
     def score_rep(self, feat: PlasmidFeatures) -> float:
-        if feat.s_rep_prior is not None:
-            return float(feat.s_rep_prior)
-        return self._lookup_prior(feat.replicon, "S_REP")
+        if feat.replicon and feat.replicon in self.replicon_lookup:
+            info = self.replicon_lookup[feat.replicon]
+            if isinstance(info, dict):
+                return float(info.get("backbone_risk", 0.5))
+        return 0.5
 
-    def score_geo(self, feat: PlasmidFeatures) -> float:
-        if feat.n_countries is not None:
-            n = feat.n_countries
-            return min(n / 45.0, 1.0)  # 45+ countries -> 1.0
-        if feat.s_geo_prior is not None:
-            return float(feat.s_geo_prior)
-        return self._lookup_prior(feat.replicon, "S_GEO")
-
-    def score_hab(self, feat: PlasmidFeatures) -> float:
-        if feat.n_habitats is not None:
-            n = feat.n_habitats
-            return min(n / 8.0, 1.0)  # 8+ habitats -> 1.0
-        if feat.s_hab_prior is not None:
-            return float(feat.s_hab_prior)
-        return self._lookup_prior(feat.replicon, "S_HAB")
-
-    def score_grow(self, feat: PlasmidFeatures) -> float:
-        if feat.annual_growth_rate is not None:
-            g = feat.annual_growth_rate
-            return float(np.clip(0.3 + g * 2.0, 0.0, 1.0))
-        if feat.s_grow_prior is not None:
-            return float(feat.s_grow_prior)
-        return self._lookup_prior(feat.replicon, "S_GROW")
-
-    # ------------------------------------------------------------------
-    # Lookup helpers
-    # ------------------------------------------------------------------
-
-    def _lookup_prior(self, replicon: str, column: str) -> float:
-        """Retrieve a prior from the replicon lookup table.
-
-        Handles multi-replicon strings (e.g., "IncFII;IncFIA;IncR") by
-        splitting on ';' and taking the maximum prior across all replicons.
-        """
-        default = self.defaults.get(column, 0.3)
-        if not replicon or self.lookup is None:
-            return default
-
-        # Split multi-replicon strings and evaluate each
-        rep_list = [r.strip() for r in re.split(r"[;,/]", str(replicon)) if r.strip()]
-        if not rep_list:
-            return default
-
-        best_val = None
-        for rep in rep_list:
-            val = self._lookup_single(rep, column)
-            if val is not None:
-                if best_val is None or val > best_val:
-                    best_val = val
-        return float(best_val) if best_val is not None else default
-
-    def _lookup_single(self, replicon: str, column: str) -> Optional[float]:
-        """Lookup prior for a single replicon name (exact + prefix match)."""
-        if not replicon or self.lookup is None:
-            return None
-        # Exact match
-        if replicon in self.lookup.index:
-            val = self.lookup.loc[replicon, column]
-            return float(val) if pd.notna(val) else None
-        # Prefix match (e.g., "IncFII" for "IncFII(K)")
-        for idx in self.lookup.index:
-            if replicon.startswith(idx) or idx.startswith(replicon):
-                val = self.lookup.loc[idx, column]
-                return float(val) if pd.notna(val) else None
-        return None
-
-    # ------------------------------------------------------------------
-    # Main scoring
-    # ------------------------------------------------------------------
-
-    def score(self, feat: PlasmidFeatures) -> Dict:
-        """
-        Compute component scores and the composite.
-
-        In full mode, all 10 components are computed.
-        In lite mode, only the 5 core components (S_ARG, S_VF, S_MOB, S_SIZE, S_BMG)
-        are computed; other S_* fields are reported as None.
-
-        When sequence-derived dimensions cannot be determined (abricate not
-        available, databases missing, or no genes detected), replicon-specific
-        empirical medians from PIPdb are used as fallback priors.
-
-        Returns
-        -------
-        dict with keys: seq_id, length_bp, replicon, n_ARG, n_VF, n_BM,
-                        S_ARG ... S_GROW, S_total, S_norm, grade, grade_label,
-                        high_risk_genes, mobility_class, model_mode,
-                        imputed_dimensions
-        """
-        all_components = {
-            "S_ARG":  self.score_arg(feat),
-            "S_VF":   self.score_vf(feat),
-            "S_MOB":  self.score_mob(feat),
-            "S_HOST": self.score_host(feat),
-            "S_REP":  self.score_rep(feat),
-            "S_SIZE": self.score_size(feat.length_bp),
-            "S_BMG":   self.score_bmg(feat),
-            "S_GEO":  self.score_geo(feat),
-            "S_HAB":  self.score_hab(feat),
-            "S_GROW": self.score_grow(feat),
-        }
-
-        # Track which dimensions were imputed from replicon priors
-        imputed = []
-        if not feat.mobility_annotated or not self._has_mobility_evidence(feat):
-            imputed.append("S_MOB")
-        if feat.n_host_genera is None:
-            imputed.append("S_HOST")
-        if feat.n_countries is None:
-            imputed.append("S_GEO")
-        if feat.n_habitats is None:
-            imputed.append("S_HAB")
-        if feat.annual_growth_rate is None:
-            imputed.append("S_GROW")
-        if not feat.replicon:
-            imputed.append("S_REP")
-
-        if self.mode == "lite":
-            # Report only active dimensions; others as None
-            components = {k: (all_components[k] if k in self.weights else None)
-                          for k in RISK_WEIGHTS}
-        else:
-            components = all_components
-
-        s_total = sum(self.weights[k] * all_components[k] for k in self.active_dims)
-        s_norm = s_total / self.weight_sum
-
-        grade, grade_label = self._grade(s_norm)
-
-        # Determine mobility class if not pre-set
-        mob_class = feat.mobility_class or self._infer_mob_class(components["S_MOB"])
-
-        # Count BM genes (including CARD fallback for reporting)
-        bm_names = list(feat.bm_gene_names)
-        bm_fallback_names = []
-        if not bm_names and feat.arg_names:
-            for name in feat.arg_names:
-                if CARD_BM_PATTERN.search(name):
-                    bm_fallback_names.append(name)
-        n_bm_total = len(bm_names) + len(bm_fallback_names)
-
-        result = {
-            "seq_id": feat.seq_id,
-            "length_bp": feat.length_bp,
-            "length_kb": round(feat.length_bp / 1000.0, 2),
-            "replicon": feat.replicon or "Unknown",
-            "n_ARG": feat.n_arg,
-            "n_VF": feat.n_vf,
-            "n_BM": n_bm_total,
-            "high_risk_genes": ";".join(feat.high_risk_args) if feat.high_risk_args else "",
-            "mobility_class": mob_class,
-            "model_mode": self.mode,
-            "imputed_dimensions": ";".join(imputed) if imputed else "",
-        }
-        for k, v in components.items():
-            result[k] = round(v, 4) if v is not None else None
-        result["S_total"] = round(s_total, 4)
-        result["S_norm"] = round(s_norm, 4)
-        result["grade"] = grade
-        result["grade_label"] = grade_label
-        return result
-
-    def score_dataframe(self, features: List[PlasmidFeatures]) -> pd.DataFrame:
-        """Score multiple plasmids and return a sorted DataFrame."""
-        rows = [self.score(f) for f in features]
-        df = pd.DataFrame(rows)
-        if not df.empty:
-            df = df.sort_values("S_norm", ascending=False).reset_index(drop=True)
-            df.insert(0, "rank", range(1, len(df) + 1))
-        return df
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
+    # -----------------------------------------------------------------
+    # S_SIZE
+    # -----------------------------------------------------------------
+    def score_size(self, length_bp: int) -> float:
+        """Monotonic sigmoid on log10 length, midpoint 30 kb."""
+        x = 4.0 * (math.log10(max(length_bp, 1)) - math.log10(30000))
+        return 1.0 / (1.0 + math.exp(-x))
 
     @staticmethod
-    def _grade(s_norm: float) -> Tuple[str, str]:
+    def score_size_logratio(length_bp: int) -> float:
+        """Discovery-pipeline log-ratio transform (weight-fitting analyses)."""
+        s = math.log10(max(length_bp, 1)) / math.log10(1_000_000)
+        return float(min(1.0, max(0.0, s)))
+
+    # -----------------------------------------------------------------
+    # S_BMG
+    # -----------------------------------------------------------------
+    def score_bmg(self, feat: PlasmidFeatures) -> float:
+        if not feat.bm_gene_names:
+            return 0.0
+        hazard = 0.0
+        families_hit = set()
+        for g in feat.bm_gene_names:
+            gl = g.lower()
+            hazard += 0.15
+            for fam, bonus in BMG_FAMILY_BONUS.items():
+                if gl.startswith(fam) or fam in gl:
+                    families_hit.add(fam)
+        for fam in families_hit:
+            hazard += BMG_FAMILY_BONUS[fam]
+        return float(min(1.0, hazard / 2.0))
+
+    # -----------------------------------------------------------------
+    # S_GEO
+    # -----------------------------------------------------------------
+    def score_geo(self, feat: PlasmidFeatures) -> float:
+        if feat.countries:
+            return float(min(1.0, len(feat.countries) / 50.0))
+        if feat.replicon and feat.replicon in self.replicon_lookup:
+            info = self.replicon_lookup[feat.replicon]
+            if isinstance(info, dict):
+                return float(info.get("geo_spread_score", 0.1))
+        return 0.1
+
+    # -----------------------------------------------------------------
+    # S_HAB
+    # -----------------------------------------------------------------
+    def score_hab(self, feat: PlasmidFeatures) -> float:
+        if feat.habitats:
+            return float(min(1.0, len(feat.habitats) / 3.0))
+        if feat.replicon and feat.replicon in self.replicon_lookup:
+            info = self.replicon_lookup[feat.replicon]
+            if isinstance(info, dict):
+                return float(info.get("habitat_breadth_score", 0.1))
+        return 0.1
+
+    # -----------------------------------------------------------------
+    # S_GROW
+    # -----------------------------------------------------------------
+    def score_grow(self, feat: PlasmidFeatures) -> float:
+        if feat.replicon and feat.replicon in self.replicon_lookup:
+            info = self.replicon_lookup[feat.replicon]
+            if isinstance(info, dict):
+                return float(min(1.0, max(0.0,
+                                          info.get("growth_rate_score", 0.1))))
+        return 0.1
+
+    # -----------------------------------------------------------------
+    # Grade
+    # -----------------------------------------------------------------
+    def _grade(self, score: float):
         for threshold, grade, label in RISK_GRADES:
-            if s_norm >= threshold:
+            if score >= threshold:
                 return grade, label
         return "E", "Minimal"
 
-    @staticmethod
-    def _infer_mob_class(s_mob: float) -> str:
-        # Thresholds for additive formula (mob_base + IS bonus)
-        if s_mob >= 0.85:
-            return "conjugative_complete"
-        elif s_mob >= 0.60:
-            return "conjugative_likely"
-        elif s_mob >= 0.35:
-            return "mobilizable"
-        else:
-            return "non-mobilizable"
-
-
-# Backward-compatible alias (tests reference score_mob)
-PlasRiskScorer.score_mob = PlasRiskScorer.score_mob
-
-
-# ---------------------------------------------------------------------------
-# PIPdb original ordinal scoring model
-# ---------------------------------------------------------------------------
-# Reference: PIPdb: a comprehensive plasmid sequence resource for tracking
-# the horizontal transfer of pathogenic factors and antimicrobial resistance
-# genes. Table 1: Risk scoring system for PSCs.
-#
-# Combined risk index:
-#   Round((Pathogenic_phylum_score + Pathogenic_species_score + Habitats_score
-#          + ARGs_score + VFGs_score + 2*WHO_ARGs_score + ISs_score
-#          + Annual_average_growth_rate) / 8 + 0.6)
-#
-# Each item is scored on an ordinal 1-5 scale based on count thresholds.
-# This model is provided as an alternative to the PlasRisk 10-dimension
-# weighted continuous model for comparison and backward compatibility.
-# ---------------------------------------------------------------------------
-
-# Ordinal bin thresholds for each PIPdb risk item
-# Each tuple: (score, lower_bound, upper_bound, right_inclusive)
-# score 5 is the highest risk; score 1 is the lowest (or 0 for absent items)
-
-def _ordinal_score(value: float, bins: List[Tuple[int, float, float]]) -> int:
-    """
-    Assign an ordinal score based on bin thresholds.
-
-    bins: list of (score, lower, upper) where lower <= value < upper.
-    The first matching bin wins; bins should be ordered high to low.
-    """
-    for score, lower, upper in bins:
-        if lower <= value < upper:
-            return score
-    return bins[-1][0]  # fallback to lowest
-
-
-# PIPdb Table 1 scoring bins
-PIPDB_BINS = {
-    "pathogenic_phylum": [
-        (5, 5, float("inf")),
-        (4, 4, 5),
-        (3, 3, 4),
-        (2, 2, 3),
-        (1, 1, 2),
-    ],
-    "pathogenic_species": [
-        (5, 8, float("inf")),
-        (4, 6, 8),
-        (3, 4, 6),
-        (2, 2, 4),
-        (1, 1, 2),
-    ],
-    "habitats": [
-        (5, 8, float("inf")),
-        (4, 6, 8),
-        (3, 4, 6),
-        (2, 2, 4),
-        (1, 1, 2),
-    ],
-    "args": [
-        (5, 10, float("inf")),
-        (4, 5, 10),
-        (3, 2, 5),
-        (2, 1, 2),
-        (1, 0, 1),  # "-" in Table 1 = no ARGs
-    ],
-    "vfgs": [
-        (5, 6, float("inf")),
-        (4, 4, 6),
-        (3, 2, 4),
-        (2, 1, 2),
-        (1, 0, 1),  # "-" in Table 1 = no VFGs
-    ],
-    "who_args": [
-        (5, 3, float("inf")),
-        (4, 2, 3),
-        (3, 1, 2),
-        (1, 0, 1),  # scores 1-2 are "-" (not applicable)
-    ],
-    "iss": [
-        (5, 30, float("inf")),
-        (4, 15, 30),
-        (3, 5, 15),
-        (2, 2, 5),
-        (1, 1, 2),
-    ],
-    "growth_rate": [
-        (5, 0.2, float("inf")),
-        (4, 0.1, 0.2),
-        (3, 0.05, 0.1),
-        (2, 0.01, 0.05),
-        (1, 0.0, 0.01),
-    ],
-}
-
-# PIPdb risk grade labels for the integer combined index (1-5)
-PIPDB_GRADES = {
-    5: ("5", "Very High"),
-    4: ("4", "High"),
-    3: ("3", "Moderate"),
-    2: ("2", "Low"),
-    1: ("1", "Minimal"),
-}
-
-
-class PIPdbScorer:
-    """
-    Original PIPdb ordinal risk scoring model.
-
-    Implements the 8-item additive scoring system from the PIPdb paper
-    (Table 1): Pathogenic phylum, Pathogenic species, Habitats, ARGs,
-    VFGs, WHO ARGs (2x weight), Insertion sequences, and Annual average
-    growth rate. Each item is binned into an ordinal 1-5 score, then:
-
-        combined_risk_index = Round((sum + 2*WHO_ARGs) / 8 + 0.6)
-
-    Use this as an alternative to PlasRiskScorer for comparison or
-    when reproducing the original PIPdb results.
-
-    Notes
-    -----
-    - Pathogenic phylum/species counts require host metadata not available
-      from sequence alone; if not provided, they default to 1 (minimum).
-    - Habitats and growth rate similarly default to 1 if unknown.
-    - ARG/VFG/WHO-ARG/IS counts can be derived from abricate annotations.
-    """
-
-    def __init__(self):
-        self.model_name = "pipdb"
-
-    @staticmethod
-    def score_pathogenic_phylum(n: Optional[int]) -> int:
-        """Score pathogenic phylum count (1-5)."""
-        if n is None:
-            return 1
-        return _ordinal_score(float(n), PIPDB_BINS["pathogenic_phylum"])
-
-    @staticmethod
-    def score_pathogenic_species(n: Optional[int]) -> int:
-        """Score pathogenic species count (1-5)."""
-        if n is None:
-            return 1
-        return _ordinal_score(float(n), PIPDB_BINS["pathogenic_species"])
-
-    @staticmethod
-    def score_habitats(n: Optional[int]) -> int:
-        """Score habitat count (1-5)."""
-        if n is None:
-            return 1
-        return _ordinal_score(float(n), PIPDB_BINS["habitats"])
-
-    @staticmethod
-    def score_args(n: int) -> int:
-        """Score ARG count (1-5)."""
-        return _ordinal_score(float(n), PIPDB_BINS["args"])
-
-    @staticmethod
-    def score_vfgs(n: int) -> int:
-        """Score VFG count (1-5)."""
-        return _ordinal_score(float(n), PIPDB_BINS["vfgs"])
-
-    @staticmethod
-    def score_who_args(n: int) -> int:
-        """Score WHO priority ARG count (1-5; double-weighted in formula)."""
-        return _ordinal_score(float(n), PIPDB_BINS["who_args"])
-
-    @staticmethod
-    def score_iss(n: int) -> int:
-        """Score insertion sequence count (1-5)."""
-        return _ordinal_score(float(n), PIPDB_BINS["iss"])
-
-    @staticmethod
-    def score_growth_rate(rate: Optional[float]) -> int:
-        """Score annual average growth rate (1-5)."""
-        if rate is None:
-            return 1
-        return _ordinal_score(float(max(rate, 0.0)), PIPDB_BINS["growth_rate"])
-
+    # -----------------------------------------------------------------
+    # Full scoring
+    # -----------------------------------------------------------------
     def score(self, feat: PlasmidFeatures) -> Dict:
-        """
-        Compute the PIPdb combined risk index for one plasmid.
+        s_arg = self.score_arg(feat)
+        s_vf = self.score_vf(feat)
+        s_mob = self.score_mob(feat)
+        s_size = self.score_size(feat.length_bp)
+        s_bmg = self.score_bmg(feat)
 
-        Returns
-        -------
-        dict with keys: seq_id, length_bp, replicon,
-                        score_phylum, score_species, score_habitats,
-                        score_args, score_vfgs, score_who_args, score_iss,
-                        score_growth, combined_risk_index,
-                        risk_index_normalized, grade, grade_label,
-                        model_mode, n_ARG, n_VF, n_IS, n_WHO_ARG
-        """
-        s_phylum = self.score_pathogenic_phylum(feat.n_pathogenic_phylum)
-        s_species = self.score_pathogenic_species(feat.n_pathogenic_species)
-        s_habitats = self.score_habitats(feat.n_habitats)
-        s_args = self.score_args(feat.n_arg)
-        s_vfgs = self.score_vfgs(feat.n_vf)
-        s_who = self.score_who_args(feat.n_who_arg)
-        s_iss = self.score_iss(feat.n_is)
-        s_growth = self.score_growth_rate(feat.annual_growth_rate)
+        components = {
+            "S_ARG": s_arg,
+            "S_VF": s_vf,
+            "S_MOB": s_mob,
+            "S_SIZE": s_size,
+            "S_BMG": s_bmg,
+        }
 
-        # PIPdb formula: Round((sum) / 8 + 0.6)
-        raw_sum = (s_phylum + s_species + s_habitats + s_args +
-                   s_vfgs + 2 * s_who + s_iss + s_growth)
-        combined_index = int(round(raw_sum / 8.0 + 0.6))
-        # Clamp to 1-5
-        combined_index = max(1, min(5, combined_index))
+        if self.mode == "full":
+            components.update({
+                "S_HOST": self.score_host(feat),
+                "S_REP": self.score_rep(feat),
+                "S_GEO": self.score_geo(feat),
+                "S_HAB": self.score_hab(feat),
+                "S_GROW": self.score_grow(feat),
+            })
+        else:
+            components.update({
+                "S_HOST": None, "S_REP": None, "S_GEO": None,
+                "S_HAB": None, "S_GROW": None,
+            })
 
-        # Normalize to [0,1] for comparison with PlasRisk
-        normalized = (combined_index - 1) / 4.0
+        s_total = sum(self.weights[k] * components[k] for k in self.weights)
+        s_norm = s_total / WEIGHT_SUM
+        grade, grade_label = self._grade(s_norm)
 
-        grade, grade_label = PIPDB_GRADES.get(
-            combined_index, ("1", "Minimal"))
+        hr_genes = sorted({
+            g for g in feat.arg_names if HIGH_RISK_PATTERNS.search(g)
+        })
 
         return {
             "seq_id": feat.seq_id,
             "length_bp": feat.length_bp,
-            "replicon": feat.replicon or "Unknown",
-            "n_ARG": feat.n_arg,
-            "n_VF": feat.n_vf,
-            "n_IS": feat.n_is,
-            "n_WHO_ARG": feat.n_who_arg,
-            "score_phylum": s_phylum,
-            "score_species": s_species,
-            "score_habitats": s_habitats,
-            "score_args": s_args,
-            "score_vfgs": s_vfgs,
-            "score_who_args": s_who,
-            "score_iss": s_iss,
-            "score_growth": s_growth,
-            "combined_risk_index": combined_index,
-            "risk_index_normalized": round(normalized, 4),
+            "replicon": feat.replicon,
+            **components,
+            "S_total": round(s_total, 6),
+            "S_norm": round(s_norm, 6),
             "grade": grade,
             "grade_label": grade_label,
-            "model_mode": "pipdb",
+            "high_risk_genes": ";".join(hr_genes),
+            "n_ARG": len(feat.arg_names),
+            "n_VF": len(feat.vf_names),
+            "n_BM": len(feat.bm_gene_names),
+            "model_mode": self.mode,
+            "aware_version": self.aware_version,
         }
 
     def score_dataframe(self, features: List[PlasmidFeatures]) -> pd.DataFrame:
-        """Score multiple plasmids and return a sorted DataFrame."""
         rows = [self.score(f) for f in features]
         df = pd.DataFrame(rows)
-        if not df.empty:
-            df = df.sort_values(
-                "combined_risk_index", ascending=False
-            ).reset_index(drop=True)
-            df.insert(0, "rank", range(1, len(df) + 1))
+        df = df.sort_values("S_norm", ascending=False).reset_index(drop=True)
+        df["rank"] = np.arange(1, len(df) + 1)
         return df
 
 
-def size_rank_concordance(lengths_bp, max_length_bp: int = 1_000_000,
-                          center_bp: int = 30_000, k: float = 4.0):
-    """
-    Rank-concordance check between the two S_SIZE normalizations.
+# =====================================================================
+# Original PIPdb 8-item ordinal index (Zhu et al. 2025, Table 1)
+# =====================================================================
+PIPdb_BINS = {
+    "pathogenic_phylum": [(1, 1), (5, 5)],
+    "pathogenic_species": [(1, 1), (5, 5)],
+    "habitats": [(0, 1), (1, 2), (2, 3), (3, 5)],
+    "args": [(0, 1), (2, 2), (5, 3), (10, 4), (20, 5)],
+    "vfgs": [(0, 1), (2, 2), (5, 3), (10, 4), (20, 5)],
+    "who_args": [(0, 1), (1, 3), (3, 4), (5, 5)],
+    "iss": [(0, 1), (1, 2), (3, 3), (5, 4), (10, 5)],
+    "growth_rate": [(-0.1, 1), (0, 2), (0.1, 3), (0.3, 4), (0.5, 5)],
+}
 
-    Discovery pipeline (log-ratio)::
 
-        S_SIZE_pipeline = clip(log10(L) / log10(max_length_bp), 0, 1)
+def _bin_value(value: float, bins: List) -> int:
+    result = bins[0][1]
+    for threshold, score in bins:
+        if value >= threshold:
+            result = score
+    return result
 
-    Released package (monotonic sigmoid, CLI default)::
 
-        S_SIZE_package  = 1 / (1 + exp(-k * (log10(L) - log10(center_bp))))
+class PIPdbScorer:
+    """Reproduce the published PIPdb combined risk index (ordinal 1-5)."""
 
-    Both transforms are strictly increasing in L, so their plasmid rankings
-    are identical even though the absolute scaling differs. Running this
-    function on the 792,964 PIPdb PSC lengths gives Spearman rho = 1.000
-    (Kendall tau = 1.000); see Supplementary Text S1.
+    def __init__(self, **kwargs):
+        self.mode = "ordinal"
 
-    Parameters
-    ----------
-    lengths_bp : iterable of float
-        Plasmid lengths in base pairs (non-positive values are dropped).
-    max_length_bp, center_bp, k : float
-        Parameters of the two transforms (defaults match the manuscript and
-        the released package).
+    def score(self, feat: PlasmidFeatures) -> Dict:
+        pathogenic_phylum = 5 if feat.host_genera else 1
+        pathogenic_species = 5 if feat.vf_names or feat.arg_names else 1
+        habitats = _bin_value(len(feat.habitats or []), PIPdb_BINS["habitats"])
+        args = _bin_value(len(feat.arg_names), PIPdb_BINS["args"])
+        vfgs = _bin_value(len(feat.vf_names), PIPdb_BINS["vfgs"])
+        who_args = _bin_value(
+            len([g for g in feat.arg_names
+                 if HIGH_RISK_PATTERNS.search(g)]),
+            PIPdb_BINS["who_args"],
+        )
+        iss = _bin_value(0, PIPdb_BINS["iss"])
+        growth = 1
 
-    Returns
-    -------
-    dict with keys n, spearman_rho, kendall_tau, min_length_bp, max_length_bp
-    """
-    L = np.asarray([float(x) for x in lengths_bp], dtype=float)
-    L = L[L > 0]
-    if L.size < 2:
-        raise ValueError("at least two positive lengths are required "
-                         "for a concordance check")
-    logL = np.log10(L)
-    sigmoid = 1.0 / (1.0 + np.exp(-k * (logL - math.log10(center_bp))))
-    logratio = np.clip(logL / math.log10(max_length_bp), 0.0, 1.0)
-    a = pd.Series(sigmoid)
-    b = pd.Series(logratio)
+        raw = (pathogenic_phylum + pathogenic_species + habitats
+               + args + vfgs + 2 * who_args + iss + growth)
+        index = int(min(5, max(1, round(raw / 8.0 + 0.6))))
+        normalized = (index - 1) / 4.0
+
+        return {
+            "seq_id": feat.seq_id,
+            "length_bp": feat.length_bp,
+            "replicon": feat.replicon,
+            "combined_risk_index": index,
+            "risk_index_normalized": round(normalized, 6),
+            "grade": str(index),
+            "grade_label": "",
+            "n_ARG": len(feat.arg_names),
+            "n_VF": len(feat.vf_names),
+            "n_BM": len(feat.bm_gene_names),
+            "model_mode": "ordinal",
+        }
+
+    def score_dataframe(self, features: List[PlasmidFeatures]) -> pd.DataFrame:
+        rows = [self.score(f) for f in features]
+        df = pd.DataFrame(rows)
+        df = df.sort_values("risk_index_normalized",
+                            ascending=False).reset_index(drop=True)
+        df["rank"] = np.arange(1, len(df) + 1)
+        return df
+
+
+# =====================================================================
+# S_SIZE rank concordance
+# =====================================================================
+def size_rank_concordance(lengths: List[int]) -> Dict:
+    """Verify sigmoid and log-ratio S_SIZE rank plasmids identically."""
+    s_sig = [PlasRiskScorer().score_size(int(L)) for L in lengths]
+    s_log = [PlasRiskScorer.score_size_logratio(int(L)) for L in lengths]
+    from scipy.stats import spearmanr, kendalltau
+    rho = float(spearmanr(s_sig, s_log).statistic)
+    tau = float(kendalltau(s_sig, s_log).statistic)
     return {
-        "n": int(L.size),
-        "spearman_rho": float(a.corr(b, method="spearman")),
-        "kendall_tau": float(a.corr(b, method="kendall")),
-        "min_length_bp": int(L.min()),
-        "max_length_bp": int(L.max()),
+        "n": len(lengths),
+        "spearman_rho": rho,
+        "kendall_tau": tau,
+        "min_length_bp": int(min(lengths)),
+        "max_length_bp": int(max(lengths)),
     }
 
 
-def get_scorer(model: str = "plasrisk", mode: str = "lite",
-               replicon_lookup: Optional[pd.DataFrame] = None):
-    """
-    Factory function to get a scorer by model name.
-
-    Parameters
-    ----------
-    model : str
-        ``"plasrisk"`` (default) — weighted continuous model; ``mode``
-        selects the 5-dimension FASTA-only lite core (default), the
-        10-dimension full model, or ``"ordinal"`` (the original PIPdb
-        8-item ordinal index, equivalent to ``model="pipdb"``).
-        ``"pipdb"`` — original PIPdb 8-item ordinal model.
-    mode : str
-        For PlasRisk: ``"lite"`` (5-dim core, default; FASTA-only),
-        ``"full"`` (10-dim) or ``"ordinal"`` (PIPdb 8-item index).
-    replicon_lookup : pd.DataFrame, optional
-        Replicon empirical prior table (PlasRisk only).
-
-    Returns
-    -------
-    PlasRiskScorer or PIPdbScorer
-    """
-    model = model.lower().strip()
-    if mode is not None:
-        mode = mode.lower().strip()
-    if model in ("plasrisk", "plasrisk10", "10dim", "10-dim"):
-        if mode == "ordinal":
-            return PIPdbScorer()
-        return PlasRiskScorer(replicon_lookup=replicon_lookup, mode=mode)
-    elif model in ("pipdb", "ordinal", "pipdb-original"):
+# =====================================================================
+# Factory
+# =====================================================================
+def get_scorer(
+    model: str = "plasrisk",
+    mode: Optional[str] = None,
+    replicon_lookup: Optional[Dict] = None,
+    aware_version: str = "legacy",
+):
+    if model == "pipdb" or mode == "ordinal":
         return PIPdbScorer()
-    else:
-        raise ValueError(
-            f"Unknown model '{model}'. Choose 'plasrisk' or 'pipdb'.")
+    effective_mode = mode or "lite"
+    return PlasRiskScorer(
+        mode=effective_mode,
+        replicon_lookup=replicon_lookup,
+        aware_version=aware_version,
+    )
