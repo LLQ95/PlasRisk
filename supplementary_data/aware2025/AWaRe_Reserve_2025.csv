@@ -1,0 +1,28 @@
+Antibiotic,Class,ATC code,Listed on EML/EMLc 2025
+Aztreonam,Monobactams,J01DF01,No
+Aztreonam/avibactam,Monobactam/beta-lactamase-inhibitor,J01DF51,No
+Carumonam,Monobactams,J01DF02,No
+Cefiderocol,Other-cephalosporins,J01DI04,Yes
+Ceftaroline-fosamil,Fifth-generation-cephalosporins,J01DI02 ,No
+Ceftazidime/avibactam,Third-generation-cephalosporins,J01DD52,Yes
+Ceftobiprole-medocaril,Fifth-generation-cephalosporins,J01DI01,No
+Ceftolozane/tazobactam,Fifth-generation-cephalosporins,J01DI54,Yes
+Dalbavancin,Glycopeptides,J01XA04,No
+Dalfopristin/quinupristin,Streptogramins,J01FG02,No
+Daptomycin,Lipopeptides,J01XX09,No
+Eravacycline,Tetracyclines,J01AA13,No
+Faropenem,Penems,J01DI03,No
+Fosfomycin_IV,Phosphonics,J01XX01,Yes
+Iclaprim,Trimethoprim-derivatives,J01EA03,No
+Imipenem/cilastatin/relebactam,Carbapenems,J01DH56,No
+Linezolid,Oxazolidinones,J01XX08,Reserve,Yes
+Minocycline_IV,Tetracyclines,J01AA08,No
+Omadacycline,Tetracyclines,J01AA15,Reserve,No
+Oritavancin,Glycopeptides,J01XA05,No
+Plazomicin,Aminoglycosides,J01GB14,Reserve,Yes
+Colistin_IV,Polymyxins,J01XB01,Reserve,Yes
+Colistin_oral,Polymyxins,A07AA10,Reserve,No
+Polymyxin-B_IV,Polymyxins,J01XB02,Reserve,Yes
+Polymyxin-B_oral,Polymyxins,A07AA05,Reserve,No
+Tedizolid,Oxazolidinones,J01XX11,Reserve,Yes
+Tigecycline,Glycylcyclines,J01AA12,Reserve,No

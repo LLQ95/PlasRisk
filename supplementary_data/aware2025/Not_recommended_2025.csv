@@ -1,0 +1,43 @@
+Antibiotic,ATC code,Indication
+Amphenicols (florfenicol, thiamphenicol),J01BA,Not recommended for use in humans
+Aminoglycosides (apramycin, hygromycin B, paromomycin),J01GB,Not recommended for use in humans
+Aminoglycoside (spectinomycin),J01XX04,Not recommended for gonorrhoea
+Bacitracin,D06AX05,Not recommended for use in humans
+Carbadox,QJ01MQ91,Not recommended for use in humans
+Cefalexin,J01DB01,Not recommended for acute uncomplicated cystitis
+Cefazolin,J01DB04,Not recommended for surgical prophylaxis except as a single dose at induction of anaesthesia
+Cefepime,J01DE01,Not recommended for community-acquired infections
+Cefixime,J01DD08,Not recommended for acute uncomplicated cystitis
+Cefotaxime,J01DD01,Not recommended for acute uncomplicated cystitis
+Cefpodoxime proxetil,J01DD13,Not recommended for acute uncomplicated cystitis
+Ceftazidime,J01DD02,Not recommended for acute uncomplicated cystitis
+Ceftriaxone,J01DD04,Not recommended for acute uncomplicated cystitis
+Cefuroxime,J01DC02,Not recommended for acute uncomplicated cystitis
+Chlortetracycline,J01AA03,Not recommended for use in humans
+Ciprofloxacin,J01MA02,Not recommended for acute uncomplicated cystitis
+Colistin,J01XB01,Not recommended for routine use in human and veterinary medicine except in patients with cystic fibrosis
+Dihydrostreptomycin,J01GA03,Not recommended for use in humans
+Enramycin,QJ01XX96,Not recommended for use in humans
+Fluoroquinolones,J01MA,Not recommended for uncomplicated gonorrhoea
+Fosfomycin,J01XX01,Not recommended for routine treatment of diarrhoea
+Furazolidone,QJ01XE90,Not recommended for use in humans
+Gatifloxacin,J01MA16,Not recommended for use in humans
+Lomefloxacin,J01MA07,Not recommended for use in humans
+Nitrofurans (furaltadone, nitrofurazone, nitrovin),J01XE,Not recommended for use in humans
+Nitrofurantoin,J01XE01,Not recommended for pyelonephritis
+Norfloxacin,J01MA06,Not recommended for acute uncomplicated cystitis
+Ofloxacin,J01MA01,Not recommended for acute uncomplicated cystitis
+Olaquindox,QJ01MQ92,Not recommended for use in humans
+Oxolinic acid,J01MB05,Not recommended for use in humans
+Penicillins,J01CA,Not recommended for uncomplicated gonorrhoea
+Quinolones,J01MB,Not recommended for uncomplicated gonorrhoea
+Rifapentine,J04AB05,Not recommended for latent TB infection
+Roxarsone,QJ51AD91,Not recommended for use in humans
+Sparfloxacin,J01MA09,Not recommended for use in humans
+Sulfonamides,J01EC,Not recommended for uncomplicated gonorrhoea
+Tetracyclines,J01AA,Not recommended for uncomplicated gonorrhoea
+Tiamulin,J01XQ01,Not recommended for use in humans
+Tilmicosin,J01FA91,Not recommended for use in humans
+Trimethoprim,J01EA01,Not recommended for acute uncomplicated cystitis
+Tylosin,QJ01FA90,Not recommended for use in humans
+Virginiamycin,QJ01FG90,Not recommended for use in humans
