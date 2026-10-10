@@ -2,6 +2,31 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.6.0] - 2026-09-23
+
+### Added
+- Raw-assembly prediction front end under the new `plasrisk run` command
+  (Python API: `plasrisk.extract`). A short-read WGS, long-read, or
+  multi-strain metagenomic assembly is length-filtered (>=1 kb), classified
+  with PlasFlow or geNomad, and the predicted plasmid contigs are extracted
+  to `predicted_plasmids.fasta`. Classifiers are invoked through subprocess
+  when present and are not bundled; precomputed outputs can be supplied with
+  `--plasflow-table`, `--genomad-table`, or a generic `--generic-table`.
+- Automatic routing (`--route auto`): long/circular plasmid contigs go to
+  the isolate scorer; short fragmented contigs and plasmid bins go to the
+  metagenomic three-layer. Multiple classifiers are combined by majority
+  vote (`--vote majority`, or `any` for high recall).
+- Unscorable reporting. Assemblies with no detected plasmid are not forced
+  into a score. They are reported with a reason, including a chromosome-only
+  determination based on total/longest contig length and the classifier
+  labels (`plasrisk_unscorable.tsv`). A per-contig `extraction_manifest.tsv`
+  and a top-level `run_status.tsv` are always written.
+
+### Fixed
+- `plasrisk meta` previously called the annotation routine with arguments
+  (`db_path`, `quiet`) that the routine does not accept, which raised a
+  `TypeError` on the abricate path. It now uses the supported interface.
+
 ## [1.5.0] - 2026-10-10
 
 ### Added
