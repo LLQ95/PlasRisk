@@ -97,12 +97,24 @@ PYEOF
       # ART names reads_1.fq / reads_2.fq
 
       if [ "${ASSEMBLER}" = "megahit" ]; then
-        megahit -1 reads_1.fq -2 reads_2.fq -o asm -t "${THREADS}" \
-          --presets meta-sensitive
         ASM_FA="${rdir}/asm/final.contigs.fa"
+        # Reuse a completed assembly; wipe only a partial dir so MEGAHIT can run
+        # (MEGAHIT refuses to write into an existing -o directory).
+        if [ -f "${ASM_FA}" ]; then
+          echo "[grid] reuse assembly: ${ASM_FA}"
+        else
+          rm -rf "${rdir}/asm"
+          megahit -1 reads_1.fq -2 reads_2.fq -o asm -t "${THREADS}" \
+            --presets meta-sensitive
+        fi
       else
-        metaspades.py -1 reads_1.fq -2 reads_2.fq -o asm -t "${THREADS}" -m 200
         ASM_FA="${rdir}/asm/contigs.fasta"
+        if [ -f "${ASM_FA}" ]; then
+          echo "[grid] reuse assembly: ${ASM_FA}"
+        else
+          rm -rf "${rdir}/asm"
+          metaspades.py -1 reads_1.fq -2 reads_2.fq -o asm -t "${THREADS}" -m 200
+        fi
       fi
 
       # Map reads back and compute per-contig depth
@@ -115,9 +127,15 @@ PYEOF
 
       # Predict and aggregate plasmids (geNomad `end-to-end`; --clean-up is a
       # boolean flag and the positional order is INPUT OUTPUT_DIR DATABASE).
+      # Reuse a completed run so re-running the grid is resumable.
       GENOMAD_OUT="${rdir}/genomad_out"
-      genomad end-to-end --clean-up --threads "${THREADS}" \
-        "${ASM_FA}" "${GENOMAD_OUT}" "${GENOMAD_DB:?set GENOMAD_DB}"
+      if find "${GENOMAD_OUT}" -name '*_plasmid_components.tsv' 2>/dev/null \
+           | grep -q .; then
+        echo "[grid] reuse geNomad output: ${GENOMAD_OUT}"
+      else
+        genomad end-to-end --clean-up --threads "${THREADS}" \
+          "${ASM_FA}" "${GENOMAD_OUT}" "${GENOMAD_DB:?set GENOMAD_DB}"
+      fi
       plasrisk meta "${ASM_FA}" --genomad-bin "${GENOMAD_OUT}" \
         --coverage depth.tsv -o plasrisk_meta --min-contig 1000 \
         --complete-length 10000 --threads "${THREADS}"
