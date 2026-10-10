@@ -30,7 +30,7 @@ Options:
     --tsv                Write per-sequence TSV (default)
     --summary            Write per-file summary TSV
     -q, --quiet          Suppress progress messages
-    -h, --help           Show help
+    -h, --help           Show help message
     -v, --version        Show version
 """
 
@@ -195,6 +195,9 @@ def main(argv=None):
     if argv and argv[0] == "meta":
         from .metagenome import meta_main
         return meta_main(argv[1:])
+    if argv and argv[0] == "run":
+        from .extract import run_main
+        return run_main(argv[1:])
     args = parse_args(argv)
     # Effective mode: legacy --model pipdb maps to --mode ordinal
     mode = "ordinal" if args.model == "pipdb" else args.mode

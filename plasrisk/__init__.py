@@ -21,10 +21,17 @@ contigs, geNomad/SCAPP-style plasmid bins and whole community samples in
 three layers; the frozen weights are never refit. Community-level indices
 are descriptive and were not trained on metagenomic data.
 
+Raw-assembly front end (v1.6.0): `plasrisk run` predicts plasmid sequences
+in short-read WGS, long-read, or metagenomic assemblies with PlasFlow or
+geNomad, extracts them, routes long/circular contigs to the isolate scorer
+and fragmented bins to the metagenomic layers. Assemblies with no detected
+plasmid are reported unscorable with a reason, including chromosome-only
+inputs.
+
 Reference: [to be updated upon publication]
 """
 
-__version__ = "1.5.0"
+__version__ = "1.6.0"
 __author__ = "PlasRisk Team"
 
 from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,
@@ -35,6 +42,10 @@ from .lookup import load_replicon_lookup
 from .metagenome import (score_contig, score_contigs, aggregate_bin,
                          aggregate_bins, aggregate_sample, load_bins_table,
                          load_genomad, load_coverage_table)
+from .extract import (ClassifiedContig, ExtractionResult, process_one,
+                      parse_plasflow_table, parse_genomad_summary,
+                      parse_generic_table, combine_classifications,
+                      decide_route, run_plasflow, run_genomad, run_main)
 
 __all__ = [
     "PlasRiskScorer",
@@ -57,4 +68,15 @@ __all__ = [
     "load_bins_table",
     "load_genomad",
     "load_coverage_table",
+    "ClassifiedContig",
+    "ExtractionResult",
+    "process_one",
+    "parse_plasflow_table",
+    "parse_genomad_summary",
+    "parse_generic_table",
+    "combine_classifications",
+    "decide_route",
+    "run_plasflow",
+    "run_genomad",
+    "run_main",
 ]
