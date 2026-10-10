@@ -16,10 +16,15 @@ is available with --mode ordinal. S_ARG can optionally use the WHO
 AWaRe 2025 category table (--aware-version 2025); the legacy mapping
 used for the frozen matrix remains the default.
 
+Metagenomic extension (v1.5.0): `plasrisk meta` scores fragmented plasmid
+contigs, geNomad/SCAPP-style plasmid bins and whole community samples in
+three layers; the frozen weights are never refit. Community-level indices
+are descriptive and were not trained on metagenomic data.
+
 Reference: [to be updated upon publication]
 """
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 __author__ = "PlasRisk Team"
 
 from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,
@@ -27,6 +32,9 @@ from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,
                       WEIGHT_SUM, get_scorer, size_rank_concordance)
 from .annotate import annotate_fasta, AnnotationResult
 from .lookup import load_replicon_lookup
+from .metagenome import (score_contig, score_contigs, aggregate_bin,
+                         aggregate_bins, aggregate_sample, load_bins_table,
+                         load_genomad, load_coverage_table)
 
 __all__ = [
     "PlasRiskScorer",
@@ -41,4 +49,12 @@ __all__ = [
     "annotate_fasta",
     "AnnotationResult",
     "load_replicon_lookup",
+    "score_contig",
+    "score_contigs",
+    "aggregate_bin",
+    "aggregate_bins",
+    "aggregate_sample",
+    "load_bins_table",
+    "load_genomad",
+    "load_coverage_table",
 ]

@@ -2,6 +2,41 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.5.0] - 2026-10-10
+
+### Added
+- Metagenomic three-layer scoring under the new `plasrisk meta` command
+  (Python API: `plasrisk.metagenome`). Layer 1 scores fragmented plasmid
+  contigs on the dimensions that remain identifiable after fragmentation:
+  S_ARG/S_BMG/S_VF are always evaluated, S_MOB only from observed transfer
+  apparatus or IS evidence (no isolate-derived priors are injected), and
+  S_SIZE only for circularised headers or contigs at/above
+  `--complete-length` (default 10,000 bp). Scores are renormalised over the
+  assessable dimensions as S_cargo3, S_frag4 and S_lite5, with A-E grades
+  emitted only when all five lite dimensions are assessable.
+- Layer 2 aggregates contigs into predicted plasmid bins (generic
+  `--bins` table, best-effort geNomad `--genomad-bin` parser for
+  `*_plasmid_components.tsv` / `*_plasmid_summary.tsv`, or singleton
+  bins for unbinned contigs): gene sets are unioned with deduplication,
+  lengths are summed, mobility markers are OR-combined, and optional
+  per-contig coverage (`--coverage`, including
+  jgi_summarize_bam_contig_depths output) is length-weighted. Bins carry
+  complete/probable/fragmented confidence labels.
+- Layer 3 reports descriptive, abundance-aware community statistics
+  (CPRI_mean/P90/P99, grade prevalence, coverage-weighted grade A/B and
+  critical-ARG loads). CPRI is an unvalidated descriptive extension and is
+  labelled as such in every sample summary.
+- `plasrisk-fragment-sim` console script (`plasrisk.fragment_sim`) for the
+  controlled fragmentation grid used to quantify score recovery versus
+  intact plasmids (Spearman rho, grade exact/within-one agreement, median
+  bias, critical-ARG recovery per fragment length).
+- New test module `tests/test_metagenome.py` (29 tests total).
+
+### Design notes
+- The frozen consensus weights are never refit on metagenomic data.
+- Fragment lengths are never passed through S_SIZE, avoiding systematic
+  penalties for megaplasmids split by short-read assembly.
+
 ## [1.4.0] - 2026-09-30
 
 ### Added

@@ -30,7 +30,7 @@ Options:
     --tsv                Write per-sequence TSV (default)
     --summary            Write per-file summary TSV
     -q, --quiet          Suppress progress messages
-    -h, --help           Show this help message
+    -h, --help           Show help
     -v, --version        Show version
 """
 
@@ -189,6 +189,12 @@ def print_banner(args, mode):
 
 
 def main(argv=None):
+    if argv is None:
+        argv = sys.argv[1:]
+    argv = list(argv)
+    if argv and argv[0] == "meta":
+        from .metagenome import meta_main
+        return meta_main(argv[1:])
     args = parse_args(argv)
     # Effective mode: legacy --model pipdb maps to --mode ordinal
     mode = "ordinal" if args.model == "pipdb" else args.mode

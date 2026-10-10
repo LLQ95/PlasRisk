@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plasrisk"
-version = "1.4.0"
-description = "PlasRisk: data-driven weighted risk assessment for bacterial plasmids from FASTA sequences (three modes: lite 5-dim FASTA-only core by default, full 10-dim model, and original PIPdb ordinal index)"
+version = "1.5.0"
+description = "PlasRisk: data-driven weighted risk assessment for bacterial plasmids from FASTA sequences (isolate and metagenomic modes; lite 5-dim FASTA-only core by default, full 10-dim model, and original PIPdb ordinal index; metagenomic contig/bin/community scoring)"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -59,6 +59,7 @@ full = [
 
 [project.scripts]
 plasrisk = "plasrisk.cli:main"
+plasrisk-fragment-sim = "plasrisk.fragment_sim:main"
 
 [project.urls]
 Homepage = "https://github.com/LLQ95/PlasRisk"
