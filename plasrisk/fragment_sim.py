@@ -1,280 +1,254 @@
 """
-fragment_sim.py - Controlled fragmentation recovery simulation.
+fragment_sim.py - Controlled fragmentation grid for metagenomic validation.
 
-Intact, circular reference plasmids are tiled into fragments of varying
-length (with random phase offsets), and each fragment set is scored with
-the metagenomic Layer-1 pipeline. An oracle bin (all fragments of one
-source plasmid grouped together, circular=True) is compared with:
+Analogue of the simulation design used by parameter-free metagenomic
+classifiers (e.g. SCiMS, Microbiome 2026): complete reference plasmids are
+fragmented in silico across a grid of fragment lengths and random phases,
+and three quantities are compared against the intact-plasmid score:
 
-    S_whole       intact plasmid, standard lite score
-    S_bin_oracle  oracle bin aggregation
-    S_contig_mean length-weighted mean of the best assessable fragment
-                  score (S_lite5 > S_frag4 > S_cargo3)
+  S_bin_oracle    fragments of one plasmid are assigned to the same bin
+                  (oracle binning, an upper bound on bin recovery),
+  S_contig_mean   length-weighted mean of the best assessable per-contig
+                  score (naive, no binning),
+  S_whole         standard lite score on the intact plasmid.
 
-Outputs report, per fragment length: Spearman rank correlation with the
-intact-plasmid scores, grade exact / within-one agreement, median score
-delta (IQR), critical-ARG recovery, and mean fragments per plasmid.
+The script reports Spearman rank correlation, grade exact / within-one
+agreement, median score bias and critical-ARG recovery per fragment length.
+It does not model assembly chimerism; pair it with ART/wgsim + metaSPAdes +
+geNomad for the realistic layer (see the accompanying analysis plan).
 """
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
-import tempfile
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 
-from .annotate import (AnnotationResult, annotate_fasta, parse_fasta)
-from .metagenome import (aggregate_bin, score_contigs, circular_map_from_fasta)
+from .annotate import AnnotationResult, annotate_fasta, parse_fasta
+from .metagenome import aggregate_bin, score_contig, score_contigs
 from .scoring import PlasRiskScorer, PlasmidFeatures
 
+GRADE_ORDER = {"A": 4, "B": 3, "C": 2, "D": 1, "E": 0}
+DEFAULT_GRID = (500, 1000, 2000, 5000, 10000, 20000)
 
-def tile_fragments(seq_id: str, sequence: str, frag_length: int,
-                   rng: np.random.Generator) -> List[PlasmidFeatures]:
-    """Tile one sequence into fragments with a random start phase."""
-    L = len(sequence)
-    if frag_length >= L:
-        return [PlasmidFeatures(seq_id=seq_id, length_bp=L)]
-    offset = int(rng.integers(0, frag_length))
-    bounds = list(range(offset, L, frag_length))
-    if not bounds or bounds[0] != 0:
-        bounds = [0] + bounds
-    if bounds[-1] != L:
-        bounds = bounds + [L]
+
+def tile_fragments(seq: str, frag_len: int, rng: np.random.Generator
+                   ) -> List[Tuple[int, int, str]]:
+    """Tile a sequence into fragments with a random phase offset."""
+    n = len(seq)
+    if frag_len >= n:
+        return [(0, n, seq.upper())]
+    shift = int(rng.integers(0, frag_len))
     out = []
-    for i in range(len(bounds) - 1):
-        a, b = bounds[i], bounds[i + 1]
-        if b - a < 1:
-            continue
-        out.append(PlasmidFeatures(
-            seq_id="%s_frag%d" % (seq_id, i + 1),
-            length_bp=b - a))
+    start = shift
+    if shift > 0:
+        out.append((0, shift, seq[:shift].upper()))
+    while start < n:
+        end = min(start + frag_len, n)
+        out.append((start, end, seq[start:end].upper()))
+        start = end
     return out
 
 
-def _best_contig_score(row: Dict) -> Optional[float]:
-    for key in ("S_lite5", "S_frag4", "S_cargo3"):
-        v = row.get(key)
+def _best_contig_score(row) -> Optional[float]:
+    for col in ("S_lite5", "S_frag4", "S_cargo3"):
+        v = row.get(col)
         if v is not None and not (isinstance(v, float) and np.isnan(v)):
             return float(v)
     return None
 
 
 def run_simulation(fasta_path: str,
-                   frag_lengths: Sequence[int] = (500, 1000, 2000, 5000,
-                                                  10000, 20000),
-                   replicates: int = 10,
-                   use_abricate: bool = True,
+                   frag_lengths: Tuple[int, ...] = DEFAULT_GRID,
+                   n_replicates: int = 10,
+                   min_fragment: int = 500,
+                   complete_length: int = 10_000,
                    threads: int = 4,
-                   seed: int = 42) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Run the fragmentation grid; return per-element and summary tables."""
+                   use_abricate: bool = True,
+                   db_path: Optional[str] = None,
+                   aware_version: str = "legacy",
+                   seed: int = 42,
+                   quiet: bool = False
+                   ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     rng = np.random.default_rng(seed)
-    records = parse_fasta(fasta_path)
-    scorer = PlasRiskScorer(mode="lite")
+    scorer = PlasRiskScorer(replicon_lookup=None, mode="lite",
+                            aware_version=aware_version)
 
-    # Intact-plasmid reference scores
-    whole_rows = []
-    for sid, seq in records.items():
-        whole_rows.append({
-            "seq_id": sid,
-            "length_bp": len(seq),
-            "S_whole": scorer.score_size(len(seq)) and None,  # placeholder
-        })
-    # Score intact plasmids through the standard annotation path
+    # ---- intact reference scores ----------------------------------------
     if use_abricate:
-        whole_ann = annotate_fasta(fasta_path, threads=threads, quiet=True)
+        whole_ann = annotate_fasta(fasta_path, db_path=db_path,
+                                   threads=threads, quiet=True)
     else:
-        feats = [PlasmidFeatures(seq_id=sid, length_bp=len(seq))
-                 for sid, seq in records.items()]
-        whole_ann = AnnotationResult(file=fasta_path, features=feats)
-    whole_df = score_contigs(whole_ann, scorer, min_length=1,
-                             circular_map={sid: True for sid in records})
-    whole_lookup = {}
-    for _, r in whole_df.iterrows():
-        whole_lookup[r["seq_id"]] = {
-            "S": r["S_lite5"] if r["S_lite5"] is not None else
-            _best_contig_score(r.to_dict()),
-            "grade": r["grade"],
-            "hr": r["high_risk_genes"],
-        }
+        recs = parse_fasta(fasta_path)
+        whole_ann = AnnotationResult(
+            file=fasta_path,
+            features=[PlasmidFeatures(seq_id=i, length_bp=len(s))
+                      for i, s in recs.items()])
+    whole_df = scorer.score_dataframe(whole_ann.features)
+    whole = {r["seq_id"]: r for _, r in whole_df.iterrows()}
 
-    per_element, summary = [], []
-    for frag_length in frag_lengths:
-        for rep in range(replicates):
-            all_frag_feats: List[PlasmidFeatures] = []
-            frag_to_source: Dict[str, str] = {}
-            source_frags: Dict[str, List[str]] = {}
-            for sid, seq in records.items():
-                frags = tile_fragments(sid, seq, frag_length, rng)
-                source_frags[sid] = [f.seq_id for f in frags]
-                for f in frags:
-                    frag_to_source[f.seq_id] = sid
-                    all_frag_feats.append(f)
+    element_rows, summary_rows = [], []
+    for frag_len in frag_lengths:
+        for rep in range(n_replicates):
+            # Build fragmented features (annotated in one batch when abricate
+            # is available, else sequence-only).
+            frag_records = []  # (plasmid_id, index, sequence)
+            frag_index = []    # (plasmid_id, index, start, end)
+            for pid, seq in parse_fasta(fasta_path).items():
+                pieces = tile_fragments(seq, frag_len, rng)
+                k = 0
+                for (a, b, s) in pieces:
+                    if len(s) < min_fragment:
+                        continue
+                    frag_records.append(("%s__f%05d" % (pid, k), s))
+                    frag_index.append((pid, k, a, b))
+                    k += 1
 
             if use_abricate:
-                tmpdir = tempfile.mkdtemp(prefix="fragsim_")
-                fpath = os.path.join(tmpdir, "fragments.fasta")
-                with open(fpath, "w") as out:
-                    for sid, seq in records.items():
-                        for f in tile_fragments(sid, seq, frag_length, rng):
-                            sub = seq  # re-tile below for sequence content
-                # Rebuild fragments with actual sequence content for abricate
-                with open(fpath, "w") as out:
-                    for sid, seq in records.items():
-                        L = len(seq)
-                        if frag_length >= L:
-                            out.write(">%s\n%s\n" % (sid, seq))
-                            continue
-                        offset = int(rng.integers(0, frag_length))
-                        bounds = list(range(offset, L, frag_length))
-                        if not bounds or bounds[0] != 0:
-                            bounds = [0] + bounds
-                        if bounds[-1] != L:
-                            bounds = bounds + [L]
-                        for i in range(len(bounds) - 1):
-                            a, b = bounds[i], bounds[i + 1]
-                            if b - a < 1:
-                                continue
-                            fid = "%s_frag%d" % (sid, i + 1)
-                            out.write(">%s\n%s\n" % (fid, seq[a:b]))
-                ann = annotate_fasta(fpath, threads=threads, quiet=True)
-                contig_df = score_contigs(ann, scorer, min_length=1)
+                import tempfile
+                with tempfile.TemporaryDirectory() as td:
+                    fp = os.path.join(td, "fragments.fasta")
+                    with open(fp, "w") as fh:
+                        for fid, s in frag_records:
+                            fh.write(">%s\n%s\n" % (fid, s))
+                    ann = annotate_fasta(fp, db_path=db_path,
+                                         threads=threads, quiet=True)
+                feats = {f.seq_id: f for f in ann.features}
             else:
-                ann = AnnotationResult(file="<fragments>",
-                                       features=all_frag_feats)
-                contig_df = score_contigs(ann, scorer, min_length=1)
+                feats = {fid: PlasmidFeatures(seq_id=fid, length_bp=len(s))
+                         for fid, s in frag_records}
 
-            contig_lookup = {r["seq_id"]: r for _, r in
-                             contig_df.iterrows()}
+            by_plasmid: Dict[str, List[PlasmidFeatures]] = {}
+            for fid, feat in feats.items():
+                pid = fid.rsplit("__f", 1)[0]
+                by_plasmid.setdefault(pid, []).append(feat)
 
-            # Oracle bins: all fragments of each source plasmid, circular
-            oracle_rows = []
-            for sid in records:
-                members = [f for f in all_frag_feats
-                           if frag_to_source.get(f.seq_id) == sid]
-                if use_abricate:
-                    members = [f for f in ann.features
-                               if frag_to_source.get(f.seq_id) == sid]
-                if not members:
+            for pid, flist in by_plasmid.items():
+                if pid not in whole:
                     continue
-                row = aggregate_bin(sid, members, scorer,
-                                    circular=True, plasmid_score=None,
-                                    coverages=None)
-                oracle_rows.append(row)
-
-            oracle_lookup = {r["bin_id"]: r for r in oracle_rows}
-
-            for sid in records:
-                ref = whole_lookup.get(sid)
-                if ref is None or ref["S"] is None:
-                    continue
-                frag_ids = [fid for fid in frag_to_source
-                            if frag_to_source[fid] == sid]
-                # length-weighted best assessable fragment score
-                num = den = 0.0
-                hr_recovered = False
-                grades = []
-                for fid in frag_ids:
-                    cr = contig_lookup.get(fid)
-                    if cr is None:
-                        continue
-                    bs = _best_contig_score(cr.to_dict())
-                    L = int(cr["length_bp"])
-                    if bs is not None:
-                        num += bs * L
-                        den += L
-                    if cr["high_risk_genes"]:
-                        hr_recovered = True
-                    if cr["grade"]:
-                        grades.append(cr["grade"])
-                s_contig = num / den if den else np.nan
-                s_oracle = oracle_lookup.get(sid, {}).get("S_lite")
-                oracle_grade = oracle_lookup.get(sid, {}).get("grade", "")
-                per_element.append({
-                    "frag_length": frag_length,
-                    "replicate": rep,
-                    "seq_id": sid,
-                    "length_bp": len(records[sid]),
-                    "S_whole": ref["S"],
-                    "grade_whole": ref["grade"],
-                    "S_bin_oracle": s_oracle,
-                    "grade_oracle": oracle_grade,
-                    "S_contig_mean": s_contig,
-                    "n_fragments": len(frag_ids),
-                    "hr_in_whole": bool(ref["hr"]),
-                    "hr_recovered": hr_recovered,
+                w = whole[pid]
+                bin_row = aggregate_bin(
+                    pid, flist, scorer, circular=True,
+                    plasmid_score=None, coverage=None)
+                contig_ann = AnnotationResult(file=fasta_path, features=flist)
+                cdf = score_contigs(contig_ann, scorer,
+                                    complete_length=complete_length,
+                                    min_length=min_fragment)
+                scores = cdf.apply(_best_contig_score, axis=1).dropna()
+                lens = cdf.loc[scores.index, "length_bp"].to_numpy(float)
+                s_contig = (float(np.sum(scores.to_numpy(float) * lens)
+                                  / np.sum(lens))
+                            if len(scores) and lens.sum() > 0 else np.nan)
+                hr_whole = str(w.get("high_risk_genes", "") or "")
+                hr_bin = bin_row["high_risk_genes"]
+                element_rows.append({
+                    "plasmid_id": pid,
+                    "frag_len_bp": frag_len,
+                    "replicate": rep + 1,
+                    "n_fragments": len(flist),
+                    "length_whole_bp": int(w["length_bp"]),
+                    "S_whole": round(float(w["S_norm"]), 4),
+                    "grade_whole": w["grade"],
+                    "S_bin_oracle": bin_row["S_lite"],
+                    "grade_bin": bin_row["grade"],
+                    "delta_bin": (round(bin_row["S_lite"]
+                                        - float(w["S_norm"]), 4)
+                                  if bin_row["S_lite"] is not None else np.nan),
+                    "S_contig_mean": round(s_contig, 4)
+                    if not np.isnan(s_contig) else np.nan,
+                    "high_risk_recovered": int(
+                        hr_whole != "" and hr_bin != ""),
+                    "high_risk_present_whole": int(hr_whole != ""),
                 })
 
-        block = pd.DataFrame([e for e in per_element
-                              if e["frag_length"] == frag_length])
-        if block.empty:
-            continue
-        rho = block[["S_whole", "S_contig_mean"]].corr(
-            method="spearman").iloc[0, 1]
-        rho_oracle = block[["S_whole", "S_bin_oracle"]].corr(
-            method="spearman").iloc[0, 1]
-        grade_exact = np.mean(
-            block["grade_whole"] == block["grade_oracle"])
-        grade_within_one = np.mean([
-            abs("ABCDE".index(a) - "ABCDE".index(b)) <= 1
-            for a, b in zip(block["grade_whole"], block["grade_oracle"])
-            if a and b]) if (block["grade_whole"] != "").any() else np.nan
-        delta = block["S_contig_mean"] - block["S_whole"]
-        hr_blocks = block[block["hr_in_whole"]]
-        hr_recovery = hr_blocks["hr_recovered"].mean() if len(hr_blocks) else np.nan
-        summary.append({
-            "frag_length": frag_length,
-            "n_elements": len(block),
-            "spearman_contig": round(rho, 4),
-            "spearman_oracle_bin": round(rho_oracle, 4),
-            "grade_exact_oracle": round(grade_exact, 4),
-            "grade_within_one_oracle": round(grade_within_one, 4)
-            if not np.isnan(grade_within_one) else np.nan,
-            "median_delta_contig": round(float(delta.median()), 4),
-            "iqr_delta_contig": round(float(delta.quantile(0.75)
-                                           - delta.quantile(0.25)), 4),
-            "critical_ARG_recovery": round(hr_recovery, 4)
-            if not np.isnan(hr_recovery) else np.nan,
-            "mean_fragments": round(block["n_fragments"].mean(), 2),
+    elem = pd.DataFrame(element_rows)
+    if elem.empty:
+        return elem, pd.DataFrame()
+
+    for frag_len, grp in elem.groupby("frag_len_bp"):
+        graded = grp[grp["grade_bin"] != ""]
+        if len(graded) >= 3 and graded["grade_whole"].nunique() > 1:
+            rho = float(graded["S_bin_oracle"].corr(
+                graded["S_whole"], method="spearman"))
+        else:
+            rho = np.nan
+        gw = graded["grade_whole"].map(GRADE_ORDER)
+        gb = graded["grade_bin"].map(GRADE_ORDER)
+        exact = float((gw == gb).mean()) if len(graded) else np.nan
+        within1 = float((np.abs(gw - gb) <= 1).mean()) if len(graded) \
+            else np.nan
+        hr = grp[grp["high_risk_present_whole"] == 1]
+        summary_rows.append({
+            "frag_len_bp": frag_len,
+            "n_comparisons": len(grp),
+            "spearman_rho_bin_vs_whole": round(rho, 4)
+            if not np.isnan(rho) else np.nan,
+            "grade_exact_agreement": round(exact, 4)
+            if not np.isnan(exact) else np.nan,
+            "grade_within_one": round(within1, 4)
+            if not np.isnan(within1) else np.nan,
+            "median_delta_bin": round(
+                float(grp["delta_bin"].median()), 4),
+            "iqr_delta_bin": "%.4f-%.4f" % (
+                float(grp["delta_bin"].quantile(0.25)),
+                float(grp["delta_bin"].quantile(0.75))),
+            "critical_ARG_recovery": round(
+                float(hr["high_risk_recovered"].mean()), 4)
+            if len(hr) else np.nan,
+            "mean_n_fragments": round(float(grp["n_fragments"].mean()), 2),
         })
+    summary = pd.DataFrame(summary_rows)
+    if not quiet:
+        print(summary.to_string(index=False))
+    return elem, summary
 
-    return pd.DataFrame(per_element), pd.DataFrame(summary)
 
-
-def build_parser():
-    import argparse
+def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="plasrisk-fragment-sim",
-        description="Fragmentation recovery simulation for PlasRisk "
-                    "metagenomic scoring.")
-    p.add_argument("fasta", help="intact reference plasmid FASTA")
+        description="In-silico fragmentation grid for PlasRisk metagenomic "
+                    "validation (oracle-bin recovery vs intact plasmids).",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p.add_argument("fasta", help="complete reference plasmid FASTA")
     p.add_argument("-o", "--output", default="fragment_sim",
                    help="output directory")
-    p.add_argument("--frag-lengths", default="500,1000,2000,5000,10000,20000",
+    p.add_argument("--frag-lengths", default=",".join(map(str, DEFAULT_GRID)),
                    help="comma-separated fragment lengths (bp)")
     p.add_argument("--replicates", type=int, default=10)
-    p.add_argument("--no-abricate", action="store_true",
-                   help="sequence-only pipeline (no gene annotation)")
+    p.add_argument("--min-fragment", type=int, default=500)
+    p.add_argument("--complete-length", type=int, default=10000)
     p.add_argument("-t", "--threads", type=int, default=4)
+    p.add_argument("--no-abricate", action="store_true",
+                   help="sequence-only plumbing test (cargo dims = 0)")
+    p.add_argument("--db", default=None)
+    p.add_argument("--aware-version", choices=["legacy", "2025"],
+                   default="legacy")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("-q", "--quiet", action="store_true")
     return p
 
 
-def main(argv=None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     args = build_parser().parse_args(argv)
-    frag_lengths = [int(x) for x in args.frag_lengths.split(",") if x]
-    per_element, summary = run_simulation(
-        args.fasta, frag_lengths=frag_lengths,
-        replicates=args.replicates, use_abricate=not args.no_abricate,
-        threads=args.threads, seed=args.seed)
+    grid = tuple(int(x) for x in args.frag_lengths.split(",") if x.strip())
+    elem, summary = run_simulation(
+        args.fasta, frag_lengths=grid, n_replicates=args.replicates,
+        min_fragment=args.min_fragment,
+        complete_length=args.complete_length, threads=args.threads,
+        use_abricate=not args.no_abricate, db_path=args.db,
+        aware_version=args.aware_version, seed=args.seed,
+        quiet=args.quiet)
     os.makedirs(args.output, exist_ok=True)
-    p1 = os.path.join(args.output, "fragment_sim_per_element.tsv")
-    p2 = os.path.join(args.output, "fragment_sim_summary.tsv")
-    per_element.to_csv(p1, sep="\t", index=False)
-    summary.to_csv(p2, sep="\t", index=False)
-    print("Saved %s and %s" % (p1, p2))
+    ep = os.path.join(args.output, "fragment_sim_per_element.tsv")
+    sp = os.path.join(args.output, "fragment_sim_summary.tsv")
+    elem.to_csv(ep, sep="\t", index=False)
+    summary.to_csv(sp, sep="\t", index=False)
+    if not args.quiet:
+        print("wrote %s\nwrote %s" % (ep, sp))
     return 0
 
 
