@@ -113,10 +113,10 @@ PYEOF
       samtools index mapped.bam
       jgi_summarize_bam_contig_depths --outputDepth depth.tsv mapped.bam
 
-      # Predict and aggregate plasmids (geNomad `classify`; --clean-up is a
+      # Predict and aggregate plasmids (geNomad `end-to-end`; --clean-up is a
       # boolean flag and the positional order is INPUT OUTPUT_DIR DATABASE).
       GENOMAD_OUT="${rdir}/genomad_out"
-      genomad classify --clean-up --threads "${THREADS}" \
+      genomad end-to-end --clean-up --threads "${THREADS}" \
         "${ASM_FA}" "${GENOMAD_OUT}" "${GENOMAD_DB:?set GENOMAD_DB}"
       plasrisk meta "${ASM_FA}" --genomad-bin "${GENOMAD_OUT}" \
         --coverage depth.tsv -o plasrisk_meta --min-contig 1000 \
