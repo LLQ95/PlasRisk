@@ -113,7 +113,7 @@ else:
 fasta_paths = glob.glob(os.path.join(ext_dir, "**", "*.f*a"), recursive=True)
 fasta_paths = [p for p in fasta_paths
                if p.lower().endswith((".fna", ".fasta", ".fa", ".fsa"))]
-if not fasta:
+if not fasta_paths:
     sys.exit("No FASTA found in PLSDB archive")
 print("  fasta file(s): %d" % len(fasta_paths))
 
