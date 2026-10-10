@@ -106,8 +106,9 @@ if [ -n "${NCBI_API_KEY:-}" ] && have vdb-config; then
   fi
 fi
 
-# Wait until fewer than $1 background jobs are running.
-slot(){ while [ "$(jobs -rp | wc -l)" -ge "$1" ]; do wait -n || true; done; }
+# Wait until fewer than $1 background jobs are running. Polling is used
+# instead of `wait -n` for compatibility with bash < 4.3 (no wait -n).
+slot(){ while [ "$(jobs -rp | wc -l)" -ge "$1" ]; do sleep 3; done; }
 
 # ENA FASTQ directory for an ERR/SRR accession (handles the 000-999 sub-buckets
 # used once the numeric part exceeds six digits). ENA mirrors NCBI SRR runs.
