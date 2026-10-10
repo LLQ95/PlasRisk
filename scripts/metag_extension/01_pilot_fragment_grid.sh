@@ -51,7 +51,7 @@ for rep in $(seq 1 "${REPLICATES}"); do
       comm="community_${tag}.fa"
       python3 - "${WORKDIR}/refs" "${comm}" "${PLASMIDS_PER_COMMUNITY}" \
               "$((1000+rep))" <<'PYEOF'
-import os, random, sys
+import math, os, random, sys
 refdir, out, k, seed = sys.argv[1:5]
 random.seed(int(seed))
 refs = [f for f in os.listdir(refdir) if f.endswith(".fa")]
@@ -92,10 +92,12 @@ PYEOF
       samtools index mapped.bam
       jgi_summarize_bam_contig_depths --outputDepth depth.tsv mapped.bam
 
-      # Predict and aggregate plasmids
-      genomad aggregate --clean-up genomad_out "${ASM_FA}" \
-        "${GENOMAD_DB:-genomad_db}" --threads "${THREADS}"
-      plasrisk meta "${ASM_FA}" --genomad-bin genomad_out \
+      # Predict and aggregate plasmids (geNomad `classify`; --clean-up is a
+      # boolean flag and the positional order is INPUT OUTPUT_DIR DATABASE).
+      GENOMAD_OUT="${rdir}/genomad_out"
+      genomad classify --clean-up --threads "${THREADS}" \
+        "${ASM_FA}" "${GENOMAD_OUT}" "${GENOMAD_DB:?set GENOMAD_DB}"
+      plasrisk meta "${ASM_FA}" --genomad-bin "${GENOMAD_OUT}" \
         --coverage depth.tsv -o plasrisk_meta --min-contig 1000 \
         --complete-length 10000 --threads "${THREADS}"
 
@@ -164,7 +166,7 @@ res = pd.DataFrame(rows)
 res.to_csv(os.path.join(os.path.dirname(manifest_file),
                         "fragment_grid_truth_matching.tsv"),
            sep="\t", index=False)
-mm = res["matchable"]
+mm = res[res["matchable"]]
 print(mm.groupby("run").agg(
     n_matchable=("plasmid_id", "count"),
     matched_pct=("matched", lambda x: 100 * x.mean()),

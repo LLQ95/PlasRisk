@@ -69,9 +69,10 @@ run_one () {
     --outputDepth "${BASEDIR}/depth/${ACC}_depth.tsv" \
     "${BASEDIR}/depth/${ACC}.bam"
 
-  # 5) geNomad plasmids
-  genomad aggregate --clean-up "${BASEDIR}/genomad/${ACC}" "${ASM}" \
-    "${GENOMAD_DB:?set GENOMAD_DB}" --threads "${THREADS}" >> "${LOG}" 2>&1
+  # 5) geNomad plasmids (positional order is INPUT OUTPUT_DIR DATABASE;
+  #    --clean-up is a boolean flag).
+  genomad classify --clean-up --threads "${THREADS}" \
+    "${ASM}" "${BASEDIR}/genomad/${ACC}" "${GENOMAD_DB}" >> "${LOG}" 2>&1
 
   # 6) PlasRisk three layers
   plasrisk meta "${ASM}" \
@@ -108,7 +109,7 @@ for _, m in meta.iterrows():
         continue
     d = pd.read_csv(p, sep="\t")
     d["accession"] = m["accession"]
-    d["habitat_group"] = m["habitat_group"]
+    d["habitat_group"] = m["habitat"]
     d["pair_id"] = m["pair_id"]
     rows.append(d)
 if rows:
