@@ -109,7 +109,7 @@ for _, m in meta.iterrows():
         continue
     d = pd.read_csv(p, sep="\t")
     d["accession"] = m["accession"]
-    d["habitat_group"] = m["habitat"]
+    d["habitat_group"] = m["habitat_group"]
     d["pair_id"] = m["pair_id"]
     rows.append(d)
 if rows:
