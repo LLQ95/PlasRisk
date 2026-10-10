@@ -62,6 +62,25 @@ DL_BACKEND="curl"
 if have aria2c; then DL_BACKEND="aria2c"; fi
 if [ "${ENABLE_ASPERA:-0}" = "1" ] && have ascp; then DL_BACKEND="aspera"; fi
 echo "[dl] backend: ${DL_BACKEND} (${DL_JOBS} samples x ${CONNS} conns)"
+
+# Locate the Aspera transfer public key (shipped with aspera-cli / Aspera
+# Connect; it is a non-secret public key). Fall back if it cannot be found.
+ASPERA_KEY="${ASPERA_SCP_KEY:-}"
+if [ -z "${ASPERA_KEY}" ]; then
+  for k in \
+    "${CONDA_PREFIX:-}/etc/asperaweb_id_dsa.openssh" \
+    "${CONDA_PREFIX:-}/opt/aspera-cli/etc/asperaweb_id_dsa.openssh" \
+    "$HOME/.aspera/connect/etc/asperaweb_id_dsa.openssh" \
+    "/usr/local/aspera/connect/etc/asperaweb_id_dsa.openssh"; do
+    [ -f "$k" ] && { ASPERA_KEY="$k"; break; }
+  done
+fi
+if [ "${DL_BACKEND}" = "aspera" ] && [ -z "${ASPERA_KEY}" ]; then
+  echo "[dl] ascp present but public key not found (set ASPERA_SCP_KEY); falling back"
+  if have aria2c; then DL_BACKEND="aria2c"; else DL_BACKEND="curl"; fi
+fi
+[ -n "${ASPERA_KEY}" ] && export ASPERA_SCP_KEY="${ASPERA_KEY}"
+echo "[dl] aspera key: ${ASPERA_KEY:-<none>}"
 for b in fastp megahit bowtie2 bowtie2-build samtools \
          jgi_summarize_bam_contig_depths genomad plasrisk; do
   have "$b" || { echo "MISSING process binary: $b"; miss_pr=1; }
@@ -119,9 +138,13 @@ ena_fetch () {
         -d "$(dirname "${OUT}")" -o "$(basename "${OUT}")" "${URL}" ;;
     aspera)
       # fasp path is the same /vol1 tree on fasp.sra.ebi.ac.uk:33001.
+      # -k1 enables resume; download into the directory (keeps file name).
       local rp="${URL#https://ftp.sra.ebi.ac.uk}"
-      ascp -QT -l "${ASPERA_RATE:-300m}" -P 33001 \
-        "fasp@fasp.sra.ebi.ac.uk:${rp}" "${OUT}" ;;
+      local keyargs=()
+      [ -n "${ASPERA_KEY}" ] && keyargs=(-i "${ASPERA_KEY}")
+      ascp -QT -k1 "${keyargs[@]}" \
+        -l "${ASPERA_RATE:-300m}" -P 33001 \
+        "fasp@fasp.sra.ebi.ac.uk:${rp}" "$(dirname "${OUT}")/" ;;
     *)
       curl -L -C - --retry 5 --retry-delay 5 --fail -o "${OUT}" "${URL}" ;;
   esac
