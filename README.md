@@ -222,6 +222,87 @@ reproduced on any input set with `plasrisk --rank-concordance` (writes
 
 ---
 
+## Metagenomic mode (`plasrisk meta`)
+
+PlasRisk extends to fragmented metagenomic assemblies with three aggregation
+layers. The frozen consensus weights are never refit; every output carries
+an explicit completeness/confidence label so that fragments are not scored
+as if they were closed plasmids.
+
+- **Layer 1, contig/element level.** S_ARG, S_BMG and S_VF are always
+  evaluated from observed genes. S_MOB is evaluated only from observed
+  transfer apparatus (MPF/T4CP, relaxase, oriT) or insertion-sequence
+  evidence; isolate-derived replicon/global priors are never injected when
+  the apparatus was simply not covered. S_SIZE is evaluated only for
+  circularised headers (`circular=true`) or contigs at/above
+  `--complete-length` (default 10,000 bp); fragment lengths are never
+  passed through S_SIZE, which would penalise megaplasmids that short-read
+  assembly split. Renormalised scores are reported as S_cargo3 (cargo
+  dimensions), S_frag4 (cargo + mobility) and S_lite5 (all five lite
+  dimensions); A-E grades are emitted only when all five dimensions are
+  assessable.
+- **Layer 2, plasmid-bin level.** Contigs assigned to the same predicted
+  plasmid (geNomad components, SCAPP plasmids, MOB-suite bins or any
+  generic contig-to-bin table) are aggregated: gene sets are unioned with
+  deduplication, lengths are summed, mobility markers are OR-combined, and
+  per-contig coverage is length-weighted. Bins are scored with the standard
+  lite model and labelled complete / probable / fragmented.
+- **Layer 3, sample/community level.** Descriptive abundance-aware
+  statistics: coverage-length weighted mean score (CPRI_mean), P90/P99,
+  grade prevalence, and coverage-weighted grade A/B and critical-ARG
+  loads (with optional per-Mb normalisation). CPRI is a descriptive
+  extension that was not trained or validated on metagenomic data; this is
+  stated in every sample summary.
+
+```bash
+# (1) Predict plasmids with geNomad (v1.10+, aggregate mode)
+genomad aggregate --clean-up output_dir/ assembly.fasta genomad_db/
+
+# (2) Score all three layers; coverage is optional but recommended
+plasrisk meta assembly.fasta \
+  --genomad-bin output_dir/ \
+  --coverage jgi_depth.tsv \
+  --min-plasmid-score 0.7 \
+  -o plasrisk_meta/
+
+# Generic bin table instead of geNomad (works with SCAPP/MOB-suite output):
+plasrisk meta assembly.fasta --bins contig_to_plasmid.tsv \
+  --coverage depth.tsv -o plasrisk_meta/
+
+# Contig-only scoring without binning (each contig is a singleton element):
+plasrisk meta assembly.fasta -o plasrisk_meta/
+```
+
+The generic bins table is a TSV/CSV with `seq_id,bin_id` columns (optional
+`circular`/`topology` and `plasmid_score`). For SCAPP, one bin is one
+plasmid FASTA in `plasmid_fastas/`; build the table from the record headers
+and pass it with `--bins`. Coverage tables accept the
+jgi_summarize_bam_contig_depths format; use `--coverage-column` for
+multi-sample depth files.
+
+Outputs: `meta_contig_scores.tsv` (Layer 1), `meta_bin_scores.tsv`
+(Layer 2), and `meta_sample_summary.tsv` (Layer 3, plus JSON with
+`--json`).
+
+### Fragmentation recovery simulation
+
+Before applying PlasRisk to a new assembly type, quantify how fragmentation
+affects scores with a controlled grid on closed reference plasmids:
+
+```bash
+plasrisk-fragment-sim closed_plasmids.fasta \
+  --frag-lengths 500,1000,2000,5000,10000,20000 \
+  --replicates 10 -o fragment_sim/
+```
+
+For each fragment length it reports Spearman rank correlation of
+oracle-binned scores against intact-plasmid scores, grade exact/within-one
+agreement, median score bias, and critical-ARG recovery. This is the
+upper-bound (oracle binning) layer; pair it with ART/wgsim reads,
+metaSPAdes/MEGAHIT assembly and geNomad binning for the realistic layer.
+
+---
+
 ## Python API
 
 ```python
@@ -324,16 +405,16 @@ included:
 - **Quartile stratification**: Q1 (highest risk) plasmids had 65.6% ARG prevalence,
   12.2% high-risk ARG rate, 13.3% conjugative rate (vs. 0% in Q4).
 - **Data-driven weights**: RF-MDG, LASSO, and grid-search optimization across four
-  outcomes (high-risk ARG, MDR-VF fusion, conjugative capacity, BMRG carriage)
+  outcomes (high-risk ARG, ARG-VF fusion, conjugative capacity, BMRG carriage)
   converged on S_ARG (0.237), S_BMG (0.222), S_MOB (0.189), and S_SIZE (0.164)
   as dominant predictors.
 - **AUC validation**: Final weights achieved AUC 0.955 (high-risk ARG), 0.967
-  (MDR-VF fusion), 0.846 (conjugation), 0.910 (BMRG); mean 0.919.
+  (ARG-VF fusion), 0.846 (conjugation), 0.910 (BMRG); mean 0.919.
 - **Dimensionality analysis**: All-subsets evaluation (1,023 subsets, 5-fold CV)
-  showed that 5 core dimensions (ARG+BM+MOB+SIZE+VF) achieve equivalent mean AUC
+  showed that 5 core dimensions (ARG+BMG+MOB+SIZE+VF) achieve equivalent mean AUC
   to the full 10-dim model (0.919 vs. 0.919), provided as `--mode lite`.
   Overfitting diagnostics (train-test gap, bootstrap optimism, learning curves)
-  confirmed no excess optimism in either model.
+  confirmed no excess optimism in both models.
 - **Leave-one-replicon-out CV**: mean AUC = 0.962 across 40 replicons.
 - **Weight perturbation sensitivity** (100 iterations, +/-30%): mean Spearman
   rho = 0.994, mean top-10 overlap = 9.2/10.
@@ -342,6 +423,136 @@ included:
   coverage, were scored with labels derived only from abricate annotation;
   AUC 0.998 (95% CI 0.994-1.000).
 
+---
+
+## Uploading to conda (bioconda)
+
+To make PlasRisk installable via `conda install -c bioconda plasrisk`:
+
+### Step 1: Upload to PyPI
+
+```bash
+# Install build tools
+pip install build twine
+
+# Build distributions
+python -m build
+
+# Upload to PyPI
+twine upload dist/*
+```
+
+### Step 2: Fork and clone bioconda-recipes
+
+```bash
+git clone https://github.com/bioconda/bioconda-recipes.git
+cd bioconda-recipes
+```
+
+### Step 3: Create the recipe
+
+```bash
+# Create recipe directory
+mkdir -p recipes/plasrisk
+```
+
+Create `recipes/plasrisk/meta.yaml`:
+
+```yaml
+{% set version = "1.0.0" %}
+
+package:
+  name: plasrisk
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/p/plasrisk/plasrisk-{{ version }}.tar.gz
+  sha256: <SHA256 from PyPI>
+
+build:
+  number: 0
+  noarch: python
+  entry_points:
+    - plasrisk = plasrisk.cli:main
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv"
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools >=61.0
+    - wheel
+  run:
+    - python >=3.9
+    - pandas >=1.3
+    - numpy >=1.20
+    # abricate/blast optional; CLI falls back to --no-abricate mode
+
+test:
+  imports:
+    - plasrisk
+  commands:
+    - plasrisk --help
+    - plasrisk --version
+
+about:
+  home: https://github.com/LLQ95/PlasRisk
+  license: MIT
+  license_file: LICENSE
+  summary: "Ten-dimension data-driven weighted risk assessment for bacterial plasmids"
+```
+
+> **Note:** The complete, ready-to-submit recipe is in the `bioconda/` directory.
+> See `UPLOAD_GUIDE.md` for the full step-by-step release process.
+
+### Step 4: Test locally
+
+```bash
+# Install bioconda-utils
+conda install -c bioconda bioconda-utils
+
+# Test the recipe
+bioconda-utils build recipes/plasrisk --docker
+```
+
+### Step 5: Submit a pull request
+
+```bash
+git checkout -b plasrisk
+git add recipes/plasrisk/
+git commit -m "Add plasrisk recipe"
+git push origin plasrisk
+# Open PR at https://github.com/bioconda/bioconda-recipes
+```
+
+Once the PR is merged and CI passes, PlasRisk will be installable via:
+
+```bash
+conda install -c bioconda plasrisk
+```
+
+### Local conda build (without bioconda)
+
+```bash
+# Build from the conda/ directory in this repo
+conda build conda/
+
+# Install locally
+conda install --use-local plasrisk
+```
+
+---
+
+## Running tests
+
+```bash
+cd plasrisk_py
+python -m pytest tests/ -v
+# or
+python tests/test_scoring.py
+```
+
+---
 
 ## Citation
 
