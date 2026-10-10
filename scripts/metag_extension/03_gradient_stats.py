@@ -69,7 +69,7 @@ def main():
     infile, outdir = sys.argv[1], sys.argv[2]
     os.makedirs(outdir, exist_ok=True)
     df = pd.read_csv(infile, sep="\t")
-    df = df["habitat_group"].isin(ORDER)].copy()
+    df = df[df["habitat_group"].isin(ORDER)].copy()
     df["group_idx"] = df["habitat_group"].map(
         {g: i for i, g in enumerate(ORDER)})
     print("n samples by group:")
