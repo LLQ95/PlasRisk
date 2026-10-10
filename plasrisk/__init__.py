@@ -31,7 +31,7 @@ inputs.
 Reference: [to be updated upon publication]
 """
 
-__version__ = "1.6.0"
+__version__ = "1.6.1"
 __author__ = "PlasRisk Team"
 
 from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,

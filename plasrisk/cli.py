@@ -30,7 +30,7 @@ Options:
     --tsv                Write per-sequence TSV (default)
     --summary            Write per-file summary TSV
     -q, --quiet          Suppress progress messages
-    -h, --help           Show help message
+    -h, --help           Show this help message
     -v, --version        Show version
 """
 

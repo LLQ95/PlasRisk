@@ -1,186 +1,178 @@
-"""Tests for the raw-assembly prediction/extraction front end."""
+"""Tests for the raw-assembly prediction front end (plasrisk.extract)."""
 
 import os
-import sys
-import tempfile
 
 import pytest
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from plasrisk.extract import (
     ClassifiedContig,
     combine_classifications,
     decide_route,
-    parse_generic_table,
     parse_genomad_summary,
+    parse_generic_table,
     parse_plasflow_table,
     process_one,
 )
 
 
 def _write(path, text):
-    with open(path, "w", encoding="utf-8") as fh:
+    with open(path, "w", newline="\n") as fh:
         fh.write(text)
 
 
-PLASFLOW_TSV = (
-    "contig_name\tcontig_length\tlabel\tplasmid\tchromosome\tunclassified\n"
-    "NODE_1\t700000\tchromosome\t0.05\t0.94\t0.01\n"
-    "NODE_2\t55000\tplasmid\t0.91\t0.08\t0.01\n"
-)
-
-GENOMAD_TSV = (
-    "seq_name\tlength\tplasmid_score\tchromosome_score\ttopology\n"
-    "c1\t700000\t0.04\t0.95\tLinear\n"
-    "c2\t55000\t0.92\t0.07\tCircular\n"
-)
+def _fasta(path, records):
+    lines = []
+    for sid, seq in records.items():
+        lines.append(">%s" % sid)
+        lines.append(seq)
+    _write(path, "\n".join(lines) + "\n")
 
 
-def test_parse_plasflow_table():
-    with tempfile.TemporaryDirectory() as d:
-        p = os.path.join(d, "pf.tsv")
-        _write(p, PLASFLOW_TSV)
-        rows = parse_plasflow_table(p)
-        assert len(rows) == 2
-        by_id = {r.seq_id: r for r in rows}
-        assert by_id["NODE_1"].label == "chromosome"
-        assert by_id["NODE_2"].label == "plasmid"
-        assert by_id["NODE_2"].plasmid_prob == pytest.approx(0.91)
+# ---------------------------------------------------------------------------
+# Parser tests
+# ---------------------------------------------------------------------------
+
+def test_parse_plasflow_table(tmp_path):
+    tsv = tmp_path / "pf.tsv"
+    _write(tsv, "contig_id\tcontig_name\tcontig_length\tid\tlabel\t"
+                "unclassified\tchromosome\tplasmid\n"
+                "1\tchrA\t5000000\t0\tchromosome\t0.01\t0.98\t0.01\n"
+                "2\tplasB\t45000\t1\tplasmid\t0.02\t0.05\t0.93\n")
+    cc = parse_plasflow_table(str(tsv))
+    assert len(cc) == 2
+    assert cc[0].seq_id == "chrA"
+    assert cc[0].label == "chromosome"
+    assert cc[1].label == "plasmid"
+    assert cc[1].plasmid_prob == pytest.approx(0.93)
+    assert cc[1].length_bp == 45000
+    assert cc[1].source == "plasflow"
 
 
-def test_parse_genomad_summary_file():
-    with tempfile.TemporaryDirectory() as d:
-        p = os.path.join(d, "asm_plasmid_summary.tsv")
-        _write(p, GENOMAD_TSV)
-        rows = parse_genomad_summary(p)
-        by_id = {r.seq_id: r for r in rows}
-        assert by_id["c2"].label == "plasmid"
-        assert by_id["c2"].circular is True
+def test_parse_genomad_summary(tmp_path):
+    tsv = tmp_path / "s_plasmid_summary.tsv"
+    _write(tsv, "seq_name\tlength\ttopology\tn_genes\tplasmid_score\t"
+                "chromosome_score\n"
+                "ctg1\t48000\tCircular\t40\t0.92\t0.05\n"
+                "ctg2\t3000000\t-\t3000\t0.02\t0.97\n")
+    cc = parse_genomad_summary(str(tmp_path))
+    labels = {c.seq_id: c for c in cc}
+    assert labels["ctg1"].label == "plasmid"
+    assert labels["ctg1"].circular is True
+    assert labels["ctg2"].label == "chromosome"
 
 
-def test_parse_genomad_summary_directory():
-    with tempfile.TemporaryDirectory() as d:
-        sub = os.path.join(d, "asm")
-        os.makedirs(sub)
-        _write(os.path.join(sub, "x_plasmid_summary.tsv"), GENOMAD_TSV)
-        rows = parse_genomad_summary(d)
-        assert len(rows) == 2
+def test_parse_generic_table(tmp_path):
+    tsv = tmp_path / "g.tsv"
+    _write(tsv, "seq_id\tlength\tlabel\tplasmid_score\n"
+                "a\t20000\tplasmid\t0.8\n"
+                "b\t900000\tchromosome\t0.1\n")
+    cc = parse_generic_table(str(tsv))
+    assert cc[0].label == "plasmid"
+    assert cc[1].label == "chromosome"
+    assert cc[1].length_bp == 900000
 
 
-def test_parse_generic_table():
-    text = ("seq_id\tlength\tlabel\tplasmid_score\n"
-            "a\t100\tunclassified\t0.1\n"
-            "b\t40000\tplasmid\t0.88\n")
-    with tempfile.TemporaryDirectory() as d:
-        p = os.path.join(d, "g.tsv")
-        _write(p, text)
-        rows = parse_generic_table(p)
-        by_id = {r.seq_id: r for r in rows}
-        assert by_id["b"].label == "plasmid"
-        assert by_id["b"].length_bp == 40000
+# ---------------------------------------------------------------------------
+# Combine and routing
+# ---------------------------------------------------------------------------
 
-
-def test_combine_majority_agreement():
-    a = [ClassifiedContig("x", 50000, "plasmid", 0.9),
-         ClassifiedContig("y", 700000, "chromosome", 0.05)]
-    b = [ClassifiedContig("x", 50000, "plasmid", 0.8),
-         ClassifiedContig("y", 700000, "chromosome", 0.06)]
-    out = {c.seq_id: c for c in combine_classifications([a, b], "majority")}
-    assert out["x"].label == "plasmid"
-    assert out["y"].label == "chromosome"
-
-
-def test_combine_majority_disagreement_is_unclassified():
-    a = [ClassifiedContig("x", 50000, "plasmid", 0.9)]
-    b = [ClassifiedContig("x", 50000, "chromosome", 0.2)]
-    out = combine_classifications([a, b], "majority")
-    assert out[0].label == "unclassified"
-
-
-def test_combine_any_high_recall():
-    a = [ClassifiedContig("x", 50000, "unclassified", 0.4)]
-    b = [ClassifiedContig("x", 50000, "plasmid", 0.6)]
-    out = combine_classifications([a, b], "any")
-    assert out[0].label == "plasmid"
+def test_combine_majority_and_any():
+    g1 = [ClassifiedContig("x", 1000, "plasmid", 0.9),
+          ClassifiedContig("y", 1000, "plasmid", 0.9)]
+    g2 = [ClassifiedContig("x", 1000, "chromosome", 0.1),
+          ClassifiedContig("y", 1000, "plasmid", 0.8)]
+    g3 = [ClassifiedContig("x", 1000, "chromosome", 0.1)]
+    maj = {c.seq_id: c for c in combine_classifications([g1, g2, g3])}
+    assert maj["x"].label == "chromosome"   # 2 of 3
+    assert maj["y"].label == "plasmid"
+    anyv = {c.seq_id: c for c in combine_classifications([g1, g2, g3],
+                                                         vote="any")}
+    assert anyv["x"].label == "plasmid"
 
 
 def test_decide_route():
-    circular = [ClassifiedContig("p", 55000, "plasmid", circular=True)]
+    circular = [ClassifiedContig("p", 60000, "plasmid", 0.9,
+                                 circular=True)]
+    fragments = [ClassifiedContig("f%d" % i, 1500, "plasmid", 0.6)
+                 for i in range(6)]
     assert decide_route(circular) == "isolate"
-    frags = [ClassifiedContig("f%d" % i, 1500, "plasmid")
-             for i in range(5)]
-    assert decide_route(frags) == "meta"
+    assert decide_route(fragments) == "meta"
 
 
-def _fasta(chrom_len, plasmid_specs):
-    parts = [">chrom\n" + "A" * chrom_len]
-    for name, length, circular in plasmid_specs:
-        tag = " circular=true" if circular else ""
-        parts.append(">%s%s\n" % (name, tag) + "C" * length)
-    return "\n".join(parts)
+# ---------------------------------------------------------------------------
+# End-to-end process_one
+# ---------------------------------------------------------------------------
+
+def _generic_table(path, rows):
+    out = ["seq_id\tlength\tlabel\tplasmid_score"]
+    for sid, length, label, prob in rows:
+        out.append("%s\t%d\t%s\t%s" % (sid, length, label, prob))
+    _write(path, "\n".join(out) + "\n")
 
 
-def _generic_table_for(specs):
-    lines = ["seq_id\tlength\tlabel\tplasmid_score"]
-    lines.append("chrom\t%d\tchromosome\t0.02" % specs["chrom"])
-    for name, length, label, score in specs["rows"]:
-        lines.append("%s\t%d\t%s\t%s" % (name, length, label, score))
-    return "\n".join("\n".join(lines).splitlines()) + "\n"
+def test_chromosome_only_unscorable(tmp_path):
+    fasta = tmp_path / "asm.fasta"
+    _fasta(fasta, {"chr1": "C" * 600_000})
+    table = tmp_path / "cls.tsv"
+    _generic_table(str(table), [("chr1", 600_000, "chromosome", 0.05)])
+    res = process_one(str(fasta), str(tmp_path / "out"),
+                      generic_table=str(table), use_abricate=False)
+    assert res.status == "unscorable"
+    assert "chromosomal sequence only" in res.reason
+    assert os.path.exists(res.output_files["unscorable"])
+    assert os.path.exists(res.output_files["manifest"])
 
 
-def test_process_chromosome_only_is_unscorable():
-    with tempfile.TemporaryDirectory() as d:
-        fasta = os.path.join(d, "asm.fasta")
-        table = os.path.join(d, "cls.tsv")
-        _write(fasta, _fasta(700000, []))
-        _write(table, _generic_table_for({
-            "chrom": 700000,
-            "rows": [("chrom", 700000, "chromosome", "0.02")]}))
-        res = process_one(fasta, d, generic_table=table, use_abricate=False)
-        assert res.status == "unscorable"
-        assert "chromosomal sequence only" in res.reason
+def test_small_ambiguous_unscorable(tmp_path):
+    fasta = tmp_path / "tiny.fasta"
+    _fasta(fasta, {"c1": "A" * 800, "c2": "G" * 1200})
+    table = tmp_path / "cls.tsv"
+    _generic_table(str(table), [
+        ("c1", 800, "unclassified", 0.4),
+        ("c2", 1200, "unclassified", 0.45)])
+    res = process_one(str(fasta), str(tmp_path / "out"),
+                      generic_table=str(table), use_abricate=False)
+    assert res.status == "unscorable"
+    assert "too small or fragmented" in res.reason
 
 
-def test_process_small_ambiguous_is_unscorable():
-    with tempfile.TemporaryDirectory() as d:
-        fasta = os.path.join(d, "asm.fasta")
-        table = os.path.join(d, "cls.tsv")
-        _write(fasta, ">x\n" + "A" * 500)
-        _write(table, ("seq_id\tlength\tlabel\tplasmid_score\n"
-                       "x\t500\tunclassified\t0.3\n"))
-        res = process_one(fasta, d, generic_table=table, use_abricate=False)
-        assert res.status == "unscorable"
-        assert "too small or fragmented" in res.reason
+def test_longread_isolate_route(tmp_path):
+    fasta = tmp_path / "lr.fasta"
+    _fasta(fasta, {
+        "chr1": "C" * 1_000_000,
+        "plas1 circular=true": "A" * 60_000})
+    table = tmp_path / "cls.tsv"
+    _generic_table(str(table), [
+        ("chr1", 1_000_000, "chromosome", 0.05),
+        ("plas1 circular=true", 60_000, "plasmid", 0.95)])
+    out = tmp_path / "out"
+    res = process_one(str(fasta), str(out), generic_table=str(table),
+                      use_abricate=False)
+    assert res.status == "scored"
+    assert res.route == "isolate"
+    assert os.path.exists(res.plasmid_fasta)
+    # Only the plasmid sequence is carried into the extracted FASTA.
+    from plasrisk.annotate import parse_fasta
+    extracted = parse_fasta(res.plasmid_fasta)
+    assert list(extracted) == ["plas1"]
+    assert os.path.exists(res.output_files["isolate_scores"])
 
 
-def test_process_longread_circular_plasmid_scored_isolate():
-    with tempfile.TemporaryDirectory() as d:
-        fasta = os.path.join(d, "asm.fasta")
-        table = os.path.join(d, "cls.tsv")
-        _write(fasta, _fasta(1_000_000, [("plas", 55000, True)]))
-        _write(table, _generic_table_for({
-            "chrom": 1_000_000,
-            "rows": [("chrom", 1_000_000, "chromosome", "0.02"),
-                     ("plas", 55000, "plasmid", "0.9")]}))
-        res = process_one(fasta, d, generic_table=table, use_abricate=False)
-        assert res.status == "scored"
-        assert res.route == "isolate"
-        extracted = open(res.plasmid_fasta).read()
-        assert "chrom" not in extracted
-        assert "plas" in extracted
-
-
-def test_process_shortread_fragmented_plasmid_scored_meta():
-    with tempfile.TemporaryDirectory() as d:
-        fasta = os.path.join(d, "asm.fasta")
-        table = os.path.join(d, "cls.tsv")
-        specs = [("f%d" % i, 1500, "plasmid", "0.8") for i in range(5)]
-        _write(fasta, _fasta(700000,
-                             [("f%d" % i, 1500, False) for i in range(5)]))
-        _write(table, _generic_table_for({
-            "chrom": 700000,
-            "rows": [("chrom", 700000, "chromosome", "0.02")] + specs}))
-        res = process_one(fasta, d, generic_table=table, use_abricate=False)
-        assert res.status == "scored"
-        assert res.route == "meta"
+def test_shortread_meta_route(tmp_path):
+    fasta = tmp_path / "sr.fasta"
+    recs = {"chr1": "C" * 800_000}
+    rows = [("chr1", 800_000, "chromosome", 0.05)]
+    for i in range(5):
+        sid = "frag%d" % i
+        recs[sid] = "A" * 1500
+        rows.append((sid, 1500, "plasmid", 0.8))
+    _fasta(fasta, recs)
+    table = tmp_path / "cls.tsv"
+    _generic_table(str(table), rows)
+    out = tmp_path / "out"
+    res = process_one(str(fasta), str(out), generic_table=str(table),
+                      use_abricate=False)
+    assert res.status == "scored"
+    assert res.route == "meta"
+    assert os.path.exists(res.output_files["bin_scores"])
+    assert os.path.exists(res.output_files["sample_summary"])

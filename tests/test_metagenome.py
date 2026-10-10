@@ -14,6 +14,7 @@ from plasrisk.metagenome import (
     is_circular_header,
     load_bins_table,
     load_coverage_table,
+    load_genomad,
     mob_evidence_score,
     score_contig,
 )
@@ -185,3 +186,54 @@ def test_simulation_plumbing_no_abricate(tmp_path):
     # oracle bin of size-only fragments must recover the intact S_SIZE
     p60 = elem[elem["plasmid_id"] == "p60kb"]
     assert (p60["delta_bin"].abs().max()) < 0.02
+
+
+# --------------------------------------------------------------------------
+# geNomad output parsing
+# --------------------------------------------------------------------------
+
+def test_load_genomad_v112_summary(tmp_path):
+    # geNomad v1.12 end-to-end layout (one row per plasmid).
+    summ_dir = tmp_path / "asm_summary"
+    summ_dir.mkdir()
+    (summ_dir / "asm_plasmid_summary.tsv").write_text(
+        "seq_name\tlength\ttopology\tplasmid_score\n"
+        "node_1\t45000\tCircular\t0.98\n"
+        "node_2\t6000\tLinear\t0.72\n",
+        encoding="utf-8")
+    bins = load_genomad(str(tmp_path))
+    assert set(bins["bin_id"]) == {"node_1", "node_2"}
+    n1 = bins[bins["bin_id"] == "node_1"].iloc[0]
+    assert bool(n1["circular"]) and n1["plasmid_score"] == pytest.approx(0.98)
+    n2 = bins[bins["bin_id"] == "node_2"].iloc[0]
+    assert not bool(n2["circular"]) and n2["plasmid_score"] == pytest.approx(0.72)
+
+
+def test_load_genomad_aggregated_fallback(tmp_path):
+    agg_dir = tmp_path / "asm_aggregated_classification"
+    agg_dir.mkdir()
+    (agg_dir / "asm_aggregated_classification.tsv").write_text(
+        "seq_name\tchromosome_score\tplasmid_score\tvirus_score\tplasmid\n"
+        "c1\t0.95\t0.03\t0.01\tFalse\n"
+        "p1\t0.05\t0.92\t0.02\tTrue\n",
+        encoding="utf-8")
+    bins = load_genomad(str(tmp_path))
+    assert set(bins["bin_id"]) == {"p1"}
+    assert bins.iloc[0]["plasmid_score"] == pytest.approx(0.92)
+
+
+def test_load_genomad_legacy_components(tmp_path):
+    (tmp_path / "asm_plasmid_components.tsv").write_text(
+        "seq_name\tcomponents\n"
+        "scaffold_1\ta,b;c\n",
+        encoding="utf-8")
+    bins = load_genomad(str(tmp_path))
+    assert set(bins["bin_id"]) == {"scaffold_1_component_1",
+                                  "scaffold_1_component_2"}
+    members = bins[bins["bin_id"] == "scaffold_1_component_1"]["seq_id"]
+    assert set(members) == {"a", "b"}
+
+
+def test_load_genomad_missing_raises(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        load_genomad(str(tmp_path))

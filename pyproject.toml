@@ -4,41 +4,57 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plasrisk"
-version = "1.6.0"
-description = "PlasRisk: plasmid risk assessment for One Health surveillance, with metagenomic and raw-assembly (WGS/long-read) front ends"
+version = "1.6.1"
+description = "PlasRisk: data-driven weighted risk assessment for bacterial plasmids from FASTA sequences (raw WGS/long-read/metagenomic assembly prediction front end, isolate and metagenomic modes; lite 5-dim FASTA-only core by default, full 10-dim model, and original PIPdb ordinal index)"
 readme = "README.md"
-requires-python = ">=3.8"
 license = {text = "MIT"}
+requires-python = ">=3.8"
 authors = [
     {name = "PlasRisk Team"},
 ]
+maintainers = [
+    {name = "PlasRisk Team"},
+]
 keywords = [
+    "bioinformatics",
     "plasmid",
     "antimicrobial resistance",
-    "virulence",
-    "one health",
+    "AMR",
     "risk assessment",
-    "metagenomics",
-    "bioinformatics",
+    "microbial genomics",
+    "One Health",
+    "biocide resistance",
+    "co-selection",
+    "horizontal gene transfer",
 ]
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
-    "Operating System :: OS Independent",
-    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Environment :: Console",
 ]
 dependencies = [
     "pandas>=1.3",
+    "numpy>=1.20",
 ]
 
 [project.optional-dependencies]
-abricate = []
-full = [
-    "numpy>=1.20",
-]
 dev = [
-    "pytest>=6.0",
+    "pytest>=7.0",
+    "pytest-cov",
+    "build",
+    "twine",
+]
+full = [
+    "biopython>=1.79",
 ]
 
 [project.scripts]
@@ -49,9 +65,16 @@ plasrisk-fragment-sim = "plasrisk.fragment_sim:main"
 Homepage = "https://github.com/LLQ95/PlasRisk"
 Repository = "https://github.com/LLQ95/PlasRisk"
 Issues = "https://github.com/LLQ95/PlasRisk/issues"
+Documentation = "https://github.com/LLQ95/PlasRisk#readme"
+Changelog = "https://github.com/LLQ95/PlasRisk/releases"
 
-[tool.setuptools]
-packages = ["plasrisk"]
+[tool.setuptools.packages.find]
+include = ["plasrisk*"]
 
 [tool.setuptools.package-data]
-plasrisk = ["data/*.tsv", "data/*.csv", "data/*.txt"]
+plasrisk = ["data/*.csv"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]

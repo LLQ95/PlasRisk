@@ -1,303 +1,654 @@
 # PlasRisk
 
-PlasRisk is a data-driven risk assessment framework for bacterial
-plasmids in One Health surveillance. It combines ten biologically
-meaningful dimensions into a single, interpretable score and ranks
-plasmids by their potential to carry and disseminate clinically relevant
-antibiotic resistance and virulence. PlasRisk was developed on 792,964
-plasmid segment clusters (PSCs) from the PIPdb resource and is
-distributed as a command-line tool and a Python package.
+**Data-driven weighted risk assessment for bacterial plasmids from FASTA sequences**
+**(three modes: 5-dimension FASTA-only lite core by default, 10-dimension full model, and the original PIPdb ordinal index)**
 
-![PlasRisk graphical abstract](graphical_abstract.png)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
 
-## Why PlasRisk
+![PlasRisk graphical abstract](docs/graphical_abstract.svg)
 
-Plasmids are the main vectors of horizontal gene transfer, but only a
-small subset pose an immediate public health risk. Existing databases
-provide either raw sequence archives or single-feature annotations that
-do not separate a transferable multidrug resistance plasmid from a
-cryptic fragment. PlasRisk integrates resistance, virulence, mobility,
-plasmid size, host range and geographic spread into one calibrated
-score, with frozen weights and a transparent A-E grading scheme. It can
-be run on a single plasmid FASTA, on fragmented metagenomic plasmid
-contigs and bins, or directly on a raw short-read/long-read assembly
-without an isolated plasmid sequence.
+PlasRisk computes a composite risk score for bacterial plasmids based on
+biologically motivated dimensions: antimicrobial resistance gene (ARG) burden,
+virulence factors (VFs), mobility/conjugation potential, host range, replicon
+type, plasmid size, biocide/metal resistance (BMRG), geographic spread, habitat
+breadth, and temporal growth rate. It accepts plasmid FASTA sequences and
+automatically annotates them using [abricate](https://github.com/tseemann/abricate).
 
-## Three scoring modes
+The default output is the FASTA-only lite core:
 
-PlasRisk offers three modes. The default lite core needs only a FASTA
-file and is fully reproducible without external databases. The full
-model adds five metadata-dependent dimensions. The original PIPdb
-8-item ordinal index is retained for direct comparison.
-
-The lite formula, with terms in descending weight order, is
-
+```
 S_lite = 0.253*S_ARG + 0.237*S_BMG + 0.201*S_MOB + 0.175*S_SIZE + 0.135*S_VF
-
-The full formula is
-
-S_full = 0.237*S_ARG + 0.222*S_BMG + 0.189*S_MOB + 0.164*S_SIZE + 0.126*S_VF + 0.030*S_HOST + 0.019*S_HAB + 0.005*S_GEO + 0.004*S_REP + 0.002*S_GROW
-
-The dimensions are:
-
-- S_ARG: critical antibiotic resistance genes, using the WHO AWaRe
-  categories (an optional 2025 AWaRe table is available).
-- S_BMG: biocide and metal resistance genes.
-- S_VF: virulence factors and virulence categories.
-- S_MOB: mobilisation potential, from relaxase, type IV coupling
-  protein, oriT, auxiliary transfer genes and insertion sequences.
-- S_SIZE: plasmid size through a monotonic sigmoid centred at 30 kb.
-- S_HOST: host range across genera.
-- S_HAB: number of distinct habitats (human, animal, environment).
-- S_GEO: geographic spread across countries.
-- S_REP: replicon prevalence.
-- S_GROW: annual growth rate of the cluster.
-
-## Installation
-
-Install from PyPI:
-
-```bash
-pip install plasrisk
 ```
 
-The lite core depends only on pandas. For sequence annotation, install
-abricate separately:
+The full 10-dimension model (`--mode full`) is:
 
-```bash
-conda install -c bioconda abricate
+```
+S_full = 0.237*S_ARG + 0.222*S_BMG + 0.189*S_MOB + 0.164*S_SIZE
+       + 0.126*S_VF + 0.030*S_HOST + 0.019*S_HAB + 0.005*S_GEO
+       + 0.004*S_REP + 0.002*S_GROW
+
+Weights derived by data-driven consensus (Random Forest MDG, LASSO, and
+grid-search optimization) on 792,964 PIPdb PSCs; sum ≈ 1.0.
 ```
 
-For the raw-assembly front end, install a plasmid classifier (either is
-sufficient); these are optional and are not bundled:
+The original PIPdb ordinal index (`--mode ordinal`) reproduces the published
+8-item formula (Zhu et al., 2025, Table 1):
 
-```bash
-# geNomad (recommended, maintained)
-pip install genomad
-# or PlasFlow
-conda install -c bioconda plasflow
+```
+CRI = clamp(Round((pathogenic_phylum + pathogenic_species + habitats
+      + ARGs + VFGs + 2*WHO_ARGs + ISs + growth_rate)/8 + 0.6), 1, 5)
 ```
 
-## Quick start
+Each item is binned to an ordinal value of 1–5; the index runs from 1
+(Minimal) to 5 (Very High), with a normalized value of (CRI−1)/4.
 
-Score one plasmid with the default lite core:
+Risk grades: **A** (Very High, S >= 0.60), **B** (High, >= 0.45),
+**C** (Moderate, >= 0.30), **D** (Low, >= 0.15), **E** (Minimal, < 0.15).
 
-```bash
-plasrisk plasmid.fasta
-```
+### AWaRe category table for S_ARG
 
-Score a folder of plasmids and write results to a directory:
-
-```bash
-plasrisk -o results /path/to/plasmids/
-```
-
-Run the full ten-dimension model:
-
-```bash
-plasrisk --mode full plasmid.fasta
-```
-
-Run the original PIPdb ordinal index:
-
-```bash
-plasrisk --mode ordinal plasmid.fasta
-```
-
-Use the WHO AWaRe 2025 table for S_ARG:
+S_ARG weights genes by the WHO AWaRe categories (Access, Watch, Reserve).
+The frozen component matrix used the legacy keyword mapping, which remains
+the default so published scores are exactly reproducible. The WHO AWaRe
+2025 table can be selected instead:
 
 ```bash
 plasrisk --aware-version 2025 plasmid.fasta
 ```
 
-Verify that the package sigmoid S_SIZE and the pipeline log-ratio S_SIZE
-rank the input sequences identically:
-
-```bash
-plasrisk --rank-concordance plasmid.fasta
+```python
+scorer = PlasRiskScorer(mode="lite", aware_version="2025")
 ```
 
-## Scoring a raw assembly without an isolated plasmid
+Under the 2025 mapping, biocide/metal genes contribute 0 to S_ARG because
+they are scored under S_BMG, and the separate 1.5x last-resort multiplier
+is not applied (Reserve already carries the highest weight). An audit of
+all 792,964 PSCs found that the 2025 mapping changes S_ARG by at least
+0.05 for 4.9% of PSCs and moves the high-risk-ARG AUC on the locked test
+from 0.9807 to 0.9789 (delta -0.0018); the frozen values are retained
+(see Method S14 and Table S56 in the Supplementary Materials).
 
-Most real FASTA files are short-read WGS, long-read, or multi-strain
-metagenomic assemblies that do not contain a separately isolated
-plasmid. The `plasrisk run` command predicts plasmid sequences first,
-extracts them, and then scores them. It works with PlasFlow or geNomad:
+---
+
+## Installation
+
+### Option 1: conda (recommended)
 
 ```bash
-# geNomad (provide its database)
-plasrisk run assembly.fasta --classifier genomad --genomad-db /path/to/genomad_db -o run_out
-
-# PlasFlow
-plasrisk run assembly.fasta --classifier plasflow -o run_out
+# Create a dedicated environment
+conda create -n plasrisk -c bioconda -c conda-forge plasrisk
+conda activate plasrisk
 ```
 
-You can pass several assemblies or a directory:
+This installs PlasRisk together with `abricate` and `blast` for full
+annotation capability.
+
+### Option 2: pip + manual abricate
 
 ```bash
-plasrisk run /path/to/assemblies/ --classifier genomad --genomad-db /path/to/genomad_db -o run_out
+pip install plasrisk
+
+# Install abricate separately for annotation
+conda install -c bioconda abricate
+# or on Debian/Ubuntu: apt-get install abricate
 ```
 
-If you have already run a classifier, supply its output table directly
-and skip classification:
+### Option 3: from source
 
 ```bash
-plasrisk run assembly.fasta --plasflow-table plasflow_predictions.tsv -o run_out
-plasrisk run assembly.fasta --genomad-table genome_plasmid_summary.tsv -o run_out
-plasrisk run assembly.fasta --generic-table labels.tsv -o run_out
+git clone https://github.com/LLQ95/PlasRisk.git
+cd plasrisk
+pip install .
+
+# Install annotation dependencies
+conda install -c bioconda abricate blast
 ```
 
-For each sample, PlasRisk writes a per-contig `extraction_manifest.tsv`,
-the extracted `predicted_plasmids.fasta`, and the score tables. Long or
-circular plasmid contigs are routed to the isolate scorer, while short
-fragmented contigs are routed to the metagenomic layers. A top-level
-`run_status.tsv` summarises every sample.
+### Set up abricate databases
 
-Assemblies with no detected plasmid are not forced into a score. They
-are reported as unscorable with a reason in `plasrisk_unscorable.tsv`.
-When the assembly is chromosome-only, identified from the classifier
-labels and the total or longest contig length, the result states that
-PlasRisk scores plasmids rather than chromosomes. Small or ambiguous
-assemblies are reported as too fragmented to classify, with a suggestion
-to lower the classifier threshold or change the classifier.
-
-## Metagenomic scoring
-
-The `plasrisk meta` command scores fragmented plasmid contigs,
-predicted plasmid bins and whole community samples in three layers:
+After installing abricate, download the databases you need:
 
 ```bash
-plasrisk meta plasmid_contigs.fasta -o meta_out
+# Download/update all default databases
+abricate-get_db --db card --force
+abricate-get_db --db vfdb --force
+abricate-get_db --db plasmidfinder --force
+abricate-get_db --db resfinder --force
+abricate-get_db --db ncbi --force
+
+# Verify
+abricate --list
 ```
 
-With predicted bins and coverage, for example from geNomad and the JGI
-coverage script:
+For BacMet (biocide/metal resistance) database, see:
+https://github.com/tseemann/abricate#making-your-own-database
+
+---
+
+## Quick start
 
 ```bash
-plasrisk meta plasmid_contigs.fasta \
-    --genomad-bin genomad_output \
-    --coverage coverage.jgi.tsv \
-    -o meta_out
+# Score a single plasmid
+plasrisk plasmid.fasta
+
+# Score multiple plasmids
+plasrisk *.fasta
+
+# Score all FASTA files in a directory
+plasrisk /path/to/plasmids/
+
+# Specify output directory
+plasrisk -o results *.fasta
+
+# Use specific abricate databases
+plasrisk --db card,vfdb,plasmidfinder,bacmet plasmid.fasta
+
+# Sequence-only mode (no abricate needed; scores based on length + replicon lookup)
+plasrisk --no-abricate contigs.fasta
+
+# JSON output
+plasrisk --json -o results plasmid.fasta
+
+# Full 10-dimension model with epidemiological context (default is lite)
+plasrisk --mode full *.fasta
+
+# Original PIPdb 8-item ordinal index (grades 1-5)
+plasrisk --mode ordinal *.fasta
+
+# Verify that the package S_SIZE transform and the discovery-pipeline
+# transform rank plasmids identically (writes rank_concordance.tsv)
+plasrisk --rank-concordance *.fasta
 ```
 
-Layer 1 reports per-contig component scores. S_ARG, S_BMG and S_VF are
-always counted. S_MOB is assessed only from observed transfer apparatus
-or insertion sequence evidence, and S_SIZE only for circularised
-headers or contigs at or above the complete-length threshold. Missing
-dimensions are reported rather than imputed, and the lite score is
-renormalised over the assessable dimensions as S_cargo3, S_frag4 and
-S_lite5. Layer 2 aggregates contigs into bins with unioned gene sets,
-summed lengths and OR-combined mobility markers, with complete,
-probable and fragmented confidence labels. Layer 3 reports descriptive,
-abundance-aware community statistics (CPRI). CPRI is a descriptive
-extension and is not trained or validated on metagenomic data.
+### Lite (default), Full and Ordinal modes
 
-## End-to-end workflow
+The default output is the 5-dimension FASTA-only lite core; no PIPdb-style
+metadata are required. The full 10-dimension model is available with
+`--mode full`, and the original PIPdb 8-item ordinal index with
+`--mode ordinal`.
 
-A complete workflow from a raw assembly to PlasRisk scores uses seqkit,
-a plasmid classifier and abricate. The individual steps are shown below;
-`plasrisk run` performs the equivalent routing automatically.
+| | Lite (default) | Full | Ordinal |
+|---|---|---|---|
+| Flag | `--mode lite` | `--mode full` | `--mode ordinal` |
+| Output scale | continuous 0–1, grades A–E | continuous 0–1, grades A–E | ordinal index 1–5 |
+| Components | S_ARG, S_BMG, S_MOB, S_SIZE, S_VF | lite 5 plus S_HOST, S_HAB, S_GEO, S_REP, S_GROW | pathogenic phylum/species, habitats, ARGs, VFGs, WHO ARGs (2×), ISs, growth rate |
+| Weights / bins | 0.253, 0.237, 0.201, 0.175, 0.135 | 0.237, 0.222, 0.189, 0.164, 0.126, 0.030, 0.019, 0.005, 0.004, 0.002 | published PIPdb ordinal bins, 1–5 per item |
+| Mean AUC (4 outcomes) | 0.919 | 0.919 | CRI AUC 0.81–0.83 (internal consistency) |
+| Grade agreement | 92.7% exact / 100% within one grade vs. full | reference | not applicable |
+| Required annotations | ARG + VF + mobility + length + BacMet | ARG + VF + mobility + replicon + BacMet + metadata | ARG + VF + WHO ARG + IS counts; unknown metadata default to bin 1 |
+| Use case | Rapid FASTA-only screening, resource-limited settings | Comprehensive risk assessment with epidemiological context | Reproducing the published PIPdb index for direct comparison |
 
-Short-read WGS or metagenomic reads are assembled first, for example
-with SPAdes or MEGAHIT, and short contigs are removed:
+### S_SIZE normalization and rank-concordance check
+
+The released package computes the length component with a monotonic sigmoid
+on log10 length, centered at 30 kb:
+
+```
+S_SIZE = 1 / (1 + exp(-4 * (log10(L) - log10(30,000))))
+```
+
+The discovery pipeline used the log-ratio `clip(log10(L)/log10(1,000,000), 0, 1)`
+for weight fitting. Both transforms are strictly increasing in L, so plasmid
+rankings are identical (Spearman rho = 1.000, Kendall tau = 1.000 over the
+792,964 PIPdb PSCs); only the absolute scaling differs. The equivalence can be
+reproduced on any input set with `plasrisk --rank-concordance` (writes
+`rank_concordance.tsv`) or via the Python API
+(`from plasrisk import size_rank_concordance`). See Supplementary Text S1.
+
+### Example output
+
+```
+  Grade A:     3 (  3.2%) ######
+  Grade B:    12 ( 12.9%) ##########################
+  Grade C:    28 ( 30.1%) ############################################################
+  Grade D:    35 ( 37.6%) ############################################################################
+  Grade E:    15 ( 16.1%) ################################
+
+  Top 10 highest-risk plasmids:
+    pNDM-1_260kb                            S=0.712  grade A  8 ARG  IncX3 [blaNDM]
+    pMCR-1_33kb                             S=0.581  grade B  4 ARG  IncX4 [mcr]
+    pKPC-2_110kb                            S=0.534  grade B  6 ARG  IncFII(K) [blaKPC]
+```
+
+### Output files
+
+| File | Description |
+|------|-------------|
+| `plasrisk_results.tsv` | Per-sequence scores: active components, S_total, S_norm, grade, gene lists |
+| `rank_concordance.tsv` | S_SIZE rank-concordance check (with `--rank-concordance`) |
+| `plasrisk_summary.tsv` | Per-file summary: counts, grade distribution, mean/max scores |
+| `plasrisk_results.json` | JSON format (with `--json`) |
+
+---
+
+## Raw-assembly front end (`plasrisk run`)
+
+Most FASTA files in practice are not ready-made plasmid collections. They are
+short-read whole-genome assemblies, long-read assemblies, or multi-strain
+metagenomic assemblies in which the plasmid sequences have to be predicted
+first. `plasrisk run` adds that step. It classifies the assembly with
+PlasFlow or geNomad, extracts the predicted plasmid contigs, and routes them
+to the right scorer. Long or circular plasmid contigs go to the isolate
+scorer; short fragmented contigs and plasmid bins go to the metagenomic
+three-layer. The frozen weights are never refit.
 
 ```bash
+# Short-read WGS / long-read / metagenomic assembly, one command.
+# Classifier tables can also be produced separately (recommended, because
+# PlasFlow runs on an older TensorFlow stack).
+plasrisk run assembly.fasta -o plasrisk_out \
+    --classifier plasflow --threshold 0.7
+
+# Pass a precomputed PlasFlow prediction TSV
+plasrisk run assembly.fasta -o plasrisk_out \
+    --plasflow-table plasflow_predictions.tsv
+
+# Pass a precomputed geNomad summary (file or output directory)
+plasrisk run assembly.fasta -o plasrisk_out \
+    --genomad-table genomad_out/assembly
+
+# Combine both classifiers (majority vote; use --vote any for high recall)
+plasrisk run assembly.fasta -o plasrisk_out \
+    --plasflow-table pf.tsv --genomad-table genomad_out
+
+# Fragmented inputs: provide bin and coverage tables for the meta route
+plasrisk run assembly.fasta -o plasrisk_out \
+    --plasflow-table pf.tsv --bins bins.tsv --coverage coverage.tsv
+```
+
+Assemblies that contain no predicted plasmid are not forced into a score.
+They are reported as unscorable with a reason. A chromosome-only assembly is
+recognised from the classifier labels together with total/longest contig
+length.
+
+```
+sample_id  status      route    n_plasmid  reason
+asmA       scored      isolate  2
+asmB       scored      meta     7
+asmC       unscorable           0          No plasmid sequence detected. The
+                                          input appears to contain chromosomal
+                                          sequence only (total length ... bp).
+```
+
+For every sample, `plasrisk run` writes a per-contig `extraction_manifest.tsv`,
+the extracted `predicted_plasmids.fasta`, and the routed score tables, plus a
+top-level `run_status.tsv`. Use `--no-abricate` for sequence/header-only
+scoring when abricate is not installed.
+
+### Full workflow with seqkit, PlasFlow and abricate
+
+```bash
+# 0. Clean and length-filter the raw assembly (PlasFlow expects >=1 kb)
 seqkit seq -m 1000 assembly.fasta > assembly.1k.fasta
+
+# 1. Predict plasmid/chromosome contigs with PlasFlow (run in its own env)
+PlasFlow.py --input assembly.1k.fasta \
+    --output plasflow_predictions.tsv --threshold 0.7
+
+# 2. Predict, extract and score in one step
+plasrisk run assembly.fasta -o plasrisk_out \
+    --plasflow-table plasflow_predictions.tsv
+
+# 3. (optional) Inspect what was classified as a plasmid
+abricate --db card plasrisk_out/*/predicted_plasmids.fasta
 ```
 
-Predict plasmids with geNomad:
+For long-read assemblies the same commands apply; complete circular plasmid
+reads are detected from the header and routed to the isolate scorer. For
+multi-strain metagenomic assemblies, assemble first (MEGAHIT or metaSPAdes),
+optionally bin plasmids with geNomad, and run `plasrisk run` with the bin and
+coverage tables, or use `plasrisk meta` directly.
+
+---
+
+## Metagenomic mode (`plasrisk meta`)
+
+PlasRisk extends to fragmented metagenomic assemblies with three aggregation
+layers. The frozen consensus weights are never refit; every output carries
+an explicit completeness/confidence label so that fragments are not scored
+as if they were closed plasmids.
+
+- **Layer 1, contig/element level.** S_ARG, S_BMG and S_VF are always
+  evaluated from observed genes. S_MOB is evaluated only from observed
+  transfer apparatus (MPF/T4CP, relaxase, oriT) or insertion-sequence
+  evidence; isolate-derived replicon/global priors are never injected when
+  the apparatus was simply not covered. S_SIZE is evaluated only for
+  circularised headers (`circular=true`) or contigs at/above
+  `--complete-length` (default 10,000 bp); fragment lengths are never
+  passed through S_SIZE, which would penalise megaplasmids that short-read
+  assembly split. Renormalised scores are reported as S_cargo3 (cargo
+  dimensions), S_frag4 (cargo + mobility) and S_lite5 (all five lite
+  dimensions); A-E grades are emitted only when all five dimensions are
+  assessable.
+- **Layer 2, plasmid-bin level.** Contigs assigned to the same predicted
+  plasmid (geNomad components, SCAPP plasmids, MOB-suite bins or any
+  generic contig-to-bin table) are aggregated: gene sets are unioned with
+  deduplication, lengths are summed, mobility markers are OR-combined, and
+  per-contig coverage is length-weighted. Bins are scored with the standard
+  lite model and labelled complete / probable / fragmented.
+- **Layer 3, sample/community level.** Descriptive abundance-aware
+  statistics: coverage-length weighted mean score (CPRI_mean), P90/P99,
+  grade prevalence, and coverage-weighted grade A/B and critical-ARG
+  loads (with optional per-Mb normalisation). CPRI is a descriptive
+  extension that was not trained or validated on metagenomic data; this is
+  stated in every sample summary.
 
 ```bash
-genomad classify -t 8 --cleanup assembly.1k.fasta genomad_out /path/to/genomad_db
+# (1) Predict plasmids with geNomad (v1.10+, aggregate mode)
+genomad aggregate --clean-up output_dir/ assembly.fasta genomad_db/
+
+# (2) Score all three layers; coverage is optional but recommended
+plasrisk meta assembly.fasta \
+  --genomad-bin output_dir/ \
+  --coverage jgi_depth.tsv \
+  --min-plasmid-score 0.7 \
+  -o plasrisk_meta/
+
+# Generic bin table instead of geNomad (works with SCAPP/MOB-suite output):
+plasrisk meta assembly.fasta --bins contig_to_plasmid.tsv \
+  --coverage depth.tsv -o plasrisk_meta/
+
+# Contig-only scoring without binning (each contig is a singleton element):
+plasrisk meta assembly.fasta -o plasrisk_meta/
 ```
 
-or with PlasFlow:
+The generic bins table is a TSV/CSV with `seq_id,bin_id` columns (optional
+`circular`/`topology` and `plasmid_score`). For SCAPP, one bin is one
+plasmid FASTA in `plasmid_fastas/`; build the table from the record headers
+and pass it with `--bins`. Coverage tables accept the
+jgi_summarize_bam_contig_depths format; use `--coverage-column` for
+multi-sample depth files.
+
+Outputs: `meta_contig_scores.tsv` (Layer 1), `meta_bin_scores.tsv`
+(Layer 2), and `meta_sample_summary.tsv` (Layer 3, plus JSON with
+`--json`).
+
+### Fragmentation recovery simulation
+
+Before applying PlasRisk to a new assembly type, quantify how fragmentation
+affects scores with a controlled grid on closed reference plasmids:
 
 ```bash
-PlasFlow.py --input assembly.1k.fasta --output plasflow_out --threshold 0.7
+plasrisk-fragment-sim closed_plasmids.fasta \
+  --frag-lengths 500,1000,2000,5000,10000,20000 \
+  --replicates 10 -o fragment_sim/
 ```
 
-Then run PlasRisk, which extracts the predicted plasmid contigs and
-routes them by completeness:
+For each fragment length it reports Spearman rank correlation of
+oracle-binned scores against intact-plasmid scores, grade exact/within-one
+agreement, median score bias, and critical-ARG recovery. This is the
+upper-bound (oracle binning) layer; pair it with ART/wgsim reads,
+metaSPAdes/MEGAHIT assembly and geNomad binning for the realistic layer.
 
-```bash
-plasrisk run assembly.fasta --classifier genomad --genomad-db /path/to/genomad_db -o run_out
-```
-
-For long-read assemblies, circular plasmid contigs are detected from
-the assembly headers and topology fields and are routed directly to the
-isolate scorer:
-
-```bash
-plasrisk run longread_assembly.fasta --classifier genomad --genomad-db /path/to/genomad_db -o run_out
-```
-
-## Fragmentation recovery
-
-To quantify how scores recover after assembly fragmentation, PlasRisk
-ships a controlled fragmentation grid:
-
-```bash
-plasrisk-fragment-sim --input intact_plasmids.fasta --out frag_out
-```
-
-It fragments intact plasmids across a grid of fragment lengths and
-reports Spearman correlation, grade exact and within-one agreement,
-median bias and critical-ARG recovery.
+---
 
 ## Python API
 
 ```python
-from plasrisk import annotate_fasta, get_scorer
+from plasrisk import PlasRiskScorer, PlasmidFeatures, annotate_fasta, load_replicon_lookup
 
-ann = annotate_fasta("plasmid.fasta")
-scorer = get_scorer(model="plasrisk", mode="lite")
-df = scorer.score_dataframe(ann.features)
-print(df[["seq_id", "S_norm", "grade"]])
+# Option A: annotate a FASTA file directly (default = 5-dim FASTA-only lite)
+lookup = load_replicon_lookup()
+result = annotate_fasta("plasmid.fasta", lookup=lookup)
+scorer = PlasRiskScorer(replicon_lookup=lookup)  # lite by default
+df = scorer.score_dataframe(result.features)
+print(df[["seq_id", "S_norm", "grade", "high_risk_genes"]])
+
+# Full 10-dimension model with epidemiological context
+scorer_full = PlasRiskScorer(replicon_lookup=lookup, mode="full")
+df_full = scorer_full.score_dataframe(result.features)
+
+# Original PIPdb 8-item ordinal index (three ways to obtain it)
+from plasrisk import PIPdbScorer, get_scorer
+scorer_ord = PIPdbScorer()                       # direct class
+scorer_ord = get_scorer("pipdb")                 # factory, model name
+scorer_ord = get_scorer("plasrisk", mode="ordinal")  # factory, mode
+df_ord = scorer_ord.score_dataframe(result.features)
+
+# S_SIZE rank-concordance check (package sigmoid vs pipeline log-ratio)
+from plasrisk import size_rank_concordance
+print(size_rank_concordance([f.length_bp for f in result.features]))
+
+# Option B: construct features manually
+feat = PlasmidFeatures(
+    seq_id="pExample",
+    length_bp=85000,
+    arg_names=["NDM-1", "CTX-M-15", "TEM-1"],
+    vf_names=["aerobactin"],
+    vf_categories=["Nutritional/Metabolic factor"],
+    bm_gene_names=["merA", "qacEdelta1"],
+    replicon="IncX3",
+    has_t4cp=True,
+    has_relaxase=True,
+    has_oriT=True,
+    has_auxiliary=True,
+)
+scores = scorer.score(feat)
+print(f"S_norm = {scores['S_norm']:.3f}, grade = {scores['grade']}")
 ```
 
-Use the full model, the ordinal index, or the 2025 AWaRe table:
+---
 
-```python
-scorer = get_scorer(model="plasrisk", mode="full")
-scorer = get_scorer(model="plasrisk", mode="ordinal")
-scorer = get_scorer(model="plasrisk", mode="lite", aware_version="2025")
+## The 10 risk dimensions
+
+| Component | Weight | What it measures | Scoring basis |
+|-----------|--------|------------------|---------------|
+| **S_ARG** | 0.237 | ARG count, WHO-priority genes, high-risk genes (mcr, NDM, KPC, CTX-M, tetX, etc.) | Base + per-gene + high-risk bonuses |
+| **S_BMG** | 0.222 | Biocide/metal resistance (mer, qac, ars/cop/sil), co-selection potential | Base + per-gene + family bonuses |
+| **S_MOB** | 0.189 | T4CP, relaxase, oriT, auxiliary transfer proteins | Element-based additive score |
+| **S_SIZE** | 0.164 | Plasmid length (cargo capacity) | Sigmoid: midpoint 30 kb |
+| **S_VF** | 0.126 | VF count, exotoxins, secretion systems (T3SS/T4SS) | Base + per-gene + category bonuses |
+| **S_HOST** | 0.030 | Number of host genera / replicon prior | Empirical host range or lookup |
+| **S_HAB** | 0.019 | Habitat breadth (human/animal/environment) | PIPdb-derived lookup |
+| **S_GEO** | 0.005 | Number of countries observed | PIPdb-derived lookup |
+| **S_REP** | 0.004 | Replicon backbone risk (IncX3, IncN, ColKP3 high; ColpVC low) | PIPdb-derived lookup table |
+| **S_GROW** | 0.002 | Annual growth rate of the replicon | PIPdb-derived lookup |
+
+---
+
+## Command-line options
+
+```
+plasrisk [options] <fasta1> [fasta2 ...]
+
+positional arguments:
+  FASTA                 FASTA file(s) or directory
+
+options:
+  -o, --output DIR      Output directory (default: ./plasrisk_output)
+  -t, --threads N       Number of abricate threads (default: 4)
+  --min-id FLOAT        Minimum abricate identity % (default: 75)
+  --min-cov FLOAT       Minimum abricate coverage % (default: 50)
+  --no-abricate         Skip abricate; sequence-only scoring
+  --mode {lite,full,ordinal}
+                        Scoring mode: lite (5-dim FASTA-only core, default),
+                        full (10-dim weighted), or ordinal (PIPdb 8-item index)
+  --model {plasrisk,pipdb}
+                        Deprecated alias; pipdb is equivalent to --mode ordinal
+  --rank-concordance    Verify S_SIZE rank concordance (sigmoid vs log-ratio)
+  --db LIST             Comma-separated abricate databases (default: auto)
+  --json                Also write JSON output
+  -q, --quiet           Suppress progress messages
+  -v, --version         Show version
+  -h, --help            Show help
 ```
 
-Score a raw assembly or metagenomic contigs programmatically:
+---
 
-```python
-from plasrisk import process_one, score_contigs, aggregate_bins, aggregate_sample
+## Model validation
 
-result = process_one("assembly.fasta", outdir="run_one",
-                     classifier="genomad", genomad_db="/path/to/genomad_db")
-print(result.status, result.reason)
+The PlasRisk model was developed and validated using 792,964 plasmid sequence
+clusters from PIPdb (Zhu et al., *Nucleic Acids Res.*, 2025). Validation
+included:
+
+- **Quartile stratification**: Q1 (highest risk) plasmids had 65.6% ARG prevalence,
+  12.2% high-risk ARG rate, 13.3% conjugative rate (vs. 0% in Q4).
+- **Data-driven weights**: RF-MDG, LASSO, and grid-search optimization across four
+  outcomes (high-risk ARG, MDR-VF fusion, conjugative capacity, BMRG carriage)
+  converged on S_ARG (0.237), S_BMG (0.222), S_MOB (0.189), and S_SIZE (0.164)
+  as dominant predictors.
+- **AUC validation**: Final weights achieved AUC 0.955 (high-risk ARG), 0.967
+  (MDR-VF fusion), 0.846 (conjugation), 0.910 (BMRG); mean 0.919.
+- **Dimensionality analysis**: All-subsets evaluation (1,023 subsets, 5-fold CV)
+  showed that 5 core dimensions (ARG+BM+MOB+SIZE+VF) achieve equivalent mean AUC
+  to the full 10-dim model (0.919 vs. 0.919), provided as `--mode lite`.
+  Overfitting diagnostics (train-test gap, bootstrap optimism, learning curves)
+  confirmed no excess optimism in either model.
+- **Leave-one-replicon-out CV**: mean AUC = 0.962 across 40 replicons.
+- **Weight perturbation sensitivity** (100 iterations, +/-30%): mean Spearman
+  rho = 0.994, mean top-10 overlap = 9.2/10.
+- **External case-control challenge**: 367 independent plasmids (167 carrying
+  critical ARGs and 200 without ARG/VF), deduplicated at 95% ANI over 80%
+  coverage, were scored with labels derived only from abricate annotation;
+  AUC 0.998 (95% CI 0.994-1.000).
+
+---
+
+## Uploading to conda (bioconda)
+
+To make PlasRisk installable via `conda install -c bioconda plasrisk`:
+
+### Step 1: Upload to PyPI
+
+```bash
+# Install build tools
+pip install build twine
+
+# Build distributions
+python -m build
+
+# Upload to PyPI
+twine upload dist/*
 ```
 
-## Output
+### Step 2: Fork and clone bioconda-recipes
 
-The default command writes a per-sequence TSV with each component
-score, the normalised total score, the rank and the A-E grade, together
-with a per-file summary. Grades use prespecified thresholds: grade A,
-S at or above 0.60; grade B, 0.45 to 0.60; grade C, 0.30 to 0.45;
-grade D, 0.15 to 0.30; and grade E below 0.15. The thresholds are
-priority categories rather than equal-width bins and are evaluated in
-the Supplementary Materials against fixed-width, quantile and normal
-binning schemes.
+```bash
+git clone https://github.com/bioconda/bioconda-recipes.git
+cd bioconda-recipes
+```
 
-## Reproducible data
+### Step 3: Create the recipe
 
-The locked data split, frozen weight vectors, frozen predictions and the
-792,964 by ten component matrix are released under
-[data/locked_v1.1.1](data/locked_v1.1.1), with SHA256 checksums. The WHO
-AWaRe 2025 source table and derived mapping are under
-[supplementary_data/aware2025](supplementary_data/aware2025).
+```bash
+# Create recipe directory
+mkdir -p recipes/plasrisk
+```
+
+Create `recipes/plasrisk/meta.yaml`:
+
+```yaml
+{% set version = "1.0.0" %}
+
+package:
+  name: plasrisk
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/p/plasrisk/plasrisk-{{ version }}.tar.gz
+  sha256: <SHA256 from PyPI>
+
+build:
+  number: 0
+  noarch: python
+  entry_points:
+    - plasrisk = plasrisk.cli:main
+  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv"
+
+requirements:
+  host:
+    - python >=3.9
+    - pip
+    - setuptools >=61.0
+    - wheel
+  run:
+    - python >=3.9
+    - pandas >=1.3
+    - numpy >=1.20
+    # abricate/blast optional; CLI falls back to --no-abricate mode
+
+test:
+  imports:
+    - plasrisk
+  commands:
+    - plasrisk --help
+    - plasrisk --version
+
+about:
+  home: https://github.com/LLQ95/PlasRisk
+  license: MIT
+  license_file: LICENSE
+  summary: "Ten-dimension data-driven weighted risk assessment for bacterial plasmids"
+```
+
+> **Note:** The complete, ready-to-submit recipe is in the `bioconda/` directory.
+> See `UPLOAD_GUIDE.md` for the full step-by-step release process.
+
+### Step 4: Test locally
+
+```bash
+# Install bioconda-utils
+conda install -c bioconda bioconda-utils
+
+# Test the recipe
+bioconda-utils build recipes/plasrisk --docker
+```
+
+### Step 5: Submit a pull request
+
+```bash
+git checkout -b plasrisk
+git add recipes/plasrisk/
+git commit -m "Add plasrisk recipe"
+git push origin plasrisk
+# Open PR at https://github.com/bioconda/bioconda-recipes
+```
+
+Once the PR is merged and CI passes, PlasRisk will be installable via:
+
+```bash
+conda install -c bioconda plasrisk
+```
+
+### Local conda build (without bioconda)
+
+```bash
+# Build from the conda/ directory in this repo
+conda build conda/
+
+# Install locally
+conda install --use-local plasrisk
+```
+
+---
+
+## Running tests
+
+```bash
+cd plasrisk_py
+python -m pytest tests/ -v
+# or
+python tests/test_scoring.py
+```
+
+---
 
 ## Citation
 
-Please cite PlasRisk and the PIPdb resource. The manuscript citation
-will be added on publication.
+If you use PlasRisk, please cite:
+
+> [Authors]. PlasRisk: a ten-dimension weighted risk assessment framework for
+> bacterial plasmids. *Journal*, 2025. doi: [to be added]
+
+The model is based on data from:
+> Zhu Q, Chen Q, Lu X, et al. PIPdb: a comprehensive plasmid sequence resource
+> for tracking the horizontal transfer of pathogenic factors and antimicrobial
+> resistance genes. *Nucleic Acids Research*, 2025, 53(D1):D169-D178.
+> doi:10.1093/nar/gkae952
+
+---
 
 ## License
 
-PlasRisk is released under the MIT license.
+MIT License - see [LICENSE](LICENSE) for details.

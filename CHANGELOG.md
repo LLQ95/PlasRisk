@@ -2,6 +2,18 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.6.1] - 2026-10-10
+
+### Fixed
+- `load_genomad` no longer requires a `*_plasmid_components.tsv`, which
+  geNomad v1.12 end-to-end does not produce. It now reads
+  `*_plasmid_summary.tsv` (one row per plasmid, with topology and
+  plasmid_score), falls back to `*_aggregated_classification.tsv` filtered
+  to the plasmid class, and still supports the legacy components layout.
+- The pilot grid and public metagenomic benchmark reuse a completed
+  geNomad run by checking for `*_plasmid_summary.tsv`, so reruns do not
+  recompute plasmid prediction or fail on existing output.
+
 ## [1.6.0] - 2026-09-23
 
 ### Added

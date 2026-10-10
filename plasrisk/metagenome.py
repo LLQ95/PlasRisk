@@ -1,668 +1,1007 @@
-#!/usr/bin/env python3
 """
-metagenome.py - Metagenomic extension for PlasRisk.
+metagenome.py - Metagenomic extension of PlasRisk (three aggregation layers).
 
-Three-layer scoring for fragmented plasmid data:
-  Layer 1 (contig): score individual plasmid contigs on the dimensions
-      that remain identifiable after fragmentation.
-  Layer 2 (bin):    aggregate contigs into predicted plasmid bins.
-  Layer 3 (sample): descriptive, abundance-aware community statistics.
+Layer 1  contig / element level
+    Fragmented plasmid contigs from a metagenomic assembly are scored on the
+    dimensions that remain identifiable after fragmentation. S_SIZE is not
+    evaluated from a fragment length (it would systematically penalise
+    megaplasmids that the assembler split), and isolate-derived mobility
+    priors are never injected when the transfer apparatus was simply not
+    covered. Scores are renormalised over the assessable dimensions:
 
-The frozen consensus weights are never refit on metagenomic data. When a
-dimension cannot be assessed from a fragment, it is reported as missing
-(None) rather than imputed from isolate-derived priors, and the lite score
-is renormalised over the assessable dimensions.
+        S_cargo3  = w_ARG, w_BMG, w_VF           (always assessable)
+        S_frag4   = cargo3 + S_MOB               (mobility evidence present)
+        S_lite5   = frag4  + S_SIZE              (circular / near-complete)
 
-CLI:
-    plasrisk meta <inputs> -o <outdir>
+Layer 2  plasmid bin level
+    Contigs assigned to the same predicted plasmid (geNomad components,
+    SCAPP plasmids, MOB-suite bins, ...) are aggregated: gene sets are
+    unioned (deduplicated), lengths are summed and mobility markers are
+    OR-combined. Bins are then scored with the standard lite model, so bin
+    scores are on the same scale as isolate plasmid scores. A confidence
+    label (complete / probable / fragmented) is always carried.
+
+Layer 3  sample / community level
+    Descriptive, abundance-aware summary statistics per sample:
+    coverage-length weighted mean score (CPRI_mean), P90/P99, grade
+    prevalence, and coverage-weighted risk loads (grade A/B load,
+    critical-ARG load). These indices were not trained or validated in the
+    isolate-derived study and must be reported as an extension, not as
+    validated predictions.
+
+The frozen consensus weights are never refit.
 """
 
 from __future__ import annotations
 
-import argparse
-import glob
-import json
 import math
 import os
+import re
 import sys
-from typing import Dict, List, Optional, Sequence
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
-from .annotate import annotate_fasta
+from .annotate import AnnotationResult, annotate_fasta, parse_fasta
 from .scoring import (
-    PlasmidFeatures,
+    GLOBAL_MEDIANS,
+    LITE_DIMENSIONS,
     PlasRiskScorer,
-    RISK_WEIGHTS,
+    PlasmidFeatures,
+    RISK_GRADES,
     RISK_WEIGHTS_LITE,
 )
 
-# Dimensions that can be counted directly from a fragment regardless of
-# completeness.
+# Lite dimensions that can be observed directly from sequence evidence
 CARGO_DIMS = ("S_ARG", "S_BMG", "S_VF")
-
-CIRCULAR_PATTERN = ("circular=true", "circular=True", "circular",
-                    "type=plasmid", "closed")
-
-# Frozen lite weights (descending), used for renormalisation over the
-# assessable dimensions.
-LITE_W: Dict[str, float] = {
-    "S_ARG": RISK_WEIGHTS_LITE["S_ARG"],
-    "S_BMG": RISK_WEIGHTS_LITE["S_BMG"],
-    "S_MOB": RISK_WEIGHTS_LITE["S_MOB"],
-    "S_SIZE": RISK_WEIGHTS_LITE["S_SIZE"],
-    "S_VF": RISK_WEIGHTS_LITE["S_VF"],
-}
-
-FULL_W: Dict[str, float] = {
-    "S_ARG": RISK_WEIGHTS["S_ARG"],
-    "S_BMG": RISK_WEIGHTS["S_BMG"],
-    "S_MOB": RISK_WEIGHTS["S_MOB"],
-    "S_SIZE": RISK_WEIGHTS["S_SIZE"],
-    "S_VF": RISK_WEIGHTS["S_VF"],
-    "S_HOST": RISK_WEIGHTS["S_HOST"],
-    "S_REP": RISK_WEIGHTS["S_REP"],
-    "S_GEO": RISK_WEIGHTS["S_GEO"],
-    "S_HAB": RISK_WEIGHTS["S_HAB"],
-    "S_GROW": RISK_WEIGHTS["S_GROW"],
-}
-
-GRADE_THRESHOLDS = (  # (lower bound, grade)
-    (0.60, "A"),
-    (0.45, "B"),
-    (0.30, "C"),
-    (0.15, "D"),
-    (0.00, "E"),
-)
+CIRCULAR_PATTERN = re.compile(r"circular[=: ]*(true|yes|y|1)\b", re.I)
 
 
-def grade_from_score(score: Optional[float]) -> str:
-    if score is None or (isinstance(score, float) and math.isnan(score)):
-        return ""
-    for lower, grade in GRADE_THRESHOLDS:
-        if score >= lower:
-            return grade
-    return "E"
+# ---------------------------------------------------------------------------
+# Small helpers
+# ---------------------------------------------------------------------------
+
+def _grade(s_norm: float) -> Tuple[str, str]:
+    for threshold, grade, label in RISK_GRADES:
+        if s_norm >= threshold:
+            return grade, label
+    return "E", "Minimal"
 
 
-def _is_circular_header(header: str) -> bool:
-    h = header.lower()
-    return any(p.lower() in h for p in CIRCULAR_PATTERN)
+def _renorm(component_values: Dict[str, Optional[float]],
+            weights: Dict[str, float] = RISK_WEIGHTS_LITE
+            ) -> Tuple[Optional[float], List[str]]:
+    """Weighted mean over dimensions that are not None, renormalised so the
+    weights of missing dimensions are redistributed (frozen weights)."""
+    avail = {k: float(v) for k, v in component_values.items()
+             if k in weights and v is not None and not (isinstance(v, float)
+                                                        and math.isnan(v))}
+    if not avail:
+        return None, []
+    wsum = sum(weights[k] for k in avail)
+    score = sum(weights[k] * v for k, v in avail.items()) / wsum
+    return float(score), list(avail.keys())
 
 
-def mob_evidence_score(features: PlasmidFeatures) -> Optional[float]:
-    """S_MOB from observed transfer apparatus / IS evidence only.
+def is_circular_header(seq_id: str) -> bool:
+    """Detect explicit circularisation flags in an assembly header."""
+    return bool(CIRCULAR_PATTERN.search(str(seq_id)))
 
-    No isolate-derived replicon or global priors are injected. Fragments
-    with no observed evidence return None (not assessable); a complete
-    assembly with no evidence is scored as non-mobilisable.
+
+def circular_map_from_fasta(path: str) -> Dict[str, bool]:
+    """Scan FASTA headers and map the first-word record id to a circular
+    flag (parse_fasta/abricate keep only the first word as id)."""
+    out: Dict[str, bool] = {}
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if line.startswith(">"):
+                header = line[1:].strip()
+                rid = header.split()[0] if header else "seq"
+                out[rid] = is_circular_header(header)
+    return out
+
+
+def mob_evidence_score(feat: PlasmidFeatures,
+                       complete: bool) -> Optional[float]:
+    """S_MOB from observed sequence evidence only.
+
+    Mirrors PlasRiskScorer.score_mob but never falls back to isolate-derived
+    replicon / global priors. Returns None when mobility cannot be assessed
+    (fragment with no transfer apparatus or IS evidence); for a complete
+    assembly, assembly-wide absence is informative and receives the
+    non-mobilizable base of 0.1.
     """
-    has_relaxase = bool(getattr(features, "has_relaxase", False))
-    has_t4cp = bool(getattr(features, "has_t4cp", False))
-    has_oriT = bool(getattr(features, "has_oriT", False))
-    has_aux = bool(getattr(features, "has_auxiliary", False))
-    has_integron = bool(getattr(features, "has_integron", False))
-    n_is = int(getattr(features, "n_is", 0) or 0)
+    has_t4cp = bool(feat.has_t4cp)
+    has_rel = bool(feat.has_relaxase)
+    has_oriT = bool(feat.has_oriT)
 
-    annotated = bool(getattr(features, "mobility_annotated", False))
-    mclass = getattr(features, "mobility_class", "") or ""
+    if feat.mobility_class:
+        mc = feat.mobility_class.lower()
+        if "complete" in mc:
+            mob_base = 1.0
+        elif "likely" in mc:
+            mob_base = 0.85
+        elif "mobilizable" in mc:
+            mob_base = 0.6
+        else:
+            mob_base = 0.1
+    elif has_t4cp and has_rel and has_oriT:
+        mob_base = 1.0
+    elif has_t4cp and has_rel:
+        mob_base = 0.85
+    elif has_rel or has_oriT:
+        mob_base = 0.6
+    elif feat.n_is > 0:
+        mob_base = 0.1
+    else:
+        if complete:
+            mob_base = 0.1
+        else:
+            return None
 
-    if mclass:
-        mc = mclass.lower()
-        if "conjugative" in mc:
-            return 0.95
-        if "mobilizable" in mc or "mobilisable" in mc:
-            return 0.55
-        if "non" in mc and ("mob" in mc):
-            return 0.1
+    mob_component = min(mob_base + (0.10 if feat.has_integron else 0.0), 1.0)
+    length_kb = feat.length_bp / 1000.0 if feat.length_bp > 0 else 1.0
+    is_density = feat.n_is / length_kb if length_kb > 0 else 0.0
+    is_bonus = 0.30 * min(is_density, 2.0) / 2.0
+    return float(np.clip(mob_component + is_bonus, 0.0, 1.0))
 
-    score = 0.0
-    if has_relaxase:
-        score += 0.45
-    if has_t4cp:
-        score += 0.35
-    if has_oriT:
-        score += 0.15
-    if has_aux:
-        score += 0.1
-    if has_integron:
-        score += 0.05
-    if n_is >= 3:
-        score += 0.1
-    elif n_is >= 1:
-        score += 0.05
-    score = min(score, 1.0)
 
-    if score > 0:
-        return score
-    if annotated:
-        # Complete assembly with explicit annotation and no apparatus.
-        return 0.1
-    # Fragment and no evidence: not assessable.
+# ---------------------------------------------------------------------------
+# Layer 1: contig-level scoring
+# ---------------------------------------------------------------------------
+
+@dataclass
+class ContigScore:
+    seq_id: str
+    length_bp: int
+    circular: bool
+    complete: bool
+    replicon: str
+    n_ARG: int
+    n_VF: int
+    n_BM: int
+    high_risk_genes: str
+    S_ARG: float
+    S_BMG: float
+    S_VF: float
+    S_MOB: Optional[float]
+    S_SIZE: Optional[float]
+    S_REP: Optional[float]
+    S_cargo3: Optional[float]
+    S_frag4: Optional[float]
+    S_lite5: Optional[float]
+    grade: str
+    grade_label: str
+    assessable_dims: str
+
+
+def score_contig(feat: PlasmidFeatures, scorer: PlasRiskScorer,
+                 complete_length: int = 10_000,
+                 circular_flag: bool = False) -> ContigScore:
+    """Score one metagenomic contig with dimension completeness tracking."""
+    circular = bool(circular_flag) or is_circular_header(feat.seq_id)
+    complete = circular or feat.length_bp >= complete_length
+
+    s_arg = scorer.score_arg(feat)
+    s_bmg = scorer.score_bmg(feat)
+    s_vf = scorer.score_vf(feat)
+    s_mob = mob_evidence_score(feat, complete=complete)
+    s_size = scorer.score_size(feat.length_bp) if complete else None
+    s_rep = scorer.score_rep(feat) if feat.replicon else None
+
+    cargo_vals = {"S_ARG": s_arg, "S_BMG": s_bmg, "S_VF": s_vf}
+    s_cargo3, _ = _renorm(cargo_vals)
+
+    s_frag4 = None
+    s_lite5 = None
+    lite5_dims = []
+    if s_mob is not None:
+        frag4_vals = dict(cargo_vals)
+        frag4_vals["S_MOB"] = s_mob
+        s_frag4, _ = _renorm(frag4_vals)
+        if s_size is not None:
+            lite5_vals = dict(frag4_vals)
+            lite5_vals["S_SIZE"] = s_size
+            s_lite5, lite5_dims = _renorm(lite5_vals)
+
+    if s_lite5 is not None and set(lite5_dims) == set(LITE_DIMENSIONS):
+        grade, grade_label = _grade(s_lite5)
+    else:
+        grade, grade_label = "", ""
+
+    assessable = list(CARGO_DIMS)
+    if s_mob is not None:
+        assessable.append("S_MOB")
+    if s_size is not None:
+        assessable.append("S_SIZE")
+
+    return ContigScore(
+        seq_id=feat.seq_id,
+        length_bp=feat.length_bp,
+        circular=circular,
+        complete=complete,
+        replicon=feat.replicon or "",
+        n_ARG=feat.n_arg,
+        n_VF=feat.n_vf,
+        n_BM=feat.n_bm,
+        high_risk_genes=";".join(feat.high_risk_args) if feat.high_risk_args
+        else "",
+        S_ARG=round(s_arg, 4),
+        S_BMG=round(s_bmg, 4),
+        S_VF=round(s_vf, 4),
+        S_MOB=round(s_mob, 4) if s_mob is not None else None,
+        S_SIZE=round(s_size, 4) if s_size is not None else None,
+        S_REP=round(s_rep, 4) if s_rep is not None else None,
+        S_cargo3=round(s_cargo3, 4) if s_cargo3 is not None else None,
+        S_frag4=round(s_frag4, 4) if s_frag4 is not None else None,
+        S_lite5=round(s_lite5, 4) if s_lite5 is not None else None,
+        grade=grade,
+        grade_label=grade_label,
+        assessable_dims=";".join(assessable),
+    )
+
+
+def score_contigs(annotation: AnnotationResult, scorer: PlasRiskScorer,
+                  complete_length: int = 10_000,
+                  min_length: int = 1_000,
+                  circular_map: Optional[Dict[str, bool]] = None
+                  ) -> pd.DataFrame:
+    rows = []
+    for feat in annotation.features:
+        if feat.length_bp < min_length:
+            continue
+        cflag = bool((circular_map or {}).get(feat.seq_id, False))
+        rows.append(score_contig(feat, scorer,
+                                 complete_length=complete_length,
+                                 circular_flag=cflag).__dict__)
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        df = df.sort_values("S_cargo3", ascending=False).reset_index(drop=True)
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Layer 2: plasmid bin aggregation
+# ---------------------------------------------------------------------------
+
+def _union(series_of_lists: List[List[str]]) -> List[str]:
+    seen = set()
+    out = []
+    for items in series_of_lists:
+        for x in items:
+            if x not in seen:
+                seen.add(x)
+                out.append(x)
+    return out
+
+
+def aggregate_bin(bin_id: str, feats: List[PlasmidFeatures],
+                  scorer: PlasRiskScorer, circular: Optional[bool],
+                  plasmid_score: Optional[float],
+                  coverage: Optional[float],
+                  complete_length: int = 10_000,
+                  circ_contigs: bool = False) -> Dict:
+    """Aggregate contig-level features of one predicted plasmid bin."""
+    feats = sorted(feats, key=lambda f: f.seq_id)
+    n_contigs = len(feats)
+    total_len = int(sum(f.length_bp for f in feats))
+
+    arg_names = _union([f.arg_names for f in feats])
+    vf_names = _union([f.vf_names for f in feats])
+    vf_cats = _union([f.vf_categories for f in feats])
+    bm_names = _union([f.bm_gene_names for f in feats])
+    replicons = _union([[r] for f in feats for r in
+                        re.split(r"[;,/]", f.replicon) if r.strip()])
+
+    # Merge per-gene product / resistance metadata
+    arg_products, arg_resistance = {}, {}
+    for f in feats:
+        arg_products.update(f.metadata.get("arg_products", {}))
+        arg_resistance.update(f.metadata.get("arg_resistance", {}))
+
+    has_t4cp = any(bool(f.has_t4cp) for f in feats)
+    has_rel = any(bool(f.has_relaxase) for f in feats)
+    has_oriT = any(bool(f.has_oriT) for f in feats)
+    has_aux = any(bool(f.has_auxiliary) for f in feats)
+    has_int = any(bool(f.has_integron) for f in feats)
+    # NOTE: IS copies split across contig boundaries are counted once per
+    # contig conservatively; summing can slightly over-count fragmented ISs.
+    n_is = int(sum(f.n_is for f in feats))
+    any_mob_evidence = (has_t4cp or has_rel or has_oriT or has_aux or has_int
+                        or n_is > 0)
+    any_mob_annotated = any(f.mobility_annotated for f in feats)
+
+    circ = (bool(circular) or bool(circ_contigs)
+            or any(is_circular_header(f.seq_id) for f in feats))
+    # S_SIZE is assessed only when the bin plausibly spans a whole plasmid:
+    # circularised, or an aggregate long enough to be a near-complete
+    # assembly. Fragment lengths never feed S_SIZE.
+    size_assessable = circ or total_len >= complete_length
+    complete = circ or (n_contigs == 1 and total_len >= complete_length)
+
+    agg = PlasmidFeatures(
+        seq_id=bin_id,
+        length_bp=total_len,
+        arg_names=arg_names,
+        vf_names=vf_names,
+        vf_categories=vf_cats,
+        bm_gene_names=bm_names,
+        replicon=";".join(replicons),
+        has_t4cp=has_t4cp,
+        has_relaxase=has_rel,
+        has_oriT=has_oriT,
+        has_auxiliary=has_aux,
+        has_integron=has_int,
+        n_is=n_is,
+        mobility_annotated=any_mob_annotated or any_mob_evidence,
+        metadata={"arg_products": arg_products,
+                  "arg_resistance": arg_resistance},
+    )
+
+    s_arg = scorer.score_arg(agg)
+    s_bmg = scorer.score_bmg(agg)
+    s_vf = scorer.score_vf(agg)
+    s_size = scorer.score_size(total_len) if size_assessable else None
+    s_mob = mob_evidence_score(
+        agg, complete=size_assessable or any_mob_annotated)
+    s_rep = scorer.score_rep(agg) if agg.replicon else None
+
+    cargo_vals = {"S_ARG": s_arg, "S_BMG": s_bmg, "S_VF": s_vf}
+    s_cargo3, _dims3 = _renorm(cargo_vals)
+    s_frag4, frag4_dims = None, []
+    if s_mob is not None:
+        f4 = dict(cargo_vals)
+        f4["S_MOB"] = s_mob
+        s_frag4, frag4_dims = _renorm(f4)
+    s_lite, dims = None, []
+    if s_size is not None and s_mob is not None:
+        lv = dict(cargo_vals)
+        lv["S_MOB"] = s_mob
+        lv["S_SIZE"] = s_size
+        s_lite, dims = _renorm(lv)
+
+    if s_lite is not None and set(dims) == set(LITE_DIMENSIONS):
+        grade, grade_label = _grade(s_lite)
+    else:
+        grade, grade_label = "", ""
+
+    if circ:
+        confidence = "complete"
+    elif total_len >= 10_000:
+        confidence = "probable"
+    else:
+        confidence = "fragmented"
+
+    # Mobility class label (best evidence across contigs)
+    mob_for_label = s_mob if s_mob is not None else 0.0
+    if mob_for_label >= 0.85:
+        mob_class = "conjugative_complete"
+    elif mob_for_label >= 0.60:
+        mob_class = "conjugative_likely"
+    elif mob_for_label >= 0.35:
+        mob_class = "mobilizable"
+    else:
+        mob_class = "non-mobilizable" if s_mob is not None else "unassessed"
+
+    return {
+        "bin_id": bin_id,
+        "n_contigs": n_contigs,
+        "total_length_bp": total_len,
+        "total_length_kb": round(total_len / 1000.0, 2),
+        "circular": circ,
+        "confidence": confidence,
+        "plasmid_score": plasmid_score,
+        "coverage": coverage,
+        "replicon": agg.replicon or "Unknown",
+        "n_ARG": len(arg_names),
+        "n_VF": len(vf_names),
+        "n_BM": len(bm_names),
+        "n_IS": n_is,
+        "high_risk_genes": ";".join(agg.high_risk_args)
+        if agg.high_risk_args else "",
+        "mobility_class": mob_class,
+        "S_ARG": round(s_arg, 4),
+        "S_BMG": round(s_bmg, 4),
+        "S_VF": round(s_vf, 4),
+        "S_SIZE": round(s_size, 4) if s_size is not None else None,
+        "S_MOB": round(s_mob, 4) if s_mob is not None else None,
+        "S_REP": round(s_rep, 4) if s_rep is not None else None,
+        "S_cargo3": round(s_cargo3, 4) if s_cargo3 is not None else None,
+        "S_frag4": round(s_frag4, 4) if s_frag4 is not None else None,
+        "S_lite": round(s_lite, 4) if s_lite is not None else None,
+        "grade": grade,
+        "grade_label": grade_label,
+        "assessable_dims": ";".join(dims),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Bin / coverage table parsers
+# ---------------------------------------------------------------------------
+
+def _find_column(columns: List[str], candidates: Tuple[str, ...]) -> Optional[str]:
+    lower = {str(c).lower().strip(): c for c in columns}
+    for cand in candidates:
+        if cand in lower:
+            return lower[cand]
+    for c in columns:
+        cl = str(c).lower().strip()
+        if any(cand in cl for cand in candidates):
+            return c
     return None
 
 
-def score_contig(features: PlasmidFeatures, header: str = "",
-                 complete_length: int = 10000,
-                 scorer: Optional[PlasRiskScorer] = None) -> Dict[str, object]:
-    """Score one plasmid contig on the assessable dimensions.
-
-    Cargo dimensions (ARG/BMG/VF) are always count-based. S_SIZE is
-    assessed only for a circularised header or a contig at/above
-    ``complete_length``. S_MOB is assessed only from observed evidence;
-    S_REP only when a replicon is detected.
-    """
-    if scorer is None:
-        scorer = PlasRiskScorer()
-
-    length = int(getattr(features, "length_bp", 0) or 0)
-    circular = _is_circular_header(header) or bool(
-        getattr(features, "metadata", {}) and
-        features.metadata.get("circular", False))
-
-    s_arg = scorer.score_arg(features)
-    s_bmg = scorer.score_bm(features)
-    s_vf = scorer.score_vf(features)
-
-    size_assessable = circular or length >= complete_length
-    s_size = scorer.score_size(features) if size_assessable else None
-
-    s_mob = mob_evidence_score(features)
-
-    replicon = getattr(features, "replicon", "") or ""
-    s_rep = scorer.score_rep(features) if replicon else None
-
-    out: Dict[str, object] = {
-        "seq_id": getattr(features, "seq_id", ""),
-        "length_bp": length,
-        "circular": circular,
-        "replicon": replicon,
-        "S_ARG": s_arg,
-        "S_BMG": s_bmg,
-        "S_VF": s_vf,
-        "S_MOB": s_mob,
-        "S_SIZE": s_size,
-        "S_REP": s_rep,
-    }
-
-    # Renormalised scores over the assessable dimensions.
-    def _renorm(dims: Sequence[str], key: str) -> None:
-        pairs = [(d, LITE_W[d]) for d in dims if out.get(d) is not None]
-        if not pairs:
-            out[key] = None
-            return
-        wsum = sum(w for _, w in pairs)
-        out[key] = sum(out[d] * w for d, w in pairs) / wsum
-
-    _renorm(("S_ARG", "S_BMG", "S_VF"), "S_cargo3")
-    _renorm(("S_ARG", "S_BMG", "S_VF", "S_MOB"), "S_frag4")
-    lite_dims = ("S_ARG", "S_BMG", "S_MOB", "S_SIZE", "S_VF")
-    assessable = [d for d in lite_dims if out.get(d) is not None]
-    _renorm(lite_dims, "S_lite5")
-    out["assessable_dims"] = ";".join(assessable)
-    out["n_assessable"] = len(assessable)
-    if len(assessable) == len(lite_dims):
-        out["grade"] = grade_from_score(out["S_lite5"])
-    else:
-        out["grade"] = ""
-    return out
-
-
-def score_contigs(features_list: Sequence[PlasmidFeatures],
-                  headers: Optional[Sequence[str]] = None,
-                  complete_length: int = 10000,
-                  scorer: Optional[PlasRiskScorer] = None
-                  ) -> List[Dict[str, object]]:
-    if scorer is None:
-        scorer = PlasRiskScorer()
-    rows = []
-    for i, feats in enumerate(features_list):
-        header = headers[i] if headers else ""
-        rows.append(score_contig(feats, header=header,
-                                complete_length=complete_length,
-                                scorer=scorer))
-    return rows
-
-
 def load_bins_table(path: str) -> pd.DataFrame:
-    """Load a generic bins table: seq_id, bin_id, optional columns.
+    """Generic contig-to-bin map.
 
-    Optional columns: circular (1/0), plasmid_score, length_bp, coverage.
+    Required columns: seq_id, bin_id (alternative names accepted:
+    contig/sequence/seq_name/contigName and bin/component/plasmid/bin_id).
+    Optional columns: circular / topology, plasmid_score.
     """
-    df = pd.read_csv(path, sep=None, engine="python", dtype=str,
-                     comment="#")
-    df.columns = [c.strip() for c in df.columns]
-    for alias, canon in (("contig", "seq_id"), ("contig_id", "seq_id"),
-                        ("seq_name", "seq_id"), ("bin", "bin_id"),
-                        ("cluster", "bin_id")):
-        if canon not in df.columns and alias in df.columns:
-            df = df.rename(columns={alias: canon})
-    if "seq_id" not in df.columns or "bin_id" not in df.columns:
-        raise ValueError("bins table must contain seq_id and bin_id columns")
-    return df
+    sep = "\t" if path.lower().endswith((".tsv", ".txt")) else ","
+    df = pd.read_csv(path, sep=sep, dtype=str)
+    df.columns = [str(c).strip() for c in df.columns]
+    seq_col = _find_column(list(df.columns),
+                           ("seq_id", "seqname", "sequence", "contig",
+                            "seq_name", "contigname", "name", "id"))
+    bin_col = _find_column(list(df.columns),
+                           ("bin_id", "bin", "component", "plasmid",
+                            "plasmid_id", "cluster"))
+    if seq_col is None or bin_col is None:
+        raise ValueError(
+            "bins table must contain seq_id and bin_id columns "
+            "(found: %s)" % ", ".join(df.columns))
+    out = pd.DataFrame({
+        "seq_id": df[seq_col].astype(str),
+        "bin_id": df[bin_col].astype(str),
+    })
+    circ_col = _find_column(list(df.columns),
+                            ("circular", "topology", "circ"))
+    if circ_col is not None:
+        out["circular"] = df[circ_col].astype(str).str.lower().map(
+            lambda x: x in ("1", "true", "yes", "y", "circular", "c"))
+    else:
+        out["circular"] = False
+    score_col = _find_column(list(df.columns),
+                             ("plasmid_score", "plasmid score", "score"))
+    if score_col is not None:
+        out["plasmid_score"] = pd.to_numeric(df[score_col],
+                                             errors="coerce")
+    else:
+        out["plasmid_score"] = np.nan
+    return out.drop_duplicates(["seq_id", "bin_id"])
 
 
-def load_genomad(path: str) -> pd.DataFrame:
-    """Load a geNomad plasmid components/summary table as a bins table."""
-    if os.path.isdir(path):
-        cands = sorted(glob.glob(os.path.join(
-            path, "**", "*_plasmid_components.tsv"), recursive=True))
-        if not cands:
-            cands = sorted(glob.glob(os.path.join(
-                path, "**", "*_plasmid_summary.tsv"), recursive=True))
-        if not cands:
-            raise FileNotFoundError(
-                "no geNomad *_plasmid_components.tsv under %s" % path)
-        path = cands[0]
-    df = pd.read_csv(path, sep="\t", dtype=str, comment="#")
-    df.columns = [c.strip() for c in df.columns]
-    rename = {}
-    for c in df.columns:
-        cl = c.lower()
-        if cl in ("seq_name", "sequence", "contig_name"):
-            rename[c] = "seq_id"
-        elif cl in ("plasmid", "plasmid_name", "component"):
-            rename[c] = "bin_id"
-        elif cl == "topology":
-            rename[c] = "circular"
-    df = df.rename(columns=rename)
-    if "bin_id" not in df.columns:
-        # Each geNomad plasmid component row is its own bin; key by seq.
-        if "seq_id" in df.columns:
-            df["bin_id"] = df["seq_id"]
-    if "circular" in df.columns:
-        df["circular"] = df["circular"].astype(str).str.lower().map(
-            lambda x: "1" if x in ("circular", "circular=true", "yes") else "0")
-    return df
+def load_genomad(genomad_dir: str) -> pd.DataFrame:
+    """Parse geNomad end-to-end outputs into the generic bins table.
+
+    geNomad classifies each sequence independently, so every plasmid
+    sequence is its own bin. Reads, searched anywhere under
+    ``genomad_dir``:
+
+      * ``*_plasmid_summary.tsv`` (preferred): one row per plasmid, with
+        seq_name, topology and plasmid_score;
+      * otherwise ``*_aggregated_classification.tsv``: per-sequence calls,
+        filtered to the plasmid class;
+      * legacy ``*_plasmid_components.tsv`` from older releases that
+        grouped several contigs into one plasmid component.
+    """
+    comp_files, summ_files, agg_files = [], [], []
+    for root, _dirs, files in os.walk(genomad_dir):
+        for f in files:
+            if f.endswith("_plasmid_components.tsv"):
+                comp_files.append(os.path.join(root, f))
+            elif f.endswith("_plasmid_summary.tsv"):
+                summ_files.append(os.path.join(root, f))
+            elif f.endswith("_aggregated_classification.tsv"):
+                agg_files.append(os.path.join(root, f))
+
+    def _summary_rows(sdf: "pd.DataFrame") -> List[dict]:
+        name_col = _find_column(list(sdf.columns),
+                                ("seq_name", "seq_id", "name", "bin_id"))
+        if name_col is None:
+            return []
+        topo_col = _find_column(list(sdf.columns),
+                                ("topology", "circular", "circ"))
+        score_col = _find_column(list(sdf.columns),
+                                 ("plasmid_score", "score"))
+        out = []
+        for _, r in sdf.iterrows():
+            name = str(r[name_col])
+            if name in ("", "nan"):
+                continue
+            circ = (topo_col is not None
+                    and str(r[topo_col]).strip().lower()
+                    in ("circular", "1", "true", "yes"))
+            score = np.nan
+            if score_col is not None and str(r[score_col]) not in ("", "nan"):
+                try:
+                    score = float(r[score_col])
+                except (ValueError, TypeError):
+                    score = np.nan
+            out.append({"seq_id": name, "bin_id": name,
+                        "circular": bool(circ), "plasmid_score": score})
+        return out
+
+    rows: List[dict] = []
+
+    if summ_files:
+        sdf = pd.read_csv(summ_files[0], sep="\t", dtype=str)
+        rows = _summary_rows(sdf)
+
+    if not rows and agg_files:
+        adf = pd.read_csv(agg_files[0], sep="\t", dtype=str)
+        lower_cols = {str(c).lower().strip(): c for c in adf.columns}
+        name_col = lower_cols.get("seq_name") or lower_cols.get("seq_id") \
+            or lower_cols.get("name")
+        # Prefer an exact boolean "plasmid" column so it is never confused
+        # with "plasmid_score"; then a categorical class column.
+        bool_col = lower_cols.get("plasmid")
+        class_col = None
+        if bool_col is None:
+            class_col = lower_cols.get("class") \
+                or lower_cols.get("classification") \
+                or lower_cols.get("prediction") or lower_cols.get("label")
+        score_col = lower_cols.get("plasmid_score") \
+            or lower_cols.get("score")
+        chrom_col = lower_cols.get("chromosome_score")
+        virus_col = lower_cols.get("virus_score")
+        true_set = {"1", "true", "yes", "y"}
+        if name_col is not None:
+            for _, r in adf.iterrows():
+                name = str(r[name_col])
+                if name in ("", "nan"):
+                    continue
+                keep = False
+                if bool_col is not None:
+                    keep = str(r[bool_col]).strip().lower() in true_set
+                elif class_col is not None:
+                    keep = "plasmid" in str(r[class_col]).lower()
+                elif score_col is not None:
+                    try:
+                        ps = float(r[score_col])
+                        cs = float(r[chrom_col]) if chrom_col else -1.0
+                        vs = float(r[virus_col]) if virus_col else -1.0
+                        keep = ps >= max(cs, vs) and ps >= 0.5
+                    except (ValueError, TypeError):
+                        keep = False
+                score = np.nan
+                if score_col is not None \
+                        and str(r[score_col]) not in ("", "nan"):
+                    try:
+                        score = float(r[score_col])
+                    except (ValueError, TypeError):
+                        score = np.nan
+                if keep:
+                    rows.append({"seq_id": name, "bin_id": name,
+                                 "circular": False,
+                                 "plasmid_score": score})
+
+    # Legacy multi-contig components (older geNomad releases).
+    if not rows and comp_files:
+        cdf = pd.read_csv(comp_files[0], sep="\t", dtype=str)
+        seq_col = _find_column(list(cdf.columns), ("seq_name", "seq_id"))
+        comp_col = _find_column(list(cdf.columns),
+                                ("components", "component"))
+        if seq_col is not None and comp_col is not None:
+            for _, r in cdf.iterrows():
+                cell = str(r[comp_col])
+                if cell in ("", "nan"):
+                    continue
+                for i, group in enumerate(cell.split(";")):
+                    contigs = [x.strip() for x in group.split(",")
+                               if x.strip()]
+                    bin_id = "%s_component_%d" % (str(r[seq_col]), i + 1)
+                    for contig in contigs:
+                        rows.append({"seq_id": contig, "bin_id": bin_id,
+                                     "circular": False,
+                                     "plasmid_score": np.nan})
+
+    if not rows:
+        raise FileNotFoundError(
+            "no geNomad plasmid output found under %s (expected "
+            "*_plasmid_summary.tsv, *_aggregated_classification.tsv or "
+            "*_plasmid_components.tsv)" % genomad_dir)
+
+    bins = pd.DataFrame(rows)
+    return bins.drop_duplicates(["seq_id", "bin_id"])
 
 
 def load_coverage_table(path: str,
-                        coverage_column: Optional[str] = None
-                        ) -> pd.DataFrame:
-    """Load per-contig coverage.
-
-    Accepts a generic two-column table (seq_id, coverage) or the output of
-    jgi_summarize_bam_contig_depths. For the JGI format, ``coverage_column``
-    selects a sample column; by default the mean of all *totalAvgDepth /
-    *coverage columns is used.
-    """
-    df = pd.read_csv(path, sep=None, engine="python", dtype=str,
-                     comment="#")
-    df.columns = [c.strip() for c in df.columns]
-    id_col = None
-    for c in df.columns:
-        if c.lower() in ("seq_id", "contig", "contig_id", "seq_name", "name"):
-            id_col = c
-            break
-    if id_col is None:
-        id_col = df.columns[0]
-
+                        coverage_column: Optional[str] = None) -> pd.DataFrame:
+    """Per-contig coverage. Accepts generic TSV/CSV and jgi_summarize output
+    (contigName + per-sample depth columns)."""
+    sep = "\t" if path.lower().endswith((".tsv", ".txt")) else ","
+    df = pd.read_csv(path, sep=sep)
+    df.columns = [str(c).strip() for c in df.columns]
+    seq_col = _find_column(list(df.columns),
+                           ("seq_id", "seqname", "sequence", "contig",
+                            "seq_name", "contigname", "name"))
+    if seq_col is None:
+        raise ValueError("coverage table must contain a contig/seq_id column")
     if coverage_column is not None:
-        cov = df[[id_col, coverage_column]].copy()
-        cov.columns = ["seq_id", "coverage"]
+        cov_col = coverage_column
     else:
-        depth_cols = [c for c in df.columns
-                      if c.lower().endswith("totalavgdepth")
-                      or c.lower() == "coverage"
-                      or c.lower().endswith("coverage")]
-        if not depth_cols:
-            depth_cols = [c for c in df.columns if c != id_col][:1]
-        vals = df[depth_cols].apply(pd.to_numeric, errors="coerce")
-        cov = pd.DataFrame({
-            "seq_id": df[id_col],
-            "coverage": vals.mean(axis=1),
-        })
-    cov["coverage"] = pd.to_numeric(cov["coverage"], errors="coerce")
-    return cov
+        cov_col = _find_column(list(df.columns),
+                               ("coverage", "cov", "mean_cov",
+                                "meandepth", "totalavgdepth", "depth"))
+        if cov_col is None:
+            numeric = df.select_dtypes(include=[np.number]).columns
+            if len(numeric) == 0:
+                raise ValueError("no numeric coverage column found in %s"
+                                 % path)
+            cov_col = numeric[0]
+    out = pd.DataFrame({"seq_id": df[seq_col].astype(str),
+                        "coverage": pd.to_numeric(df[cov_col],
+                                                   errors="coerce")})
+    return out.dropna(subset=["coverage"])
 
 
-def aggregate_bin(contig_rows: Sequence[Dict[str, object]],
-                  bin_id: str,
-                  coverages: Optional[Dict[str, float]] = None
-                  ) -> Dict[str, object]:
-    """Aggregate scored contig rows into one plasmid bin."""
-    rows = list(contig_rows)
-    n = len(rows)
-    lengths = [float(r.get("length_bp", 0) or 0) for r in rows]
-    total_len = sum(lengths)
-    circular = any(bool(r.get("circular", False)) for r in rows)
+def aggregate_bins(contig_df: pd.DataFrame,
+                   features_by_id: Dict[str, PlasmidFeatures],
+                   bins_df: Optional[pd.DataFrame],
+                   coverage_df: Optional[pd.DataFrame],
+                   scorer: PlasRiskScorer,
+                   min_plasmid_score: float = 0.0,
+                   complete_length: int = 10_000,
+                   header_circular_map: Optional[Dict[str, bool]] = None
+                   ) -> pd.DataFrame:
+    """Layer 2: build one score row per predicted plasmid bin.
 
-    replicons = sorted({str(r.get("replicon", "")).strip()
-                        for r in rows if str(r.get("replicon", "")).strip()})
+    Contigs absent from ``bins_df`` become singleton bins (flagged
+    ``unbinned`` via the bin_id prefix)."""
+    cov_map = (dict(zip(coverage_df["seq_id"], coverage_df["coverage"]))
+               if coverage_df is not None else {})
 
-    def _mean(key: str) -> Optional[float]:
-        vals = [r.get(key) for r in rows if r.get(key) is not None]
-        vals = [v for v in vals if not (isinstance(v, float) and math.isnan(v))]
-        if not vals:
-            return None
-        wg = []
-        for r in rows:
-            v = r.get(key)
-            if v is None or (isinstance(v, float) and math.isnan(v)):
-                continue
-            L = float(r.get("length_bp", 0) or 0)
-            if coverages is not None:
-                c = coverages.get(str(r.get("seq_id", "")), 1.0)
-                L *= max(float(c), 0.0)
-            wg.append(L if L > 0 else 1.0)
-        wsum = sum(wg)
-        return sum(float(v) * w for v, w in zip(vals, wg)) / wsum
-
-    s_arg = _mean("S_ARG")
-    s_bmg = _mean("S_BMG")
-    s_vf = _mean("S_VF")
-    s_mob = _mean("S_MOB")
-    s_size = _mean("S_SIZE")
-
-    # Fragmented bins cannot have S_SIZE assessed from summed fragment
-    # lengths unless the bin is circularised.
-    if not circular and s_size is not None:
-        # A bin is treated as complete if any member was size-assessable and
-        # the summed length is at the threshold; otherwise keep the observed
-        # component mean but flag confidence.
-        pass
-
-    out: Dict[str, object] = {
-        "bin_id": bin_id,
-        "n_contigs": n,
-        "length_bp": total_len,
-        "circular": circular,
-        "replicon": ";".join(replicons),
-        "S_ARG": s_arg,
-        "S_BMG": s_bmg,
-        "S_VF": s_vf,
-        "S_MOB": s_mob,
-        "S_SIZE": s_size if circular else (s_size if all(
-            r.get("S_SIZE") is not None for r in rows) else None),
-    }
-
-    lite_dims = ("S_ARG", "S_BMG", "S_MOB", "S_SIZE", "S_VF")
-    assessable = [d for d in lite_dims if out.get(d) is not None]
-    pairs = [(d, LITE_W[d]) for d in lite_dims if out.get(d) is not None]
-    if pairs:
-        wsum = sum(w for _, w in pairs)
-        out["S_lite5"] = sum(out[d] * w for d, w in pairs) / wsum
+    if bins_df is not None:
+        bins_df = bins_df.copy()
+        if min_plasmid_score > 0:
+            bins_df = bins_df[
+                bins_df["plasmid_score"].isna()
+                | (bins_df["plasmid_score"] >= min_plasmid_score)]
+        bin_map = dict(zip(bins_df["seq_id"], bins_df["bin_id"]))
+        circ_map = bins_df.groupby("bin_id")["circular"].any().to_dict()
+        score_map = (bins_df.dropna(subset=["plasmid_score"])
+                     .groupby("bin_id")["plasmid_score"].max().to_dict())
     else:
-        out["S_lite5"] = None
-    out["assessable_dims"] = ";".join(assessable)
+        bin_map, circ_map, score_map = {}, {}, {}
 
-    if circular:
-        out["confidence"] = "complete"
-    elif len(assessable) >= 4:
-        out["confidence"] = "probable"
+    groups: Dict[str, List[PlasmidFeatures]] = {}
+    for cid, feat in features_by_id.items():
+        if cid in bin_map:
+            groups.setdefault(bin_map[cid], []).append(feat)
+        else:
+            groups.setdefault("unbinned:%s" % cid, []).append(feat)
+
+    rows = []
+    header_map = header_circular_map or {}
+    for bin_id, feats in groups.items():
+        circ = circ_map.get(bin_id)
+        circ_contigs = any(header_map.get(f.seq_id, False) for f in feats)
+        pscore = score_map.get(bin_id)
+        covs = [cov_map[f.seq_id] for f in feats if f.seq_id in cov_map]
+        if covs:
+            lens = np.array([f.length_bp for f in feats], dtype=float)
+            cs = np.array(covs, dtype=float)
+            coverage = float(np.sum(cs * lens) / np.sum(lens))
+        else:
+            coverage = None
+        rows.append(aggregate_bin(bin_id, feats, scorer, circ, pscore,
+                                  coverage,
+                                  complete_length=complete_length,
+                                  circ_contigs=circ_contigs))
+    df = pd.DataFrame(rows)
+    if not df.empty:
+        sort_col = df["S_lite"].combine_first(df["S_frag4"]) \
+            .combine_first(df["S_cargo3"]).fillna(-1)
+        df = df.assign(_s=sort_col).sort_values("_s", ascending=False)
+        df = df.drop(columns="_s").reset_index(drop=True)
+        df.insert(0, "rank", range(1, len(df) + 1))
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Layer 3: sample / community summary
+# ---------------------------------------------------------------------------
+
+def aggregate_sample(sample_id: str, bin_df: pd.DataFrame,
+                     contig_df: pd.DataFrame,
+                     total_assembly_bp: Optional[int] = None) -> Dict:
+    """Descriptive community-level statistics (CPRI = community plasmid
+    risk index; not trained/validated in the isolate study)."""
+    b = bin_df.copy()
+    s_use = b["S_lite"] if "S_lite" in b.columns else pd.Series(
+        np.nan, index=b.index)
+    for col in ("S_frag4", "S_cargo3"):
+        if col in b.columns:
+            s_use = s_use.combine_first(b[col])
+    b["S_use"] = s_use
+    scored = b.dropna(subset=["S_use"]).copy()
+    graded = scored[scored["grade"] != ""]
+
+    n_bins = len(b)
+    n_scored = len(scored)
+    n_graded = len(graded)
+    n_complete = int((b["confidence"] == "complete").sum())
+    n_probable = int((b["confidence"] == "probable").sum())
+    n_fragmented = int((b["confidence"] == "fragmented").sum())
+
+    weights = pd.Series(1.0, index=scored.index)
+    weighting = "unweighted"
+    if "coverage" in scored.columns and scored["coverage"].notna().any():
+        cov = scored["coverage"].fillna(0).to_numpy(dtype=float)
+        length = scored["total_length_bp"].to_numpy(dtype=float)
+        w = cov * length
+        if w.sum() > 0:
+            weights = pd.Series(w, index=scored.index)
+            weighting = "coverage_x_length"
     else:
-        out["confidence"] = "fragmented"
-    out["grade"] = (grade_from_score(out["S_lite5"])
-                    if len(assessable) == len(lite_dims) else "")
-    return out
+        length = scored["total_length_bp"].to_numpy(dtype=float)
+        if length.sum() > 0:
+            weights = pd.Series(length, index=scored.index)
+            weighting = "length"
 
+    s = scored["S_use"].to_numpy(dtype=float)
+    w = weights.to_numpy(dtype=float)
 
-def aggregate_bins(contig_rows: Sequence[Dict[str, object]],
-                   bins_table: Optional[pd.DataFrame] = None,
-                   coverage_table: Optional[pd.DataFrame] = None
-                   ) -> List[Dict[str, object]]:
-    """Aggregate scored contig rows into bins.
+    def _wq(q):
+        if len(s) == 0:
+            return np.nan
+        order = np.argsort(s)
+        sw, ss = w[order], s[order]
+        cw = np.cumsum(sw)
+        if cw[-1] <= 0:
+            return np.nan
+        idx = np.searchsorted(cw, q * cw[-1])
+        return ss[min(idx, len(ss) - 1)]
 
-    When no bins table is supplied, each contig becomes its own bin. Unbinned
-    contigs are assigned to ``unbinned:<seq_id>``.
-    """
-    by_id = {str(r["seq_id"]): r for r in contig_rows}
+    cpri_mean = float(np.sum(w * s) / np.sum(w)) if w.sum() > 0 else np.nan
 
-    coverages: Optional[Dict[str, float]] = None
-    if coverage_table is not None:
-        coverages = {}
-        for _, rr in coverage_table.iterrows():
-            coverages[str(rr["seq_id"])] = float(rr["coverage"])
+    grade_counts = {g: int((graded["grade"] == g).sum())
+                    for g in ("A", "B", "C", "D", "E")}
+    ab = graded[graded["grade"].isin(("A", "B"))]
+    # critical ARGs remain detectable on fragments; count them across all
+    # scored bins, not only bins with a complete five-dimension grade
+    hr = scored[scored["high_risk_genes"].fillna("") != ""]
 
-    groups: Dict[str, List[str]] = {}
-    if bins_table is not None:
-        for _, rr in bins_table.iterrows():
-            sid = str(rr["seq_id"]).strip()
-            bid = str(rr["bin_id"]).strip()
-            # First token alias for contig headers.
-            key = sid if sid in by_id else sid.split()[0]
-            if key not in by_id:
-                continue
-            groups.setdefault(bid, []).append(key)
+    plasmid_bp = float(np.nansum(b["total_length_bp"].to_numpy(
+        dtype=float)))
+    ab_load = float(np.sum(
+        ab["total_length_bp"].to_numpy(dtype=float)
+        * np.nan_to_num(ab.get("coverage", pd.Series(
+            [1.0] * len(ab))).to_numpy(dtype=float))))
+    hr_load = float(np.sum(
+        hr["total_length_bp"].to_numpy(dtype=float)
+        * np.nan_to_num(hr.get("coverage", pd.Series(
+            [1.0] * len(hr))).to_numpy(dtype=float))))
 
-    assigned = set()
-    for ids in groups.values():
-        assigned.update(ids)
-
-    for sid, row in by_id.items():
-        if sid not in assigned:
-            groups.setdefault("unbinned:%s" % sid, []).append(sid)
-
-    out = []
-    for bid, ids in groups.items():
-        rows = [by_id[i] for i in ids]
-        out.append(aggregate_bin(rows, bin_id=bid, coverages=coverages))
-    out.sort(key=lambda r: str(r["bin_id"]))
-    return out
-
-
-def aggregate_sample(bin_rows: Sequence[Dict[str, object]],
-                     contig_rows: Optional[Sequence[Dict[str, object]]] = None,
-                     coverages: Optional[Dict[str, float]] = None
-                     ) -> Dict[str, object]:
-    """Descriptive, abundance-aware community statistics (CPRI)."""
-    bins = list(bin_rows)
-    n_bins = len(bins)
-
-    def _w(row: Dict[str, object]) -> float:
-        L = float(row.get("length_bp", 0) or 0)
-        if coverages is not None:
-            L *= max(coverages.get(str(row.get("bin_id", row.get("seq_id", ""))),
-                                  1.0), 0.0)
-        return L if L > 0 else 1.0
-
-    scored = [b for b in bins if b.get("S_lite5") is not None]
-    if scored:
-        weights = [_w(b) for b in scored]
-        wsum = sum(weights)
-        cpri_mean = sum(float(b["S_lite5"]) * w
-                        for b, w in zip(scored, weights)) / wsum
-        svals = sorted(float(b["S_lite5"]) for b in scored)
-
-        def _quantile(q: float) -> float:
-            if len(svals) == 1:
-                return svals[0]
-            pos = q * (len(svals) - 1)
-            lo = int(math.floor(pos))
-            hi = int(math.ceil(pos))
-            if lo == hi:
-                return svals[lo]
-            return svals[lo] + (svals[hi] - svals[lo]) * (pos - lo)
-
-        cpri_p90 = _quantile(0.90)
-        cpri_p99 = _quantile(0.99)
-        s_max = max(svals)
-    else:
-        cpri_mean = cpri_p90 = cpri_p99 = s_max = None
-
-    grade_counts = {g: 0 for g in ("A", "B", "C", "D", "E")}
-    for b in scored:
-        g = b.get("grade", "")
-        if g in grade_counts:
-            grade_counts[g] += 1
-
-    total_len = sum(float(b.get("length_bp", 0) or 0) for b in bins)
-
-    # Critical-ARG load from contig rows (count-based).
-    crit_load = 0
-    if contig_rows is not None:
-        for r in contig_rows:
-            if r.get("S_ARG") is not None and float(r["S_ARG"]) >= 0.8:
-                crit_load += 1
-
-    out: Dict[str, object] = {
-        "n_bins": n_bins,
-        "n_scored_bins": len(scored),
-        "total_plasmid_length_bp": total_len,
-        "CPRI_mean": cpri_mean,
-        "CPRI_p90": cpri_p90,
-        "CPRI_p99": cpri_p99,
-        "S_max": s_max,
+    denom_bp = (float(total_assembly_bp) if total_assembly_bp
+                else plasmid_bp)
+    row = {
+        "sample_id": sample_id,
+        "n_contig_elements": int(len(contig_df)),
+        "n_plasmid_bins": int(n_bins),
+        "n_scored_bins": int(n_scored),
+        "n_graded_bins": int(n_graded),
+        "n_complete": n_complete,
+        "n_probable": n_probable,
+        "n_fragmented": n_fragmented,
+        "pct_ARG_positive": round(100.0 * (scored["n_ARG"] > 0).mean(), 2)
+        if n_scored else np.nan,
+        "pct_BMG_positive": round(100.0 * (scored["n_BM"] > 0).mean(), 2)
+        if n_scored else np.nan,
+        "pct_high_risk_ARG": round(
+            100.0 * (scored["high_risk_genes"].fillna("") != "").mean(), 2)
+        if n_scored else np.nan,
+        "CPRI_mean": round(cpri_mean, 4) if not np.isnan(cpri_mean) else np.nan,
+        "CPRI_p90": round(float(_wq(0.90)), 4) if n_scored else np.nan,
+        "CPRI_p99": round(float(_wq(0.99)), 4) if n_scored else np.nan,
+        "S_max": round(float(np.nanmax(s)), 4) if n_scored else np.nan,
+        "pct_grade_A": round(100.0 * grade_counts["A"] / n_graded, 3)
+        if n_graded else np.nan,
+        "pct_grade_AB": round(
+            100.0 * (grade_counts["A"] + grade_counts["B"]) / n_graded, 3)
+        if n_graded else np.nan,
         "grade_A": grade_counts["A"],
         "grade_B": grade_counts["B"],
         "grade_C": grade_counts["C"],
         "grade_D": grade_counts["D"],
         "grade_E": grade_counts["E"],
-        "critical_ARG_contigs": crit_load,
-        "critical_ARG_per_Mb": (crit_load / (total_len / 1e6)
-                                if total_len > 0 else None),
+        "risk_load_AB": round(ab_load, 1),
+        "critical_ARG_load": round(hr_load, 1),
+        "risk_load_AB_per_Mb": round(1e6 * ab_load / denom_bp, 3)
+        if denom_bp else np.nan,
+        "critical_ARG_load_per_Mb": round(1e6 * hr_load / denom_bp, 3)
+        if denom_bp else np.nan,
+        "weighting": weighting,
         "note": "Descriptive extension; CPRI was not trained or validated "
-                "on metagenomic data.",
+                "on metagenomic data",
     }
-    return out
+    return row
 
 
-def _collect_fastas(inputs: Sequence[str]) -> List[str]:
-    out = []
-    exts = {".fasta", ".fa", ".fna", ".fsa", ".fas"}
-    for inp in inputs:
-        matches = glob.glob(inp)
-        if not matches and os.path.exists(inp):
-            matches = [inp]
-        for m in matches:
-            if os.path.isdir(m):
-                for root, _d, files in os.walk(m):
-                    for f in files:
-                        if os.path.splitext(f)[1].lower() in exts:
-                            out.append(os.path.join(root, f))
-            elif os.path.isfile(m):
-                out.append(m)
-    seen, uniq = set(), []
-    for f in out:
-        ap = os.path.abspath(f)
-        if ap not in seen:
-            seen.add(ap)
-            uniq.append(f)
-    return uniq
+# ---------------------------------------------------------------------------
+# CLI:  plasrisk meta ...
+# ---------------------------------------------------------------------------
+
+def _collect_fasta(paths: List[str]) -> List[str]:
+    fasta = []
+    exts = (".fasta", ".fa", ".fna", ".fasta.gz", ".fa.gz", ".fna.gz")
+    for p in paths:
+        if os.path.isdir(p):
+            for root, _d, files in os.walk(p):
+                for f in sorted(files):
+                    if f.lower().endswith(exts):
+                        fasta.append(os.path.join(root, f))
+        elif any(ch in p for ch in "*?"):
+            import glob
+            fasta.extend(sorted(glob.glob(p)))
+        else:
+            fasta.append(p)
+    return fasta
 
 
-def _headers_for(fasta_path: str) -> List[str]:
-    headers = []
-    with open(fasta_path, "r", errors="replace") as fh:
-        for line in fh:
-            if line.startswith(">"):
-                headers.append(line[1:].rstrip("\n"))
-    return headers
+def _sample_id_from_path(path: str) -> str:
+    base = os.path.basename(path)
+    for suf in (".fasta.gz", ".fa.gz", ".fna.gz", ".fasta", ".fa", ".fna"):
+        if base.lower().endswith(suf):
+            return base[: -len(suf)]
+    return os.path.splitext(base)[0]
 
 
-def meta_main(argv=None):
-    parser = argparse.ArgumentParser(
+def build_meta_parser() -> "argparse.ArgumentParser":
+    import argparse
+    p = argparse.ArgumentParser(
         prog="plasrisk meta",
-        description="PlasRisk metagenomic three-layer scoring "
-                    "(contig / bin / sample)")
-    parser.add_argument("inputs", nargs="+",
-                        help="FASTA file(s) of plasmid contigs, or directory")
-    parser.add_argument("-o", "--output", default="plasrisk_meta_output",
-                        help="Output directory")
-    parser.add_argument("--bins", default=None,
-                        help="Optional bins table (seq_id, bin_id, ...)")
-    parser.add_argument("--genomad-bin", default=None,
-                        help="Optional geNomad plasmid components file/dir")
-    parser.add_argument("--coverage", default=None,
-                        help="Optional per-contig coverage table")
-    parser.add_argument("--coverage-column", default=None,
-                        help="Coverage column for JGI depth format")
-    parser.add_argument("--complete-length", type=int, default=10000,
-                        help="Length at/above which a contig is size-assessable")
-    parser.add_argument("-t", "--threads", type=int, default=4)
-    parser.add_argument("--min-id", type=float, default=75.0)
-    parser.add_argument("--min-cov", type=float, default=50.0)
-    parser.add_argument("--no-abricate", action="store_true")
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument("-q", "--quiet", action="store_true")
-    args = parser.parse_args(argv)
+        description="Metagenomic three-layer PlasRisk scoring "
+                    "(contig / plasmid-bin / community sample).",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    p.add_argument("inputs", nargs="+",
+                   help="assembled contig FASTA file(s) or a directory")
+    p.add_argument("-o", "--output", default="plasrisk_meta",
+                   help="output directory")
+    p.add_argument("-t", "--threads", type=int, default=4)
+    p.add_argument("--min-id", type=float, default=75.0)
+    p.add_argument("--min-cov", type=float, default=50.0)
+    p.add_argument("--db", default=None,
+                   help="abricate database root (default: bundled lookup)")
+    p.add_argument("--no-abricate", action="store_true",
+                   help="skip annotation (sequence / header evidence only)")
+    p.add_argument("--aware-version", choices=["legacy", "2025"],
+                   default="legacy",
+                   help="WHO AWaRe version used by S_ARG")
+    p.add_argument("--min-contig", type=int, default=1000,
+                   help="ignore contigs shorter than this (bp)")
+    p.add_argument("--complete-length", type=int, default=10000,
+                   help="single contig length at/above which S_SIZE is "
+                        "assessed without a circular flag (bp)")
+    p.add_argument("--bins", default=None,
+                   help="generic contig-to-bin TSV/CSV "
+                        "(seq_id,bin_id[,circular,plasmid_score])")
+    p.add_argument("--genomad-bin", default=None, metavar="DIR",
+                   help="geNomad aggregate output directory "
+                        "(*_plasmid_components.tsv / _plasmid_summary.tsv)")
+    p.add_argument("--min-plasmid-score", type=float, default=0.0,
+                   help="drop bins below this geNomad plasmid_score "
+                        "(0 keeps all; geNomad recommends 0.7)")
+    p.add_argument("--coverage", default=None,
+                   help="per-contig coverage TSV/CSV (seq_id,coverage); "
+                        "jgi_summarize_bam_contig_depths output accepted")
+    p.add_argument("--coverage-column", default=None,
+                   help="coverage column name for multi-sample coverage files")
+    p.add_argument("--sample-id", default=None,
+                   help="sample identifier (single FASTA input only)")
+    p.add_argument("--total-assembly-bp", type=int, default=None,
+                   help="total assembly length for per-Mb normalisation "
+                        "(default: sum of plasmid bin lengths)")
+    p.add_argument("--json", action="store_true",
+                   help="also write meta_sample_summary.json")
+    p.add_argument("-q", "--quiet", action="store_true")
+    return p
 
-    os.makedirs(args.output, exist_ok=True)
-    fastas = _collect_fastas(args.inputs)
+
+def meta_main(argv: Optional[List[str]] = None) -> int:
+    import json
+    args = build_meta_parser().parse_args(argv)
+
+    from .lookup import load_replicon_lookup
+    lookup = None
+    if not args.no_abricate:
+        try:
+            lookup = load_replicon_lookup()
+        except Exception:
+            lookup = None
+    scorer = PlasRiskScorer(replicon_lookup=lookup, mode="lite",
+                            aware_version=args.aware_version)
+
+    fastas = _collect_fasta(args.inputs)
     if not fastas:
-        print("ERROR: no FASTA inputs found", file=sys.stderr)
+        print("[plasrisk meta] no FASTA inputs found", file=sys.stderr)
         return 2
+    os.makedirs(args.output, exist_ok=True)
 
     bins_df = None
     if args.genomad_bin:
         bins_df = load_genomad(args.genomad_bin)
-    elif args.bins:
-        bins_df = load_bins_table(args.bins)
-
-    cov_df = None
-    if args.coverage:
-        cov_df = load_coverage_table(args.coverage,
-                                     coverage_column=args.coverage_column)
-
-    all_contig_rows: List[Dict[str, object]] = []
-    sample_rows: List[Dict[str, object]] = []
-    scorer = PlasRiskScorer()
-
-    for fasta in fastas:
-        sample_id = os.path.splitext(os.path.basename(fasta))[0]
         if not args.quiet:
-            print("[meta] %s" % sample_id)
-        ann = annotate_fasta(fasta, use_abricate=not args.no_abricate,
-                             min_id=args.min_id, min_cov=args.min_cov,
-                             threads=args.threads)
-        headers = _headers_for(fasta)
-        rows = score_contigs(ann.features, headers=headers,
-                             complete_length=args.complete_length,
-                             scorer=scorer)
-        for r in rows:
-            r["sample_id"] = sample_id
-        all_contig_rows.extend(rows)
+            print("[plasrisk meta] geNomad bins: %d contig-bin assignments"
+                  % len(bins_df))
+    if args.bins:
+        generic = load_bins_table(args.bins)
+        bins_df = generic if bins_df is None else pd.concat(
+            [bins_df, generic], ignore_index=True).drop_duplicates(
+            ["seq_id", "bin_id"])
+    coverage_df = (load_coverage_table(args.coverage,
+                                       args.coverage_column)
+                   if args.coverage else None)
 
-        sub_bins = bins_df
-        if sub_bins is not None:
-            sub_bins = bins_df[bins_df.get(
-                "sample_id", pd.Series([sample_id] * len(bins_df)))
-                .astype(str) == sample_id] if "sample_id" in bins_df.columns \
-                else bins_df
-        bin_rows = aggregate_bins(rows, bins_table=sub_bins,
-                                  coverage_table=cov_df)
-        coverages = None
-        if cov_df is not None:
-            coverages = {str(rr["seq_id"]): float(rr["coverage"])
-                         for _, rr in cov_df.iterrows()}
-        sample = aggregate_sample(bin_rows, contig_rows=rows,
-                                  coverages=coverages)
-        sample["sample_id"] = sample_id
-        sample_rows.append(sample)
+    all_contig, all_bin, sample_rows = [], [], []
+    for fi, fasta in enumerate(fastas):
+        sid = (args.sample_id if args.sample_id and len(fastas) == 1
+               else _sample_id_from_path(fasta))
+        if not args.quiet:
+            print("[plasrisk meta] (%d/%d) %s" % (fi + 1, len(fastas), sid))
 
-        if args.json:
-            with open(os.path.join(args.output, "%s_meta_sample.json" % sample_id),
-                      "w") as jf:
-                json.dump(sample, jf, indent=2, default=str)
+        if args.no_abricate:
+            records = parse_fasta(fasta)
+            from .annotate import PlasmidFeatures as _PF
+            feats = []
+            for seq_id, seq in records.items():
+                feats.append(_PF(seq_id=seq_id, length_bp=len(seq)))
+            annotation = AnnotationResult(file=fasta, features=feats)
+        else:
+            annotation = annotate_fasta(
+                fasta, use_abricate=True, min_id=args.min_id,
+                min_cov=args.min_cov, threads=args.threads,
+                lookup=lookup)
 
-    contig_df = pd.DataFrame(all_contig_rows)
-    contig_path = os.path.join(args.output, "meta_contig_scores.tsv")
-    contig_df.to_csv(contig_path, sep="\t", index=False)
+        circ_header = circular_map_from_fasta(fasta)
+        feats_kept = {f.seq_id: f for f in annotation.features
+                      if f.length_bp >= args.min_contig}
+        contig_df = score_contigs(annotation, scorer,
+                                  complete_length=args.complete_length,
+                                  min_length=args.min_contig,
+                                  circular_map=circ_header)
+        contig_df.insert(0, "sample_id", sid)
 
-    # Bin rows across samples (recompute to capture all).
-    all_bin_rows: List[Dict[str, object]] = []
-    for fasta in fastas:
-        sample_id = os.path.splitext(os.path.basename(fasta))[0]
-        rows = [r for r in all_contig_rows if r.get("sample_id") == sample_id]
-        sub_bins = bins_df
-        if sub_bins is not None and "sample_id" in sub_bins.columns:
-            sub_bins = sub_bins[sub_bins["sample_id"].astype(str) == sample_id]
-        br = aggregate_bins(rows, bins_table=sub_bins, coverage_table=cov_df)
-        for b in br:
-            b["sample_id"] = sample_id
-        all_bin_rows.extend(br)
-    bin_df = pd.DataFrame(all_bin_rows)
-    bin_path = os.path.join(args.output, "meta_bin_scores.tsv")
-    bin_df.to_csv(bin_path, sep="\t", index=False)
+        bin_df = aggregate_bins(
+            contig_df, feats_kept, bins_df, coverage_df, scorer,
+            min_plasmid_score=args.min_plasmid_score,
+            complete_length=args.complete_length,
+            header_circular_map=circ_header)
+        bin_df.insert(0, "sample_id", sid)
 
-    sample_df = pd.DataFrame(sample_rows)
-    sample_path = os.path.join(args.output, "meta_sample_summary.tsv")
-    sample_df.to_csv(sample_path, sep="\t", index=False)
+        total_bp = args.total_assembly_bp
+        if total_bp is None:
+            total_bp = int(sum(f.length_bp for f in feats_kept.values()))
+        sample_row = aggregate_sample(sid, bin_df, contig_df, total_bp)
+        all_contig.append(contig_df)
+        all_bin.append(bin_df)
+        sample_rows.append(sample_row)
+
+    contig_all = pd.concat(all_contig, ignore_index=True)
+    bin_all = pd.concat(all_bin, ignore_index=True)
+    sample_all = pd.DataFrame(sample_rows)
+
+    cpath = os.path.join(args.output, "meta_contig_scores.tsv")
+    bpath = os.path.join(args.output, "meta_bin_scores.tsv")
+    spath = os.path.join(args.output, "meta_sample_summary.tsv")
+    contig_all.to_csv(cpath, sep="\t", index=False)
+    bin_all.to_csv(bpath, sep="\t", index=False)
+    sample_all.to_csv(spath, sep="\t", index=False)
+    if args.json:
+        sample_all.to_json(os.path.join(
+            args.output, "meta_sample_summary.json"),
+            orient="records", indent=2)
 
     if not args.quiet:
-        print("[meta] wrote %s, %s, %s" % (contig_path, bin_path, sample_path))
+        print("[plasrisk meta] samples: %d | contig elements: %d | "
+              "plasmid bins: %d" % (len(sample_all), len(contig_all),
+                                    len(bin_all)))
+        print("[plasrisk meta] wrote %s" % cpath)
+        print("[plasrisk meta] wrote %s" % bpath)
+        print("[plasrisk meta] wrote %s" % spath)
     return 0
 
-
-if __name__ == "__main__":
-    sys.exit(meta_main())

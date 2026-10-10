@@ -129,7 +129,7 @@ PYEOF
       # boolean flag and the positional order is INPUT OUTPUT_DIR DATABASE).
       # Reuse a completed run so re-running the grid is resumable.
       GENOMAD_OUT="${rdir}/genomad_out"
-      if find "${GENOMAD_OUT}" -name '*_plasmid_components.tsv' 2>/dev/null \
+      if find "${GENOMAD_OUT}" -name '*_plasmid_summary.tsv' 2>/dev/null \
            | grep -q .; then
         echo "[grid] reuse geNomad output: ${GENOMAD_OUT}"
       else

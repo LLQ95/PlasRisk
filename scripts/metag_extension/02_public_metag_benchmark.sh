@@ -161,8 +161,11 @@ process_one () {
       --outputDepth "${BASEDIR}/depth/${ACC}_depth.tsv" \
       "${BASEDIR}/depth/${ACC}.bam"
 
-    genomad end-to-end --cleanup --threads "${THREADS}" \
-      "${ASM}" "${BASEDIR}/genomad/${ACC}" "${GENOMAD_DB}"
+    if ! find "${BASEDIR}/genomad/${ACC}" \
+          -name '*_plasmid_summary.tsv' 2>/dev/null | grep -q .; then
+      genomad end-to-end --cleanup --threads "${THREADS}" \
+        "${ASM}" "${BASEDIR}/genomad/${ACC}" "${GENOMAD_DB}"
+    fi
 
     plasrisk meta "${ASM}" \
       --genomad-bin "${BASEDIR}/genomad/${ACC}" \
