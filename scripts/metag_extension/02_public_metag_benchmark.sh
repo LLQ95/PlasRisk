@@ -110,44 +110,25 @@ fi
 # instead of `wait -n` for compatibility with bash < 4.3 (no wait -n).
 slot(){ while [ "$(jobs -rp | wc -l)" -ge "$1" ]; do sleep 3; done; }
 
-# ENA FASTQ directory for an ERR/SRR accession (handles the 000-999 sub-buckets
-# used once the numeric part exceeds six digits). ENA mirrors NCBI SRR runs.
-ena_dir () {
-  local ACC="$1"
-  local b6="${ACC:0:6}"
-  local digits="${ACC:3}"
-  local d="/vol1/fastq/${b6}"
-  if [ "${#digits}" -gt 6 ]; then
-    local n=$(( ${#digits} - 6 ))
-    local suf="${digits: -$n}"
-    local sub
-    sub="$(printf '%03d' "$((10#${suf}))")"
-    d="${d}/${sub}"
-  fi
-  echo "${d}/${ACC}"
-}
-
-# Fetch one ENA FASTQ member into a target path.
-#   ena_fetch <https_url> <out_path>
+# Fetch one ENA FASTQ member.
+#   ena_fetch <https_url> <aspera_remote> <out_path>
 ena_fetch () {
-  local URL="$1" OUT="$2"
+  local HTTPS_URL="$1" ASP_REMOTE="$2" OUT="$3"
   case "${DL_BACKEND}" in
-    aria2c)
-      # -c resume, -x/-s multi-connection, -m 0 keep retrying, falloc fast.
-      aria2c -c -x "${CONNS}" -s "${CONNS}" -k 1M \
-        --file-allocation=falloc --retry-wait=5 -m 0 \
-        -d "$(dirname "${OUT}")" -o "$(basename "${OUT}")" "${URL}" ;;
     aspera)
-      # fasp path is the same /vol1 tree on fasp.sra.ebi.ac.uk:33001.
       # -k1 enables resume; download into the directory (keeps file name).
-      local rp="${URL#https://ftp.sra.ebi.ac.uk}"
       local keyargs=()
       [ -n "${ASPERA_KEY}" ] && keyargs=(-i "${ASPERA_KEY}")
       ascp -QT -k1 "${keyargs[@]}" \
         -l "${ASPERA_RATE:-300m}" -P 33001 \
-        "fasp@fasp.sra.ebi.ac.uk:${rp}" "$(dirname "${OUT}")/" ;;
+        "${ASP_REMOTE}" "$(dirname "${OUT}")/" ;;
+    aria2c)
+      # -c resume, -x/-s multi-connection, -m 0 keep retrying, falloc fast.
+      aria2c -c -x "${CONNS}" -s "${CONNS}" -k 1M \
+        --file-allocation=falloc --retry-wait=5 -m 0 \
+        -d "$(dirname "${OUT}")" -o "$(basename "${OUT}")" "${HTTPS_URL}" ;;
     *)
-      curl -L -C - --retry 5 --retry-delay 5 --fail -o "${OUT}" "${URL}" ;;
+      curl -L -C - --retry 5 --retry-delay 5 --fail -o "${OUT}" "${HTTPS_URL}" ;;
   esac
 }
 
@@ -158,25 +139,38 @@ dl_one () {
   mkdir -p "${RD}"
   if [ -f "${RD}/dl_done" ]; then echo "[dl] ${ACC} cached"; return 0; fi
   echo "[dl] ${ACC} start (${DL_BACKEND})" > "${LOG}"
-  local d host url1 url2
-  d="$(ena_dir "${ACC}")"
-  host="https://ftp.sra.ebi.ac.uk"
-  url1="${host}${d}_1.fastq.gz"
-  url2="${host}${d}_2.fastq.gz"
-  # ENA mirrors both ERR and SRR. Probe whether the member exists.
-  ena_exists () {
-    curl -L -s -o /dev/null --fail -r 0-0 "$1"
-  }
-  if ena_exists "${url1}"; then
-    if ! ena_fetch "${url1}" "${RD}/${ACC}_1.fastq.gz" >>"${LOG}" 2>&1; then
-      echo "[dl] ${ACC} FAILED (_1)"; return 1
-    fi
-    if ena_exists "${url2}"; then
-      ena_fetch "${url2}" "${RD}/${ACC}_2.fastq.gz" >>"${LOG}" 2>&1 \
-        || echo "[dl] ${ACC} no _2 (single-end?)" >>"${LOG}"
-    else
-      echo "[dl] ${ACC} no _2 on ENA (single-end?)" >>"${LOG}"
-    fi
+
+  # Authoritative paths come from ENA's filereport API (this also confirms the
+  # run is present, so no separate range-probe against ftp.sra.ebi.ac.uk).
+  local api rep ftp_col asp_col
+  api="https://www.ebi.ac.uk/ena/portal/api/filereport?accession=${ACC}"
+  api="${api}&result=read_run&fields=run_accession,fastq_ftp,fastq_aspera,fastq_md5"
+  api="${api}&format=tsv&download=false"
+  rep="$(curl -L -s --retry 3 --retry-delay 3 "${api}" | tail -n +2)"
+  ftp_col="$(printf '%s' "${rep}" | cut -f2)"
+  asp_col="$(printf '%s' "${rep}" | cut -f3)"
+
+  if [ -n "${ftp_col}" ]; then
+    local oldifs="${IFS}"; IFS=';'
+    # shellcheck disable=SC2206
+    local ftps=(${ftp_col}); # shellcheck disable=SC2206
+    local asps=(${asp_col}); IFS="${oldifs}"
+    local i https_url asp_remote out base
+    for ((i=0; i<${#ftps[@]}; i++)); do
+      base="$(basename "${ftps[$i]}")"
+      https_url="https://${ftps[$i]}"
+      if [ -n "${asps[$i]:-}" ]; then
+        asp_remote="fasp@${asps[$i]}"
+      else
+        # derive the fasp remote from the FTP path (strip the FTP host).
+        asp_remote="fasp@fasp.sra.ebi.ac.uk:${ftps[$i]#ftp.sra.ebi.ac.uk}"
+      fi
+      out="${RD}/${base}"
+      if [ -s "${out}" ]; then echo "[dl] ${ACC} ${base} exists" >>"${LOG}"; continue; fi
+      if ! ena_fetch "${https_url}" "${asp_remote}" "${out}" >>"${LOG}" 2>&1; then
+        echo "[dl] ${ACC} FAILED (${base})"; return 1
+      fi
+    done
   elif [[ "${ACC}" == SRR* ]] && have prefetch; then
     # ENA does not mirror this run: fall back to NCBI prefetch.
     echo "[dl] ${ACC} ENA missing, prefetch fallback" >>"${LOG}"
@@ -194,7 +188,7 @@ dl_one () {
   else
     echo "[dl] ${ACC} FAILED (not on ENA, no prefetch)"; return 1
   fi
-  if ls "${RD}"/*_1.fastq.gz >/dev/null 2>&1; then
+  if ls "${RD}"/*.fastq.gz >/dev/null 2>&1; then
     touch "${RD}/dl_done"; echo "[dl] ${ACC} DONE"
   else
     echo "[dl] ${ACC} FAILED (no reads)"; return 1
