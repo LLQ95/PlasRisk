@@ -41,7 +41,7 @@ TRUTH_TSV="${TRUTH_DIR}/closed_plasmids_truth.tsv"
 echo "=== Stage A: download PLSDB FASTA archive and subsample ==="
 python3 - "${FIGSHARE_ARTICLE}" "${CLOSED}" "${SEED}" \
         "${N_TRUTH}" "${MIN_LEN}" "${MAX_LEN}" <<'PYEOF'
-import glob, io, json, math, os, random, sys, tarfile, urllib.request
+import glob, io, json, math, os, random, shutil, sys, tarfile, urllib.request, zipfile
 
 article, out_fasta, seed, n_target, min_len, max_len = (
     sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]),
@@ -51,12 +51,24 @@ dl_dir = "dl"
 os.makedirs(dl_dir, exist_ok=True)
 
 # --- 1) resolve the FASTA archive download URL via the Figshare API --------
+# Figshare returns HTTP 403 to the default Python-urllib User-Agent, so the
+# requests identify as curl (same approach used by make_accessions.sh).
+HEADERS = {"User-Agent": "curl/8.4.0", "Accept": "application/json"}
+
+
+def open_url(url, timeout=120):
+    req = urllib.request.Request(url, headers=HEADERS)
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
 api = "https://api.figshare.com/v2/articles/%s/files" % article
-with urllib.request.urlopen(api, timeout=60) as fh:
+with open_url(api, 60) as fh:
     files = json.load(fh)
 fasta_files = [f for f in files
-               if "fasta" in f["name"].lower()
-               and f["name"].lower().endswith((".tar.gz", ".tgz", ".gz"))]
+               if any(k in f["name"].lower()
+                      for k in ("fasta", "fna", "nucleotide", "sequence"))
+               and f["name"].lower().endswith(
+                   (".tar.gz", ".tgz", ".gz", ".zip"))]
 if not fasta_files:
     # fall back to the largest archive
     fasta_files = sorted(files, key=lambda f: f.get("size", 0), reverse=True)[:1]
@@ -67,29 +79,41 @@ print("  archive: %s (%.1f MB)" % (chosen["name"],
 archive = os.path.join(dl_dir, chosen["name"])
 if not os.path.exists(archive):
     print("  downloading ...")
-    urllib.request.urlretrieve(chosen["download_url"], archive)
+    with open_url(chosen["download_url"], 600) as r, \
+            open(archive, "wb") as out:
+        shutil.copyfileobj(r, out, length=1024 * 1024)
 else:
     print("  cached: %s" % archive)
 
 # --- 2) extract ------------------------------------------------------------
 ext_dir = os.path.join(dl_dir, "extracted")
 os.makedirs(ext_dir, exist_ok=True)
-opener, mode = (tarfile.open, "r:gz") if archive.endswith((".tar.gz", ".tgz")) \
-    else (tarfile.open, "r:*")
-with opener(archive, mode) as tf:
-    members = [m for m in tf.getmembers()
-               if m.isfile() and m.name.lower().endswith((".fna", ".fasta",
-                                                         ".fa", ".fsa"))]
-    if not members:  # extract everything and locate fasta afterwards
-        tf.extractall(ext_dir)
-    else:
-        for m in members:
-            tf.extract(m, ext_dir)
+if archive.lower().endswith(".zip"):
+    with zipfile.ZipFile(archive) as zf:
+        names = [n for n in zf.namelist()
+                 if n.lower().endswith((".fna", ".fasta", ".fa", ".fsa"))]
+        if not names:  # extract everything and locate fasta afterwards
+            zf.extractall(ext_dir)
+        else:
+            for n in names:
+                zf.extract(n, ext_dir)
+else:
+    opener, mode = (tarfile.open, "r:gz") \
+        if archive.endswith((".tar.gz", ".tgz")) else (tarfile.open, "r:*")
+    with opener(archive, mode) as tf:
+        members = [m for m in tf.getmembers()
+                   if m.isfile() and m.name.lower().endswith(
+                       (".fna", ".fasta", ".fa", ".fsa"))]
+        if not members:  # extract everything and locate fasta afterwards
+            tf.extractall(ext_dir)
+        else:
+            for m in members:
+                tf.extract(m, ext_dir)
 
 fasta_paths = glob.glob(os.path.join(ext_dir, "**", "*.f*a"), recursive=True)
 fasta_paths = [p for p in fasta_paths
                if p.lower().endswith((".fna", ".fasta", ".fa", ".fsa"))]
-if not fasta_paths:
+if not fasta:
     sys.exit("No FASTA found in PLSDB archive")
 print("  fasta file(s): %d" % len(fasta_paths))
 
