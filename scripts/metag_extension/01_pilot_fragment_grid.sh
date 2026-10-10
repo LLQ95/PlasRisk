@@ -125,7 +125,7 @@ PYEOF
       samtools index mapped.bam
       jgi_summarize_bam_contig_depths --outputDepth depth.tsv mapped.bam
 
-      # Predict and aggregate plasmids (geNomad `end-to-end`; --clean-up is a
+      # Predict and aggregate plasmids (geNomad `end-to-end`; --cleanup is a
       # boolean flag and the positional order is INPUT OUTPUT_DIR DATABASE).
       # Reuse a completed run so re-running the grid is resumable.
       GENOMAD_OUT="${rdir}/genomad_out"
@@ -133,7 +133,7 @@ PYEOF
            | grep -q .; then
         echo "[grid] reuse geNomad output: ${GENOMAD_OUT}"
       else
-        genomad end-to-end --clean-up --threads "${THREADS}" \
+        genomad end-to-end --cleanup --threads "${THREADS}" \
           "${ASM_FA}" "${GENOMAD_OUT}" "${GENOMAD_DB:?set GENOMAD_DB}"
       fi
       plasrisk meta "${ASM_FA}" --genomad-bin "${GENOMAD_OUT}" \

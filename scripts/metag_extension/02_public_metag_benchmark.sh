@@ -161,7 +161,7 @@ process_one () {
       --outputDepth "${BASEDIR}/depth/${ACC}_depth.tsv" \
       "${BASEDIR}/depth/${ACC}.bam"
 
-    genomad end-to-end --clean-up --threads "${THREADS}" \
+    genomad end-to-end --cleanup --threads "${THREADS}" \
       "${ASM}" "${BASEDIR}/genomad/${ACC}" "${GENOMAD_DB}"
 
     plasrisk meta "${ASM}" \
