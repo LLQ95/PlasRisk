@@ -1,20 +1,31 @@
 #!/usr/bin/env bash
 # =============================================================================
 # 02_public_metag_benchmark.sh
-# Tier A public-metagenome benchmark, resumable + parallel.
-#   Stage 1 download : ERR -> ENA direct FASTQ (curl, resume, parallel)
-#                      SRR -> prefetch (resumable) + fasterq-dump + pigz
+# Tier A public-metagenome benchmark, resumable + parallel + multi-connection.
+#   Stage 1 download : ERR/SRR -> ENA direct FASTQ. Multi-connection with
+#                      aria2c (preferred), Aspera fasp (optional), or curl
+#                      resume as fallback. SRR falls back to prefetch if ENA
+#                      does not mirror the run.
 #   Stage 2 process  : fastp -> MEGAHIT -> depth -> geNomad -> plasrisk meta
 # Per-sample failures are isolated and logged; re-running resumes from the
 # last completed step (markers and existing outputs are reused).
 #
+# Credentials (kept OUT of this repo): the NCBI API key is read from the
+#   NCBI_API_KEY environment variable, or from a shell snippet at
+#   $PLASRIS_CREDENTIALS (default ~/.config/plasrisk/credentials) containing
+#     export NCBI_API_KEY=your_key
+#   The key raises NCBI E-utilities/prefetch request limits; it does not raise
+#   bulk byte throughput. ENA multi-connection (aria2c) is the real speedup.
+#
 # Usage:
 #   02_public_metag_benchmark.sh ACCESSIONS WORKDIR THREADS \
-#                                [MODE] [DL_JOBS] [PROC_JOBS]
+#                                [MODE] [DL_JOBS] [PROC_JOBS] [CONNS]
 #   MODE      = all | download | process           (default all)
-#   DL_JOBS   = parallel downloads                 (default 4)
+#   DL_JOBS   = parallel samples downloading       (default 6)
 #   PROC_JOBS = parallel samples in stage 2, each
 #               using THREADS; keep PROC_JOBS*THREADS <= cores (default 1)
+#   CONNS     = connections per file for aria2c    (default 8, max 16)
+# Set ENABLE_ASPERA=1 to prefer Aspera when the `ascp` binary is available.
 # accessions.tsv columns (no header): accession,habitat_group,pair_id
 # =============================================================================
 set -uo pipefail   # no -e: per-sample failures must not abort the whole run
@@ -23,8 +34,18 @@ ACC_FILE="${1:?accessions.tsv required}"
 BASEDIR="${2:?output dir required}"
 THREADS="${3:-16}"
 MODE="${4:-all}"
-DL_JOBS="${5:-4}"
+DL_JOBS="${5:-6}"
 PROC_JOBS="${6:-1}"
+CONNS="${7:-8}"
+
+# Load the NCBI API key from env or a local, non-repo credentials file.
+CRED_FILE="${PLASRIS_CREDENTIALS:-$HOME/.config/plasrisk/credentials}"
+if [ -z "${NCBI_API_KEY:-}" ] && [ -f "${CRED_FILE}" ]; then
+  # shellcheck disable=SC1090
+  . "${CRED_FILE}" >/dev/null 2>&1 || true
+fi
+export NCBI_API_KEY
+if [ -n "${NCBI_API_KEY:-}" ]; then echo "[cred] NCBI API key loaded"; fi
 
 mkdir -p "${BASEDIR}"/{reads,qc,asm,depth,genomad,plasrisk,logs}
 FAIL_LOG="${BASEDIR}/failed_samples.tsv"
@@ -35,14 +56,20 @@ have(){ command -v "$1" >/dev/null 2>&1; }
 # --------------------------- dependency self-check ---------------------------
 miss_dl=0; miss_pr=0
 have curl || { echo "MISSING download binary: curl"; miss_dl=1; }
+# Choose the download backend. aria2c gives multi-connection throughput;
+# Aspera (fasp) is used only when explicitly enabled and installed.
+DL_BACKEND="curl"
+if have aria2c; then DL_BACKEND="aria2c"; fi
+if [ "${ENABLE_ASPERA:-0}" = "1" ] && have ascp; then DL_BACKEND="aspera"; fi
+echo "[dl] backend: ${DL_BACKEND} (${DL_JOBS} samples x ${CONNS} conns)"
 for b in fastp megahit bowtie2 bowtie2-build samtools \
          jgi_summarize_bam_contig_depths genomad plasrisk; do
   have "$b" || { echo "MISSING process binary: $b"; miss_pr=1; }
 done
-# SRR runs additionally need sra-tools + pigz (ERR use ENA direct FASTQ).
+# SRR runs only need sra-tools if ENA does not mirror them (prefetch fallback).
 if grep -Eq '^[[:space:]]*SRR' "${ACC_FILE}"; then
-  for b in prefetch fasterq-dump pigz; do
-    have "$b" || { echo "MISSING download binary (SRR): $b"; miss_dl=1; }
+  for b in prefetch fasterq-dump; do
+    have "$b" || echo "NOTE (SRR fallback): $b not found; ENA direct will be used"
   done
 fi
 if [ "${MODE}" != "process" ] && [ "${miss_dl}" -ne 0 ]; then
@@ -53,11 +80,18 @@ if [ "${MODE}" != "download" ]; then
   : "${GENOMAD_DB:?set GENOMAD_DB to the genomad_db folder}"
 fi
 
+# Configure sra-tools with the API key once, if a supported flag exists.
+if [ -n "${NCBI_API_KEY:-}" ] && have vdb-config; then
+  if vdb-config --help 2>&1 | grep -q -- '--api-key'; then
+    vdb-config --api-key "${NCBI_API_KEY}" >/dev/null 2>&1 || true
+  fi
+fi
+
 # Wait until fewer than $1 background jobs are running.
 slot(){ while [ "$(jobs -rp | wc -l)" -ge "$1" ]; do wait -n || true; done; }
 
-# ENA FASTQ directory for an ERR accession (handles the 000-999 sub-buckets
-# used once the numeric part exceeds six digits).
+# ENA FASTQ directory for an ERR/SRR accession (handles the 000-999 sub-buckets
+# used once the numeric part exceeds six digits). ENA mirrors NCBI SRR runs.
 ena_dir () {
   local ACC="$1"
   local b6="${ACC:0:6}"
@@ -73,26 +107,55 @@ ena_dir () {
   echo "${d}/${ACC}"
 }
 
+# Fetch one ENA FASTQ member into a target path.
+#   ena_fetch <https_url> <out_path>
+ena_fetch () {
+  local URL="$1" OUT="$2"
+  case "${DL_BACKEND}" in
+    aria2c)
+      # -c resume, -x/-s multi-connection, -m 0 keep retrying, falloc fast.
+      aria2c -c -x "${CONNS}" -s "${CONNS}" -k 1M \
+        --file-allocation=falloc --retry-wait=5 -m 0 \
+        -d "$(dirname "${OUT}")" -o "$(basename "${OUT}")" "${URL}" ;;
+    aspera)
+      # fasp path is the same /vol1 tree on fasp.sra.ebi.ac.uk:33001.
+      local rp="${URL#https://ftp.sra.ebi.ac.uk}"
+      ascp -QT -l "${ASPERA_RATE:-300m}" -P 33001 \
+        "fasp@fasp.sra.ebi.ac.uk:${rp}" "${OUT}" ;;
+    *)
+      curl -L -C - --retry 5 --retry-delay 5 --fail -o "${OUT}" "${URL}" ;;
+  esac
+}
+
 # ------------------------------- Stage 1 download ----------------------------
 dl_one () {
   local ACC="$1" RD="$2"
   local LOG="${BASEDIR}/logs/${ACC}.dl.log"
   mkdir -p "${RD}"
   if [ -f "${RD}/dl_done" ]; then echo "[dl] ${ACC} cached"; return 0; fi
-  echo "[dl] ${ACC} start" > "${LOG}"
-  if [[ "${ACC}" == ERR* ]]; then
-    local d host
-    d="$(ena_dir "${ACC}")"
-    host="https://ftp.sra.ebi.ac.uk"
-    # -C - resumes a partial transfer; --retry handles transient failures.
-    if ! curl -L -C - --retry 5 --retry-delay 5 --fail \
-          -o "${RD}/${ACC}_1.fastq.gz" "${host}${d}_1.fastq.gz" >>"${LOG}" 2>&1; then
+  echo "[dl] ${ACC} start (${DL_BACKEND})" > "${LOG}"
+  local d host url1 url2
+  d="$(ena_dir "${ACC}")"
+  host="https://ftp.sra.ebi.ac.uk"
+  url1="${host}${d}_1.fastq.gz"
+  url2="${host}${d}_2.fastq.gz"
+  # ENA mirrors both ERR and SRR. Probe whether the member exists.
+  ena_exists () {
+    curl -L -s -o /dev/null --fail -r 0-0 "$1"
+  }
+  if ena_exists "${url1}"; then
+    if ! ena_fetch "${url1}" "${RD}/${ACC}_1.fastq.gz" >>"${LOG}" 2>&1; then
       echo "[dl] ${ACC} FAILED (_1)"; return 1
     fi
-    curl -L -C - --retry 5 --retry-delay 5 --fail \
-      -o "${RD}/${ACC}_2.fastq.gz" "${host}${d}_2.fastq.gz" >>"${LOG}" 2>&1 \
-      || echo "[dl] ${ACC} no _2 (single-end?)" >>"${LOG}"
-  else
+    if ena_exists "${url2}"; then
+      ena_fetch "${url2}" "${RD}/${ACC}_2.fastq.gz" >>"${LOG}" 2>&1 \
+        || echo "[dl] ${ACC} no _2 (single-end?)" >>"${LOG}"
+    else
+      echo "[dl] ${ACC} no _2 on ENA (single-end?)" >>"${LOG}"
+    fi
+  elif [[ "${ACC}" == SRR* ]] && have prefetch; then
+    # ENA does not mirror this run: fall back to NCBI prefetch.
+    echo "[dl] ${ACC} ENA missing, prefetch fallback" >>"${LOG}"
     if ! prefetch "${ACC}" -O "${RD}" >>"${LOG}" 2>&1; then
       echo "[dl] ${ACC} FAILED (prefetch)"; return 1
     fi
@@ -102,7 +165,10 @@ dl_one () {
           -e "${THREADS}" --progress >>"${LOG}" 2>&1; then
       echo "[dl] ${ACC} FAILED (fasterq)"; return 1
     fi
-    pigz -p "${THREADS}" "${RD}"/*.fastq
+    have pigz && pigz -p "${THREADS}" "${RD}"/*.fastq \
+              || gzip "${RD}"/*.fastq
+  else
+    echo "[dl] ${ACC} FAILED (not on ENA, no prefetch)"; return 1
   fi
   if ls "${RD}"/*_1.fastq.gz >/dev/null 2>&1; then
     touch "${RD}/dl_done"; echo "[dl] ${ACC} DONE"
