@@ -7,16 +7,16 @@
 #
 # Run on the server under any conda env that has: art/MEGAHIT/metaSPAdes,
 # genomad, bowtie2, jgi_summarize_bam_contig_depths, plasrisk (>=1.5.0).
-# Edit the CONFIG block before running.
+# Accepts positional args; see usage below.
 # =============================================================================
 set -euo pipefail
 
-# ---------------------------- CONFIG (edit me) -------------------------------
-PLASMID_FASTA="/db/student/metagenome/pipdb/contigs/truth/closed_plasmids.fasta"
-TRUTH_TABLE="/db/student/metagenome/pipdb/contigs/truth/closed_plasmids_truth.tsv"
-# truth table columns: plasmid_id,length_bp,S_whole,grade,high_risk_genes
-WORKDIR="/db/student/metagenome/pipdb/contigs/fragment_grid"
-THREADS=16
+# ---------------------------- args / CONFIG ----------------------------------
+# Usage: bash 01_pilot_fragment_grid.sh [TRUTH_DIR] [WORKDIR] [THREADS] [SEED]
+TRUTH_DIR="${1:-truth}"
+OUTDIR="${2:-fragment_grid}"
+THREADS="${3:-16}"
+SEED="${4:-42}"
 READ_LENGTHS=(150)            # e.g. 100 150 250
 DEPTHS=(10 30)                # per-community total depth split across plasmids
 REPLICATES=3
@@ -24,7 +24,28 @@ PLASMIDS_PER_COMMUNITY=30
 ASSEMBLER="megahit"           # megahit | metaspades
 # -----------------------------------------------------------------------------
 
-mkdir -p "${WORKDIR}"; cd "${WORKDIR}"
+# Resolve absolute paths (the loop cd's into per-run dirs and back).
+mkdir -p "${TRUTH_DIR}" "${OUTDIR}"
+TRUTH_DIR="$(cd "${TRUTH_DIR}" && pwd)"
+WORKDIR="$(cd "${OUTDIR}" && pwd)"
+PLASMID_FASTA="${TRUTH_DIR}/closed_plasmids.fasta"
+TRUTH_TABLE="${TRUTH_DIR}/closed_plasmids_truth.tsv"
+# truth table columns: plasmid_id,length_bp,S_whole,grade,...,cargo_genes
+[ -f "${PLASMID_FASTA}" ] || { echo "missing ${PLASMID_FASTA}; run 00 first"; exit 1; }
+[ -f "${TRUTH_TABLE}" ] || { echo "missing ${TRUTH_TABLE}; run 00 first"; exit 1; }
+: "${GENOMAD_DB:?set GENOMAD_DB to the genomad_db folder (geNomad database)}"
+
+# Dependency self-check (fail once, listing everything missing).
+missing=0
+need(){ command -v "$1" >/dev/null 2>&1 || { echo "MISSING binary: $1"; missing=1; }; }
+for b in art_illumina bowtie2 bowtie2-build samtools \
+         jgi_summarize_bam_contig_depths genomad; do need "$b"; done
+if [ "${ASSEMBLER}" = "megahit" ]; then need megahit; else need metaspades.py; fi
+python3 -c "import plasrisk" 2>/dev/null || \
+  { echo "MISSING: plasrisk (pip install plasrisk==1.6.0)"; missing=1; }
+[ "$missing" -eq 0 ] || { echo "install missing tools, then re-run"; exit 1; }
+
+cd "${WORKDIR}"
 
 # Split closed plasmids into one-file-per-plasmid for community mixing
 mkdir -p refs
@@ -41,7 +62,7 @@ echo -e "rep\tread_len\tdepth\tcommunity\tdir" > "${GRID_LOG}"
 
 for rep in $(seq 1 "${REPLICATES}"); do
   for rl in "${READ_LENGTHS[@]}"; do
-    for dep in "${DEPTHS}"; do
+    for dep in "${DEPTHS[@]}"; do
       tag="rep${rep}_r${rl}_d${dep}"
       rdir="${WORKDIR}/runs/${tag}"
       mkdir -p "${rdir}"; cd "${rdir}"
@@ -50,7 +71,7 @@ for rep in $(seq 1 "${REPLICATES}"); do
       # log-uniform relative abundances
       comm="community_${tag}.fa"
       python3 - "${WORKDIR}/refs" "${comm}" "${PLASMIDS_PER_COMMUNITY}" \
-              "$((1000+rep))" <<'PYEOF'
+              "$((SEED+rep))" <<'PYEOF'
 import math, os, random, sys
 refdir, out, k, seed = sys.argv[1:5]
 random.seed(int(seed))
