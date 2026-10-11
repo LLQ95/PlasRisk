@@ -16,7 +16,11 @@ breadth, and temporal growth rate. It is not restricted to curated plasmid
 FASTAs. The unified `plasrisk auto` command scores a ready plasmid collection
 directly and also mines plasmids out of raw short-read whole-genome, long-read
 whole-genome, and multi-strain metagenomic assemblies, reporting an explicit
-unscorable status when no plasmid can be recovered. Annotation uses
+unscorable status when no plasmid can be recovered. A single FASTA may mix
+chromosomal and plasmid contigs, or complete and fragmented molecules from
+several replicons; every contig is classified separately and only the
+predicted plasmid sequences are extracted and scored, so hybrid inputs work
+without manual splitting. Annotation uses
 [abricate](https://github.com/tseemann/abricate) when available and falls back
 to sequence/header evidence otherwise.
 
@@ -89,6 +93,7 @@ with `--input-type`, `--read-type`, or `--classifier`.
 | Long-read WGS / complete isolate assembly | a chromosome-scale contig with few, very long contigs (or high median length) | finds plasmids by PlasmidFinder replicon / replication genes and circularised molecules, extracts them, scores as isolate contigs; falls back to geNomad if the replicon scan finds nothing |
 | Short-read WGS assembly | chromosome present with many fragmented contigs | predicts plasmid contigs with geNomad end-to-end, then routes complete contigs to the isolate scorer and fragments to the metagenomic layers |
 | Short- or long-read metagenomic assembly | `--input-type metagenome` | geNomad plasmid prediction followed by the three-layer contig/bin/sample aggregation |
+| Mixed / hybrid assembly (chromosome + plasmid contigs, or complete + fragmented molecules in one FASTA) | a chromosome-scale contig alongside smaller circular or replicon-bearing contigs | each contig is labelled by replicon/circularity (long reads) or geNomad (short reads); predicted plasmids are extracted and scored, chromosomes ignored |
 | Chromosome-only assembly | chromosome-scale molecules, no plasmid signal | reports `unscorable` with the reason; never fabricates a score |
 | Raw reads (`.fastq`/`.fq`, optionally `.gz`) | read file extension | exits with code 2 and prints the assembler command; reads are assembled first, never in place |
 

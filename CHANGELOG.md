@@ -2,6 +2,18 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.7.1] - 2026-10-11
+
+### Changed
+- Documentation states the generality explicitly: PlasRisk is not limited to
+  curated plasmid sequences. A single FASTA may mix chromosomal and plasmid
+  contigs, or complete and fragmented molecules from several replicons, and
+  each contig is classified separately (replicon/circularity on long reads,
+  geNomad on short reads) so that only the predicted plasmid sequences are
+  extracted and scored and chromosomes are ignored.
+- Releases are published non-interactively from the project's configured
+  PyPI credential; no functional scoring change versus 1.7.0.
+
 ## [1.7.0] - 2026-10-11
 
 ### Added
