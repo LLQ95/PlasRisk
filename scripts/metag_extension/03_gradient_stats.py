@@ -16,6 +16,7 @@ Tests:
   - paired Wilcoxon for samples sharing a pair_id
   - BH adjustment across metrics
 """
+import argparse
 import os
 import sys
 
@@ -65,15 +66,45 @@ def cliffs_delta(x, gidx):
     return num / den if den else np.nan
 
 
-def main():
-    infile, outdir = sys.argv[1], sys.argv[2]
-    os.makedirs(outdir, exist_ok=True)
-    df = pd.read_csv(infile, sep="\t")
-    df = df[df["habitat_group"].isin(ORDER)].copy()
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        description="Tier A anthropogenic-intensity gradient statistics.")
+    ap.add_argument(
+        "infile",
+        help="benchmark_sample_summary.tsv produced by 02_public_metag_benchmark.sh")
+    ap.add_argument("outdir", help="directory for output tables")
+    ap.add_argument(
+        "--order", default=",".join(ORDER),
+        help="comma-separated habitat_group labels, low->high intensity; "
+             "must match the labels in accessions.tsv (default: prespecified "
+             "5-level order)")
+    args = ap.parse_args(argv)
+    order = [g.strip() for g in args.order.split(",") if g.strip()]
+
+    if not os.path.exists(args.infile):
+        sys.exit(
+            "[error] input not found: %s\n"
+            "        03 reads benchmark_sample_summary.tsv, which is written "
+            "to the workdir only after 02_public_metag_benchmark.sh has run its "
+            "process stage (fastp->megahit->genomad->plasrisk meta). Finish that "
+            "first, then rerun 03." % args.infile)
+    os.makedirs(args.outdir, exist_ok=True)
+    df = pd.read_csv(args.infile, sep="\t")
+    if "habitat_group" not in df.columns:
+        sys.exit("[error] input has no habitat_group column: %s" % args.infile)
+    present = sorted(df["habitat_group"].dropna().astype(str).unique().tolist())
+    df = df[df["habitat_group"].isin(order)].copy()
+    if df.empty:
+        sys.exit(
+            "[error] no rows match the habitat order.\n"
+            "        order given : %s\n"
+            "        present     : %s\n"
+            "        rerun with --order matching the present labels, e.g. "
+            "--order wastewater,livestock" % (order, present))
     df["group_idx"] = df["habitat_group"].map(
-        {g: i for i, g in enumerate(ORDER)})
+        {g: i for i, g in enumerate(order)})
     print("n samples by group:")
-    print(df.groupby("habitat_group").size().reindex(ORDER))
+    print(df.groupby("habitat_group").size().reindex(order))
 
     trend_rows = []
     for metric in METRICS:
@@ -99,7 +130,7 @@ def main():
     if not trend.empty:
         trend["spearman_p_BH"] = bh_adjust(trend["spearman_p"])
         trend["kruskal_p_BH"] = bh_adjust(trend["kruskal_p"].fillna(1))
-    trend.to_csv(os.path.join(outdir, "gradient_trend_tests.tsv"),
+    trend.to_csv(os.path.join(args.outdir, "gradient_trend_tests.tsv"),
                  sep="\t", index=False)
 
     # Paired comparisons (pair_id must be shared by exactly two samples)
@@ -125,18 +156,18 @@ def main():
     pairs = pd.DataFrame(pair_rows)
     if not pairs.empty:
         pairs["wilcoxon_p_BH"] = bh_adjust(pairs["wilcoxon_p"].fillna(1))
-    pairs.to_csv(os.path.join(outdir, "paired_comparisons.tsv"),
+    pairs.to_csv(os.path.join(args.outdir, "paired_comparisons.tsv"),
                  sep="\t", index=False)
 
     # Group medians/IQRs for figure construction
     desc = df.groupby("habitat_group")[METRICS].agg(
         ["median", lambda q: q.quantile(0.25), lambda q: q.quantile(0.75),
          "count"])
-    desc.to_csv(os.path.join(outdir, "group_descriptive.tsv"), sep="\t")
+    desc.to_csv(os.path.join(args.outdir, "group_descriptive.tsv"), sep="\t")
 
     print("\n=== trend tests ===")
     print(trend.to_string(index=False) if not trend.empty else "(none)")
-    print("\nwrote", outdir)
+    print("\nwrote", args.outdir)
 
 
 if __name__ == "__main__":
