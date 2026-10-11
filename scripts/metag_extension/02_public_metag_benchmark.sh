@@ -34,9 +34,9 @@ ACC_FILE="${1:?accessions.tsv required}"
 BASEDIR="${2:?output dir required}"
 THREADS="${3:-16}"
 MODE="${4:-all}"
-DL_JOBS="${5:-6}"
+DL_JOBS="${5:-4}"
 PROC_JOBS="${6:-1}"
-CONNS="${7:-8}"
+CONNS="${7:-4}"
 
 # Load the NCBI API key from env or a local, non-repo credentials file.
 CRED_FILE="${PLASRIS_CREDENTIALS:-$HOME/.config/plasrisk/credentials}"
@@ -132,6 +132,30 @@ ena_fetch () {
   esac
 }
 
+# Query the ENA portal filereport API and return the raw TSV only when it is a
+# genuine table containing this run. Under high concurrency the EBI edge can
+# answer with an HTML/JS challenge page instead of TSV; that is a transient
+# block, so it is detected and retried with backoff rather than being parsed.
+ena_api_tsv () {
+  local ACC="$1" url out t
+  url="https://www.ebi.ac.uk/ena/portal/api/filereport?accession=${ACC}"
+  url="${url}&result=read_run&fields=run_accession,fastq_ftp,fastq_aspera,fastq_md5"
+  url="${url}&format=tsv&download=false"
+  for ((t=1; t<=6; t++)); do
+    out="$(curl -L -s --retry 3 --retry-delay 3 "${url}" || true)"
+    if printf '%s' "${out}" | head -1 | grep -q 'run_accession' \
+       && printf '%s' "${out}" | grep -q "^${ACC}[[:space:]]"; then
+      printf '%s' "${out}"; return 0
+    fi
+    sleep $((t*5))
+  done
+  return 1
+}
+
+# True when the file is a valid gzip (a soft-blocked HTTP 200 returns an HTML
+# body that is saved under the .fastq.gz name; gzip -t rejects it).
+is_gzip(){ gzip -t "$1" 2>/dev/null; }
+
 # ------------------------------- Stage 1 download ----------------------------
 dl_one () {
   local ACC="$1" RD="$2"
@@ -142,11 +166,8 @@ dl_one () {
 
   # Authoritative paths come from ENA's filereport API (this also confirms the
   # run is present, so no separate range-probe against ftp.sra.ebi.ac.uk).
-  local api rep ftp_col asp_col
-  api="https://www.ebi.ac.uk/ena/portal/api/filereport?accession=${ACC}"
-  api="${api}&result=read_run&fields=run_accession,fastq_ftp,fastq_aspera,fastq_md5"
-  api="${api}&format=tsv&download=false"
-  rep="$(curl -L -s --retry 3 --retry-delay 3 "${api}" | tail -n +2)"
+  local rep ftp_col asp_col
+  rep="$(ena_api_tsv "${ACC}" | tail -n +2 || true)"
   ftp_col="$(printf '%s' "${rep}" | cut -f2)"
   asp_col="$(printf '%s' "${rep}" | cut -f3)"
 
@@ -155,7 +176,7 @@ dl_one () {
     # shellcheck disable=SC2206
     local ftps=(${ftp_col}); # shellcheck disable=SC2206
     local asps=(${asp_col}); IFS="${oldifs}"
-    local i https_url asp_remote out base
+    local i https_url asp_remote out base attempt ok
     for ((i=0; i<${#ftps[@]}; i++)); do
       base="$(basename "${ftps[$i]}")"
       https_url="https://${ftps[$i]}"
@@ -166,9 +187,21 @@ dl_one () {
         asp_remote="fasp@fasp.sra.ebi.ac.uk:${ftps[$i]#ftp.sra.ebi.ac.uk}"
       fi
       out="${RD}/${base}"
-      if [ -s "${out}" ]; then echo "[dl] ${ACC} ${base} exists" >>"${LOG}"; continue; fi
-      if ! ena_fetch "${https_url}" "${asp_remote}" "${out}" >>"${LOG}" 2>&1; then
-        echo "[dl] ${ACC} FAILED (${base})"; return 1
+      if [ -s "${out}" ]; then
+        if is_gzip "${out}"; then
+          echo "[dl] ${ACC} ${base} exists" >>"${LOG}"; continue
+        fi
+        rm -f "${out}"   # truncated or an HTML block page saved under the name
+      fi
+      ok=0
+      for attempt in 1 2 3 4; do
+        if ena_fetch "${https_url}" "${asp_remote}" "${out}" >>"${LOG}" 2>&1 \
+           && [ -s "${out}" ] && is_gzip "${out}"; then ok=1; break; fi
+        rm -f "${out}"; sleep $((attempt*5))
+      done
+      if [ "${ok}" != 1 ]; then
+        echo "[dl] ${ACC} FAILED (${base}; blocked/non-gzip after retries)"
+        return 1
       fi
     done
   elif [[ "${ACC}" == SRR* ]] && have prefetch; then
@@ -186,7 +219,8 @@ dl_one () {
     have pigz && pigz -p "${THREADS}" "${RD}"/*.fastq \
               || gzip "${RD}"/*.fastq
   else
-    echo "[dl] ${ACC} FAILED (not on ENA, no prefetch)"; return 1
+    echo "[dl] ${ACC} FAILED (not confirmed on ENA after retries; re-run later)"
+    return 1
   fi
   if ls "${RD}"/*.fastq.gz >/dev/null 2>&1; then
     touch "${RD}/dl_done"; echo "[dl] ${ACC} DONE"
