@@ -2,6 +2,41 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.7.0] - 2026-10-11
+
+### Added
+- Unified `plasrisk auto` entry point (Python API:
+  `plasrisk.extract.auto_main`, `characterize_assembly`,
+  `choose_auto_strategy`). One command accepts a ready plasmid collection or
+  a raw short-read WGS, long-read WGS, or metagenomic assembly and decides
+  the workflow from the assembly itself: collections with no
+  chromosome-scale molecule are scored directly; assemblies containing a
+  chromosome are split by contig size/count into long-read vs short-read.
+- Long-read non-plasmid assemblies are mined for plasmids with a new
+  replicon classifier (`--classifier replicon`, Python API
+  `classify_by_replicon`): contigs carrying a PlasmidFinder replicon /
+  replication gene (abricate `plasmidfinder`, or a precomputed
+  `--replicon-table`) are extracted, as are circularised molecules in the
+  plasmid size range; chromosome-scale contigs without plasmid signal are
+  excluded. If the replicon scan finds nothing and geNomad with a database
+  is available, `auto` falls back to geNomad.
+- Short-read non-plasmid assemblies are predicted with geNomad end-to-end
+  and then routed to the isolate or metagenomic layers based on contig
+  completeness; metagenomic input always uses the three-layer aggregation.
+- Override switches `--input-type {auto,plasmid,genome,metagenome}`,
+  `--read-type {auto,short,long}`, and `--classifier`. A per-sample
+  `auto_status.tsv` records the detected read type, action, classifier,
+  route, plasmid count, and any unscorable reason.
+- FASTQ reads are not assembled in place. `auto` detects `.fastq/.fq(.gz)`
+  input, exits with code 2, and prints the recommended assemblers
+  (MEGAHIT/metaSPAdes for short reads; Flye/metaFlye for long reads).
+
+### Changed
+- geNomad invocation updated to the v1.7+ command line (verified on
+  v1.12): `genomad end-to-end INPUT OUTPUT DATABASE --cleanup --threads N
+  --min-score T`, replacing the removed `genomad classify`. Summary tables
+  are located recursively so the nested `<stem>_summary/` layout is handled.
+
 ## [1.6.1] - 2026-10-10
 
 ### Fixed

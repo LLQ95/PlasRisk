@@ -12,8 +12,13 @@ PlasRisk computes a composite risk score for bacterial plasmids based on
 biologically motivated dimensions: antimicrobial resistance gene (ARG) burden,
 virulence factors (VFs), mobility/conjugation potential, host range, replicon
 type, plasmid size, biocide/metal resistance (BMRG), geographic spread, habitat
-breadth, and temporal growth rate. It accepts plasmid FASTA sequences and
-automatically annotates them using [abricate](https://github.com/tseemann/abricate).
+breadth, and temporal growth rate. It is not restricted to curated plasmid
+FASTAs. The unified `plasrisk auto` command scores a ready plasmid collection
+directly and also mines plasmids out of raw short-read whole-genome, long-read
+whole-genome, and multi-strain metagenomic assemblies, reporting an explicit
+unscorable status when no plasmid can be recovered. Annotation uses
+[abricate](https://github.com/tseemann/abricate) when available and falls back
+to sequence/header evidence otherwise.
 
 The default output is the FASTA-only lite core:
 
@@ -68,6 +73,74 @@ all 792,964 PSCs found that the 2025 mapping changes S_ARG by at least
 0.05 for 4.9% of PSCs and moves the high-risk-ARG AUC on the locked test
 from 0.9807 to 0.9789 (delta -0.0018); the frozen values are retained
 (see Method S14 and Table S56 in the Supplementary Materials).
+
+---
+
+## One command for every input (`plasrisk auto`)
+
+`plasrisk auto` inspects each FASTA and chooses the workflow, so the same
+command works from a closed plasmid to a raw metagenomic assembly. The
+decision is recorded per sample in `auto_status.tsv` and can be overridden
+with `--input-type`, `--read-type`, or `--classifier`.
+
+| What you have | Detection basis | What `auto` does |
+|---|---|---|
+| Plasmid FASTA / plasmid collection | no chromosome-scale molecule (total and longest contig below the chromosome threshold) | scores the sequences directly (`plasrisk_results.tsv`) |
+| Long-read WGS / complete isolate assembly | a chromosome-scale contig with few, very long contigs (or high median length) | finds plasmids by PlasmidFinder replicon / replication genes and circularised molecules, extracts them, scores as isolate contigs; falls back to geNomad if the replicon scan finds nothing |
+| Short-read WGS assembly | chromosome present with many fragmented contigs | predicts plasmid contigs with geNomad end-to-end, then routes complete contigs to the isolate scorer and fragments to the metagenomic layers |
+| Short- or long-read metagenomic assembly | `--input-type metagenome` | geNomad plasmid prediction followed by the three-layer contig/bin/sample aggregation |
+| Chromosome-only assembly | chromosome-scale molecules, no plasmid signal | reports `unscorable` with the reason; never fabricates a score |
+| Raw reads (`.fastq`/`.fq`, optionally `.gz`) | read file extension | exits with code 2 and prints the assembler command; reads are assembled first, never in place |
+
+```bash
+# Let PlasRisk decide (most users only need this)
+plasrisk auto input.fasta -o plasrisk_out
+
+# A directory of assemblies is handled per file
+plasrisk auto assemblies/ -o plasrisk_out -t 16
+
+# Force a particular interpretation
+plasrisk auto asm.fasta --input-type genome --read-type long
+plasrisk auto community.fasta --input-type metagenome --genomad-db /path/to/genomad_db
+
+# Provide precomputed classifier tables to avoid running the external tools
+plasrisk auto longread.fasta --replicon-table abricate_plasmidfinder.tsv
+plasrisk auto shortread.fasta --genomad-table genomad_out/
+```
+
+Assemble reads before scoring; the package deliberately does not bundle an
+assembler:
+
+```bash
+# Short reads (WGS or metagenomic)
+megahit -1 R1.fq.gz -2 R2.fq.gz -o asm          # metagenome: add --meta for metaSPAdes
+# Long reads
+flye --nano-raw reads.fq.gz -o asm             # metagenome: flye --meta (metaFlye)
+plasrisk auto asm/final.contigs.fa -o plasrisk_out
+```
+
+### External tools and when they are needed
+
+The pip package itself only requires Python with pandas/numpy and always
+supports `--no-abricate` sequence/header scoring. The full generality uses
+optional external tools that are not bundled:
+
+| Capability | Tool | When needed | Install |
+|---|---|---|---|
+| Gene/replicon annotation | [abricate](https://github.com/tseemann/abricate) with CARD/VFDB/PlasmidFinder/BacMet | ARG, VF, BMG and replicon calling; replicon classifier on long reads | `conda install -c bioconda abricate` |
+| Short-read plasmid prediction | [geNomad](https://github.com/apcamargo/geNomad) v1.7+ (verified on v1.12) + database | non-plasmid short-read and metagenomic inputs | `pip install genomad` then `genomad download-database genomad_db`; point `--genomad-db` or set `GENOMAD_DB` |
+| Short-read plasmid prediction (alt.) | [PlasFlow](https://github.com/smaegol/PlasFlow) | optional alternative classifier (`--classifier plasflow`, older TensorFlow stack) | its own conda environment; pass `--plasflow-table` |
+| Short-read assembly | MEGAHIT / metaSPAdes | raw short reads | `conda install -c bioconda megahit` / `spades` |
+| Long-read assembly | Flye / metaFlye | raw long reads | `conda install -c bioconda flye` |
+
+geNomad is invoked as `genomad end-to-end INPUT OUTPUT DATABASE --cleanup
+--threads N --min-score T` (the legacy `genomad classify`/`aggregate`
+subcommands were removed in v1.7). Precomputed tables can always be supplied
+instead, so a machine without these tools can still run the scoring layers.
+
+The lower-level commands remain available for full control: `plasrisk run`
+(predict → extract → route from an assembly) and `plasrisk meta`
+(three-layer metagenomic scoring).
 
 ---
 
@@ -294,11 +367,26 @@ plasrisk run assembly.fasta -o plasrisk_out \
 abricate --db card plasrisk_out/*/predicted_plasmids.fasta
 ```
 
-For long-read assemblies the same commands apply; complete circular plasmid
-reads are detected from the header and routed to the isolate scorer. For
-multi-strain metagenomic assemblies, assemble first (MEGAHIT or metaSPAdes),
-optionally bin plasmids with geNomad, and run `plasrisk run` with the bin and
-coverage tables, or use `plasrisk meta` directly.
+For long-read assemblies, complete circular plasmid reads are detected from
+the header and routed to the isolate scorer. For a complete long-read WGS
+assembly the recommended classifier is `replicon`, which extracts contigs by
+PlasmidFinder replicon evidence (run abricate separately and pass the table
+if abricate is not on PATH):
+
+```bash
+# Long-read WGS: replicon-based extraction (abricate plasmidfinder)
+plasrisk run longread.fasta -o out --classifier replicon
+# or with a precomputed table
+abricate --db plasmidfinder longread.fasta > replicon.tsv
+plasrisk run longread.fasta -o out --classifier replicon \
+    --replicon-table replicon.tsv
+```
+
+For most users `plasrisk auto` chooses these classifiers and routes
+automatically. For multi-strain metagenomic assemblies, assemble first
+(MEGAHIT or metaSPAdes), optionally bin plasmids with geNomad, and run
+`plasrisk run` with the bin and coverage tables, or use `plasrisk meta`
+directly.
 
 ---
 
@@ -335,8 +423,8 @@ as if they were closed plasmids.
   stated in every sample summary.
 
 ```bash
-# (1) Predict plasmids with geNomad (v1.10+, aggregate mode)
-genomad aggregate --clean-up output_dir/ assembly.fasta genomad_db/
+# (1) Predict plasmids with geNomad v1.7+ (verified on v1.12), end-to-end
+genomad end-to-end --cleanup --threads 16 assembly.fasta output_dir/ genomad_db/
 
 # (2) Score all three layers; coverage is optional but recommended
 plasrisk meta assembly.fasta \

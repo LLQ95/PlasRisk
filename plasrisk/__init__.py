@@ -28,10 +28,18 @@ and fragmented bins to the metagenomic layers. Assemblies with no detected
 plasmid are reported unscorable with a reason, including chromosome-only
 inputs.
 
+Unified entry point (v1.7.0): `plasrisk auto` detects whether the input is a
+ready plasmid collection or a raw WGS/long-read/metagenomic assembly and
+whether it is short- or long-read, then routes automatically. Long-read
+non-plasmid assemblies are mined for plasmids by PlasmidFinder replicon
+evidence and circularity (with a geNomad fallback); short-read non-plasmid
+assemblies are predicted with geNomad (end-to-end, v1.7+). The tool is not
+restricted to curated plasmid sequences.
+
 Reference: [to be updated upon publication]
 """
 
-__version__ = "1.6.1"
+__version__ = "1.7.0"
 __author__ = "PlasRisk Team"
 
 from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,
@@ -45,7 +53,10 @@ from .metagenome import (score_contig, score_contigs, aggregate_bin,
 from .extract import (ClassifiedContig, ExtractionResult, process_one,
                       parse_plasflow_table, parse_genomad_summary,
                       parse_generic_table, combine_classifications,
-                      decide_route, run_plasflow, run_genomad, run_main)
+                      classify_by_replicon, parse_abricate_replicon_table,
+                      characterize_assembly, choose_auto_strategy,
+                      decide_route, run_plasflow, run_genomad, run_main,
+                      auto_main)
 
 __all__ = [
     "PlasRiskScorer",
@@ -75,8 +86,13 @@ __all__ = [
     "parse_genomad_summary",
     "parse_generic_table",
     "combine_classifications",
+    "classify_by_replicon",
+    "parse_abricate_replicon_table",
+    "characterize_assembly",
+    "choose_auto_strategy",
     "decide_route",
     "run_plasflow",
     "run_genomad",
     "run_main",
+    "auto_main",
 ]

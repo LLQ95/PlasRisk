@@ -198,6 +198,9 @@ def main(argv=None):
     if argv and argv[0] == "run":
         from .extract import run_main
         return run_main(argv[1:])
+    if argv and argv[0] == "auto":
+        from .extract import auto_main
+        return auto_main(argv[1:])
     args = parse_args(argv)
     # Effective mode: legacy --model pipdb maps to --mode ordinal
     mode = "ordinal" if args.model == "pipdb" else args.mode
