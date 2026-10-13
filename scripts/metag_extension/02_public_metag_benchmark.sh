@@ -244,8 +244,13 @@ fi
 process_one () {
   local ACC="$1"
   local LOG="${BASEDIR}/logs/${ACC}.proc.log"
-  echo "[proc] ${ACC} start"
   local RD="${BASEDIR}/reads/${ACC}"
+  local OUT="${BASEDIR}/plasrisk/${ACC}"
+  # A finished sample is defined by its plasrisk summary, not by a loose marker.
+  if [ -s "${OUT}/meta_sample_summary.tsv" ]; then
+    echo "[proc] ${ACC} cached"; return 0
+  fi
+  echo "[proc] ${ACC} start"
   local R1 R2
   R1=$(ls "${RD}"/*_1.fastq.gz 2>/dev/null | head -1 || true)
   R2=$(ls "${RD}"/*_2.fastq.gz 2>/dev/null | head -1 || true)
@@ -253,51 +258,74 @@ process_one () {
     echo -e "${ACC}\tno paired reads" >> "${FAIL_LOG}.tmp"
     echo "[proc] ${ACC} skipped (no paired reads)"; return 0
   fi
-  # Heavy body in an isolated subshell: any non-zero status is caught once.
+  # An HTML block page or a truncated transfer can be saved under the .fastq.gz
+  # name; fastp would fail instantly on it. Reject before any heavy work.
+  if ! is_gzip "${R1}" || ! is_gzip "${R2}"; then
+    echo -e "${ACC}\tcorrupt/non-gzip reads; re-run download" >> "${FAIL_LOG}.tmp"
+    rm -f "${RD}/dl_done"
+    echo "[proc] ${ACC} skipped (corrupt reads; re-download)"; return 0
+  fi
+  local ASM="${BASEDIR}/asm/${ACC}/final.contigs.fa"
+  # Heavy body in an isolated subshell; each step logs a labelled marker so the
+  # failing stage is obvious in logs/<ACC>.proc.log.
   (
     set -e
-    fastp -i "${R1}" -I "${R2}" \
-      -o "${BASEDIR}/qc/${ACC}_1.fq.gz" -O "${BASEDIR}/qc/${ACC}_2.fq.gz" \
-      -h "${BASEDIR}/qc/${ACC}.html" -j "${BASEDIR}/qc/${ACC}.json" \
-      -w "${THREADS}"
+    echo ">> step 1/6 fastp"
+    if [ ! -s "${BASEDIR}/qc/${ACC}_2.fq.gz" ]; then
+      fastp -i "${R1}" -I "${R2}" \
+        -o "${BASEDIR}/qc/${ACC}_1.fq.gz" -O "${BASEDIR}/qc/${ACC}_2.fq.gz" \
+        -h "${BASEDIR}/qc/${ACC}.html" -j "${BASEDIR}/qc/${ACC}.json" \
+        -w "${THREADS}"
+    fi
 
-    if [ ! -f "${BASEDIR}/asm/${ACC}/final.contigs.fa" ]; then
+    echo ">> step 2/6 megahit"
+    if [ ! -f "${ASM}" ]; then
+      [ -d "${BASEDIR}/asm/${ACC}" ] && rm -rf "${BASEDIR}/asm/${ACC}"
       megahit -1 "${BASEDIR}/qc/${ACC}_1.fq.gz" \
               -2 "${BASEDIR}/qc/${ACC}_2.fq.gz" \
               -o "${BASEDIR}/asm/${ACC}" -t "${THREADS}" --presets meta-large
     fi
-    ASM="${BASEDIR}/asm/${ACC}/final.contigs.fa"
 
-    bowtie2-build -q "${ASM}" "${BASEDIR}/depth/${ACC}_idx"
-    bowtie2 -x "${BASEDIR}/depth/${ACC}_idx" \
-      -1 "${BASEDIR}/qc/${ACC}_1.fq.gz" -2 "${BASEDIR}/qc/${ACC}_2.fq.gz" \
-      -p "${THREADS}" --very-fast -S "${BASEDIR}/depth/${ACC}.sam"
-    samtools view -bS "${BASEDIR}/depth/${ACC}.sam" \
-      | samtools sort -@ "${THREADS}" -o "${BASEDIR}/depth/${ACC}.bam"
-    samtools index "${BASEDIR}/depth/${ACC}.bam"
-    jgi_summarize_bam_contig_depths \
-      --outputDepth "${BASEDIR}/depth/${ACC}_depth.tsv" \
-      "${BASEDIR}/depth/${ACC}.bam"
+    echo ">> step 3/6 depth (bowtie2/samtools)"
+    if [ ! -s "${BASEDIR}/depth/${ACC}_depth.tsv" ]; then
+      [ ! -f "${BASEDIR}/depth/${ACC}_idx.1.bt2" ] && \
+        bowtie2-build -q "${ASM}" "${BASEDIR}/depth/${ACC}_idx"
+      bowtie2 -x "${BASEDIR}/depth/${ACC}_idx" \
+        -1 "${BASEDIR}/qc/${ACC}_1.fq.gz" -2 "${BASEDIR}/qc/${ACC}_2.fq.gz" \
+        -p "${THREADS}" --very-fast -S "${BASEDIR}/depth/${ACC}.sam"
+      samtools view -bS "${BASEDIR}/depth/${ACC}.sam" \
+        | samtools sort -@ "${THREADS}" -o "${BASEDIR}/depth/${ACC}.bam"
+      samtools index "${BASEDIR}/depth/${ACC}.bam"
+      jgi_summarize_bam_contig_depths \
+        --outputDepth "${BASEDIR}/depth/${ACC}_depth.tsv" \
+        "${BASEDIR}/depth/${ACC}.bam"
+      rm -f "${BASEDIR}/depth/${ACC}.sam"
+    fi
 
+    echo ">> step 4/6 geNomad"
     if ! find "${BASEDIR}/genomad/${ACC}" \
           -name '*_plasmid_summary.tsv' 2>/dev/null | grep -q .; then
       genomad end-to-end --cleanup --threads "${THREADS}" \
         "${ASM}" "${BASEDIR}/genomad/${ACC}" "${GENOMAD_DB}"
     fi
 
+    echo ">> step 5/6 plasrisk meta"
     plasrisk meta "${ASM}" \
       --genomad-bin "${BASEDIR}/genomad/${ACC}" \
       --coverage "${BASEDIR}/depth/${ACC}_depth.tsv" \
       --coverage-column "${ACC}" \
-      -o "${BASEDIR}/plasrisk/${ACC}" \
+      -o "${OUT}" \
       --min-contig 1000 --complete-length 10000 --threads "${THREADS}"
+
+    echo ">> done"
   ) >> "${LOG}" 2>&1
 
-  if [ $? -eq 0 ]; then
+  if [ $? -eq 0 ] && [ -s "${OUT}/meta_sample_summary.tsv" ]; then
     echo "[proc] ${ACC} DONE"
   else
     echo -e "${ACC}\tprocessing error (see logs/${ACC}.proc.log)" >> "${FAIL_LOG}.tmp"
-    echo "[proc] ${ACC} FAILED"
+    echo "[proc] ${ACC} FAILED -- last log lines:"
+    tail -n 20 "${LOG}" 2>/dev/null | sed 's/^/    /'
   fi
 }
 
