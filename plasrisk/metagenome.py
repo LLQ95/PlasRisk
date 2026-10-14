@@ -609,6 +609,52 @@ def load_genomad(genomad_dir: str) -> pd.DataFrame:
     return bins.drop_duplicates(["seq_id", "bin_id"])
 
 
+def _jgi_sample_columns(columns) -> List[str]:
+    """Per-sample depth columns in a jgi_summarize table: contigName, length,
+    totalAvgDepth and each ``<sample>-var`` variance column are excluded."""
+    reserved = {"contigname", "length", "totalavgdepth"}
+    out = []
+    for c in columns:
+        cs = str(c).strip().lower()
+        if cs in reserved or cs.endswith("-var"):
+            continue
+        out.append(c)
+    return out
+
+
+def _cov_column_basename(name: str) -> str:
+    """Normalize a jgi column label: drop directory and a trailing .bam."""
+    base = os.path.basename(str(name)).strip()
+    if base.endswith(".bam"):
+        base = base[:-4]
+    return base
+
+
+def _resolve_coverage_column(columns, requested: Optional[str]) -> str:
+    """Resolve a coverage column robustly.
+
+    jgi_summarize_bam_contig_depths names the depth column after the BAM
+    argument verbatim, which may be a full path or carry a ``.bam`` suffix.
+    Accept an exact match, then a basename match, then the first jgi sample
+    column, so callers can pass the bare accession without KeyError."""
+    cols = [c for c in columns]
+    if requested is not None:
+        if requested in cols:
+            return requested
+        target = _cov_column_basename(requested)
+        cand = [c for c in cols
+                if not str(c).endswith("-var")
+                and _cov_column_basename(c) == target]
+        if cand:
+            return cand[0]
+    sample = _jgi_sample_columns(cols)
+    if sample:
+        return sample[0]
+    raise KeyError(
+        "could not find coverage column %r; available columns: %s"
+        % (requested, list(cols)))
+
+
 def load_coverage_table(path: str,
                         coverage_column: Optional[str] = None) -> pd.DataFrame:
     """Per-contig coverage. Accepts generic TSV/CSV and jgi_summarize output
@@ -622,7 +668,7 @@ def load_coverage_table(path: str,
     if seq_col is None:
         raise ValueError("coverage table must contain a contig/seq_id column")
     if coverage_column is not None:
-        cov_col = coverage_column
+        cov_col = _resolve_coverage_column(df.columns, coverage_column)
     else:
         cov_col = _find_column(list(df.columns),
                                ("coverage", "cov", "mean_cov",

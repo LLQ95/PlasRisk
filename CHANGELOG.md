@@ -2,6 +2,21 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.7.2] - 2026-10-14
+
+### Fixed
+- `plasrisk meta` no longer raises `KeyError` when the coverage column passed
+  via `--coverage-column` does not exactly match the jgi_summarize_bam_contig_depths
+  header. jgi names the depth column after the BAM argument verbatim, which may
+  be a full path or carry a `.bam` suffix. The column is now resolved by exact
+  name, then by basename (directory and `.bam` stripped), then by the first
+  jgi sample column, so a bare run accession works as expected.
+- Benchmark script `02_public_metag_benchmark.sh` reads the real depth column
+  from the jgi table header instead of assuming the bare accession, cleans an
+  incomplete MEGAHIT output directory before reassembly, gzip-validates reads
+  before fastp, skips completed samples and resumable per-step outputs, and
+  prints the failing step and last log lines on a per-sample failure.
+
 ## [1.7.1] - 2026-10-11
 
 ### Changed

@@ -302,6 +302,13 @@ process_one () {
       rm -f "${BASEDIR}/depth/${ACC}.sam"
     fi
 
+    # jgi names the depth column after the BAM argument (often a full path,
+    # e.g. .../depth/ERR5518577.bam), not the bare accession. Read the real
+    # column name from the header (4th field = first sample depth) so plasrisk
+    # is given a name that actually exists.
+    COV_COL=$(awk -F'\t' 'NR==1{print $4}' "${BASEDIR}/depth/${ACC}_depth.tsv")
+    [ -n "${COV_COL}" ] || COV_COL="${ACC}"
+
     echo ">> step 4/6 geNomad"
     if ! find "${BASEDIR}/genomad/${ACC}" \
           -name '*_plasmid_summary.tsv' 2>/dev/null | grep -q .; then
@@ -313,7 +320,7 @@ process_one () {
     plasrisk meta "${ASM}" \
       --genomad-bin "${BASEDIR}/genomad/${ACC}" \
       --coverage "${BASEDIR}/depth/${ACC}_depth.tsv" \
-      --coverage-column "${ACC}" \
+      --coverage-column "${COV_COL}" \
       -o "${OUT}" \
       --min-contig 1000 --complete-length 10000 --threads "${THREADS}"
 

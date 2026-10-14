@@ -136,6 +136,26 @@ def test_bins_and_coverage_parsers(tmp_path):
     assert cov2.loc[cov2.seq_id == "c1", "coverage"].iloc[0] == 9.0
 
 
+def test_jgi_coverage_column_resolves_by_basename(tmp_path):
+    # jgi labels the depth column after the BAM argument; the caller passes a
+    # bare accession, sometimes with a .bam suffix or a full path in the file.
+    jp = tmp_path / "ERR5518577_depth.tsv"
+    jp.write_text(
+        "contigName\tlength\ttotalAvgDepth\t"
+        "results/public_metag/depth/ERR5518577.bam\t"
+        "results/public_metag/depth/ERR5518577.bam-var\n"
+        "c1\t100\t5.5\t5.5\t0.1\nc2\t200\t2.0\t2.0\t0.0\n",
+        encoding="utf-8")
+    bare = load_coverage_table(str(jp), coverage_column="ERR5518577")
+    assert bare.loc[bare.seq_id == "c1", "coverage"].iloc[0] == 5.5
+    suff = load_coverage_table(str(jp), coverage_column="ERR5518577.bam")
+    assert suff.loc[suff.seq_id == "c1", "coverage"].iloc[0] == 5.5
+    full = load_coverage_table(
+        str(jp),
+        coverage_column="results/public_metag/depth/ERR5518577.bam")
+    assert full.loc[full.seq_id == "c1", "coverage"].iloc[0] == 5.5
+
+
 # --------------------------------------------------------------------------
 # Layer 3
 # --------------------------------------------------------------------------
