@@ -105,24 +105,32 @@ process_one() {
   local asm_fa="$BASEDIR/assemblies/${id}.fna"
   local gd="$BASEDIR/genomad/$id"
   local pr="$BASEDIR/plasrisk/$id"
-  local stem; stem="$(basename "$asm_fa" | sed 's/\.[^.]*$//')"
-  local gsum="$gd/${id}/${stem}_summary/${stem}_plasmid_summary.tsv"
+
+  # geNomad layout depends on the input form: a single FASTA writes
+  # <gd>/<stem>_summary/<stem>_plasmid_summary.tsv, whereas a directory of
+  # inputs adds one <stem>/ level. Resolve the summary by recursive search
+  # (mirrors 02_public_metag_benchmark.sh) instead of hardcoding a depth.
+  local gsum
+  gsum="$(find "$gd" -type f -name '*_plasmid_summary.tsv' 2>/dev/null | head -1)"
 
   {
     echo "[asm] $id start"
     download_one "$id" "$url" "$BASEDIR/assemblies/${id}.fna.gz" "$asm_fa" || exit 11
     echo "[asm] $id contigs ready"
 
-    if [[ ! -s "$gsum" ]]; then
+    if [[ -z "$gsum" ]]; then
       echo "  [genomad] running"
       genomad end-to-end --cleanup --threads "$THREADS" "$asm_fa" "$gd" "$GENOMAD_DB" \
         || exit 12
     fi
-    if [[ ! -s "$gsum" ]]; then echo "genomad plasmid summary missing: $gsum"; exit 13; fi
+    gsum="$(find "$gd" -type f -name '*_plasmid_summary.tsv' 2>/dev/null | head -1)"
+    if [[ -z "$gsum" || ! -s "$gsum" ]]; then
+      echo "genomad plasmid summary missing under $gd"; exit 13
+    fi
 
     if [[ ! -s "$pr/meta_sample_summary.tsv" ]]; then
       echo "  [plasrisk] meta (no coverage)"
-      plasrisk meta "$asm_fa" --genomad-bin "$gd/$id" $GE_ARG \
+      plasrisk meta "$asm_fa" --genomad-bin "$gd" $GE_ARG \
         -o "$pr" || exit 14
     fi
     if [[ ! -s "$pr/meta_sample_summary.tsv" ]]; then
