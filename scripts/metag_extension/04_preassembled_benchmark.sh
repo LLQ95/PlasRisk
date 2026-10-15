@@ -131,6 +131,7 @@ process_one() {
     if [[ ! -s "$pr/meta_sample_summary.tsv" ]]; then
       echo "  [plasrisk] meta (no coverage)"
       plasrisk meta "$asm_fa" --genomad-bin "$gd" $GE_ARG \
+        --min-contig 1000 --complete-length 10000 --threads "$THREADS" \
         -o "$pr" || exit 14
     fi
     if [[ ! -s "$pr/meta_sample_summary.tsv" ]]; then
