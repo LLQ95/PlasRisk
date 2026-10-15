@@ -740,6 +740,13 @@ def aggregate_bins(contig_df: pd.DataFrame,
                                   circ_contigs=circ_contigs))
     df = pd.DataFrame(rows)
     if not df.empty:
+        # Bins from the external caller (geNomad/components) are predicted
+        # plasmids; singleton bins built for contigs absent from the bin map
+        # are an unbinned sensitivity layer (dominated by chromosome
+        # fragments in a whole-community assembly).
+        df["bin_origin"] = np.where(
+            df["bin_id"].astype(str).str.startswith("unbinned:"),
+            "unbinned", "predicted")
         sort_col = df["S_lite"].combine_first(df["S_frag4"]) \
             .combine_first(df["S_cargo3"]).fillna(-1)
         df = df.assign(_s=sort_col).sort_values("_s", ascending=False)
@@ -756,7 +763,14 @@ def aggregate_sample(sample_id: str, bin_df: pd.DataFrame,
                      contig_df: pd.DataFrame,
                      total_assembly_bp: Optional[int] = None) -> Dict:
     """Descriptive community-level statistics (CPRI = community plasmid
-    risk index; not trained/validated in the isolate study)."""
+    risk index; not trained/validated in the isolate study).
+
+    Unprefixed columns are computed over all scored elements (predicted
+    bins plus unbinned singletons). Columns with the ``pred_`` prefix are
+    computed over caller-predicted plasmid bins only (bin_origin ==
+    'predicted'); these are the primary plasmid-level statistics and are
+    not diluted by the typically much larger set of chromosome
+    fragments."""
     b = bin_df.copy()
     s_use = b["S_lite"] if "S_lite" in b.columns else pd.Series(
         np.nan, index=b.index)
@@ -764,107 +778,134 @@ def aggregate_sample(sample_id: str, bin_df: pd.DataFrame,
         if col in b.columns:
             s_use = s_use.combine_first(b[col])
     b["S_use"] = s_use
-    scored = b.dropna(subset=["S_use"]).copy()
-    graded = scored[scored["grade"] != ""]
 
     n_bins = len(b)
-    n_scored = len(scored)
-    n_graded = len(graded)
+    n_predicted = (
+        int((b["bin_origin"] == "predicted").sum())
+        if "bin_origin" in b.columns else n_bins)
+    n_unbinned = n_bins - n_predicted
     n_complete = int((b["confidence"] == "complete").sum())
     n_probable = int((b["confidence"] == "probable").sum())
     n_fragmented = int((b["confidence"] == "fragmented").sum())
 
-    weights = pd.Series(1.0, index=scored.index)
-    weighting = "unweighted"
-    if "coverage" in scored.columns and scored["coverage"].notna().any():
-        cov = scored["coverage"].fillna(0).to_numpy(dtype=float)
-        length = scored["total_length_bp"].to_numpy(dtype=float)
-        w = cov * length
-        if w.sum() > 0:
-            weights = pd.Series(w, index=scored.index)
-            weighting = "coverage_x_length"
-    else:
-        length = scored["total_length_bp"].to_numpy(dtype=float)
-        if length.sum() > 0:
-            weights = pd.Series(length, index=scored.index)
-            weighting = "length"
-
-    s = scored["S_use"].to_numpy(dtype=float)
-    w = weights.to_numpy(dtype=float)
-
-    def _wq(q):
-        if len(s) == 0:
-            return np.nan
-        order = np.argsort(s)
-        sw, ss = w[order], s[order]
-        cw = np.cumsum(sw)
-        if cw[-1] <= 0:
-            return np.nan
-        idx = np.searchsorted(cw, q * cw[-1])
-        return ss[min(idx, len(ss) - 1)]
-
-    cpri_mean = float(np.sum(w * s) / np.sum(w)) if w.sum() > 0 else np.nan
-
-    grade_counts = {g: int((graded["grade"] == g).sum())
-                    for g in ("A", "B", "C", "D", "E")}
-    ab = graded[graded["grade"].isin(("A", "B"))]
-    # critical ARGs remain detectable on fragments; count them across all
-    # scored bins, not only bins with a complete five-dimension grade
-    hr = scored[scored["high_risk_genes"].fillna("") != ""]
-
-    plasmid_bp = float(np.nansum(b["total_length_bp"].to_numpy(
-        dtype=float)))
-    ab_load = float(np.sum(
-        ab["total_length_bp"].to_numpy(dtype=float)
-        * np.nan_to_num(ab.get("coverage", pd.Series(
-            [1.0] * len(ab))).to_numpy(dtype=float))))
-    hr_load = float(np.sum(
-        hr["total_length_bp"].to_numpy(dtype=float)
-        * np.nan_to_num(hr.get("coverage", pd.Series(
-            [1.0] * len(hr))).to_numpy(dtype=float))))
-
     denom_bp = (float(total_assembly_bp) if total_assembly_bp
-                else plasmid_bp)
+                else float(np.nansum(b["total_length_bp"].to_numpy(
+                    dtype=float))))
+
+    def _block(d, prefix):
+        """Statistics for one bin subset (all bins, or predicted-plasmid
+        bins only). Key names carry ``prefix`` when it is non-empty."""
+        sd = d.dropna(subset=["S_use"]).copy()
+        gd = d[d["grade"] != ""]
+        n_s = len(sd)
+        n_g = len(gd)
+
+        weights = pd.Series(1.0, index=sd.index)
+        weighting = "unweighted"
+        if "coverage" in sd.columns and sd["coverage"].notna().any():
+            cov = sd["coverage"].fillna(0).to_numpy(dtype=float)
+            length = sd["total_length_bp"].to_numpy(dtype=float)
+            wv = cov * length
+            if wv.sum() > 0:
+                weights = pd.Series(wv, index=sd.index)
+                weighting = "coverage_x_length"
+        else:
+            length = sd["total_length_bp"].to_numpy(dtype=float)
+            if length.sum() > 0:
+                weights = pd.Series(length, index=sd.index)
+                weighting = "length"
+
+        sv = sd["S_use"].to_numpy(dtype=float)
+        wv = weights.to_numpy(dtype=float)
+
+        def _wq(q):
+            if len(sv) == 0:
+                return np.nan
+            order = np.argsort(sv)
+            sw, ss = wv[order], sv[order]
+            cw = np.cumsum(sw)
+            if cw[-1] <= 0:
+                return np.nan
+            idx = np.searchsorted(cw, q * cw[-1])
+            return ss[min(idx, len(ss) - 1)]
+
+        cpri_mean = float(np.sum(wv * sv) / np.sum(wv)) if wv.sum() > 0 \
+            else np.nan
+
+        grade_counts = {g: int((gd["grade"] == g).sum())
+                        for g in ("A", "B", "C", "D", "E")}
+        ab = gd[gd["grade"].isin(("A", "B"))]
+        # critical ARGs remain detectable on fragments; count them across
+        # all scored bins, not only bins with a complete five-dimension grade
+        hr = sd[sd["high_risk_genes"].fillna("") != ""]
+
+        def _cov(dd):
+            return np.nan_to_num(dd.get("coverage", pd.Series(
+                [1.0] * len(dd))).to_numpy(dtype=float))
+
+        ab_load = float(np.sum(
+            ab["total_length_bp"].to_numpy(dtype=float) * _cov(ab)))
+        hr_load = float(np.sum(
+            hr["total_length_bp"].to_numpy(dtype=float) * _cov(hr)))
+
+        p = prefix
+        out = {
+            "%sn_scored_bins" % p: int(n_s),
+            "%sn_graded_bins" % p: int(n_g),
+            "%spct_ARG_positive" % p: round(
+                100.0 * (sd["n_ARG"] > 0).mean(), 2) if n_s else np.nan,
+            "%spct_BMG_positive" % p: round(
+                100.0 * (sd["n_BM"] > 0).mean(), 2) if n_s else np.nan,
+            "%spct_high_risk_ARG" % p: round(
+                100.0 * (sd["high_risk_genes"].fillna("") != "").mean(), 2)
+            if n_s else np.nan,
+            "%sCPRI_mean" % p: round(cpri_mean, 4)
+            if not np.isnan(cpri_mean) else np.nan,
+            "%sCPRI_p90" % p: round(float(_wq(0.90)), 4) if n_s else np.nan,
+            "%sCPRI_p99" % p: round(float(_wq(0.99)), 4) if n_s else np.nan,
+            "%sS_max" % p: round(float(np.nanmax(sv)), 4) if n_s else np.nan,
+            "%spct_grade_A" % p: round(
+                100.0 * grade_counts["A"] / n_g, 3) if n_g else np.nan,
+            "%spct_grade_AB" % p: round(
+                100.0 * (grade_counts["A"] + grade_counts["B"]) / n_g, 3)
+            if n_g else np.nan,
+            "%sgrade_A" % p: grade_counts["A"],
+            "%sgrade_B" % p: grade_counts["B"],
+            "%sgrade_C" % p: grade_counts["C"],
+            "%sgrade_D" % p: grade_counts["D"],
+            "%sgrade_E" % p: grade_counts["E"],
+            "%srisk_load_AB" % p: round(ab_load, 1),
+            "%scritical_ARG_load" % p: round(hr_load, 1),
+            "%srisk_load_AB_per_Mb" % p: round(
+                1e6 * ab_load / denom_bp, 3) if denom_bp else np.nan,
+            "%scritical_ARG_load_per_Mb" % p: round(
+                1e6 * hr_load / denom_bp, 3) if denom_bp else np.nan,
+        }
+        if not p:
+            out["weighting"] = weighting
+        return out
+
     row = {
         "sample_id": sample_id,
         "n_contig_elements": int(len(contig_df)),
         "n_plasmid_bins": int(n_bins),
-        "n_scored_bins": int(n_scored),
-        "n_graded_bins": int(n_graded),
+        "n_predicted_bins": int(n_predicted),
+        "n_unbinned_bins": int(n_unbinned),
         "n_complete": n_complete,
         "n_probable": n_probable,
         "n_fragmented": n_fragmented,
-        "pct_ARG_positive": round(100.0 * (scored["n_ARG"] > 0).mean(), 2)
-        if n_scored else np.nan,
-        "pct_BMG_positive": round(100.0 * (scored["n_BM"] > 0).mean(), 2)
-        if n_scored else np.nan,
-        "pct_high_risk_ARG": round(
-            100.0 * (scored["high_risk_genes"].fillna("") != "").mean(), 2)
-        if n_scored else np.nan,
-        "CPRI_mean": round(cpri_mean, 4) if not np.isnan(cpri_mean) else np.nan,
-        "CPRI_p90": round(float(_wq(0.90)), 4) if n_scored else np.nan,
-        "CPRI_p99": round(float(_wq(0.99)), 4) if n_scored else np.nan,
-        "S_max": round(float(np.nanmax(s)), 4) if n_scored else np.nan,
-        "pct_grade_A": round(100.0 * grade_counts["A"] / n_graded, 3)
-        if n_graded else np.nan,
-        "pct_grade_AB": round(
-            100.0 * (grade_counts["A"] + grade_counts["B"]) / n_graded, 3)
-        if n_graded else np.nan,
-        "grade_A": grade_counts["A"],
-        "grade_B": grade_counts["B"],
-        "grade_C": grade_counts["C"],
-        "grade_D": grade_counts["D"],
-        "grade_E": grade_counts["E"],
-        "risk_load_AB": round(ab_load, 1),
-        "critical_ARG_load": round(hr_load, 1),
-        "risk_load_AB_per_Mb": round(1e6 * ab_load / denom_bp, 3)
-        if denom_bp else np.nan,
-        "critical_ARG_load_per_Mb": round(1e6 * hr_load / denom_bp, 3)
-        if denom_bp else np.nan,
-        "weighting": weighting,
-        "note": "Descriptive extension; CPRI was not trained or validated "
-                "on metagenomic data",
     }
+    row.update(_block(b, ""))
+    # Predicted-plasmid subset (caller-supplied bin map, e.g. geNomad):
+    # primary statistics for plasmid risk, free of whole-community
+    # chromosome-fragment dilution.
+    if "bin_origin" in b.columns:
+        bp = b[b["bin_origin"] == "predicted"]
+        row.update(_block(bp, "pred_"))
+    row["note"] = (
+        "Descriptive extension; CPRI was not trained or validated on "
+        "metagenomic data. Unprefixed metrics use all elements; pred_* "
+        "metrics use only caller-predicted plasmid bins")
     return row
 
 
@@ -944,6 +985,10 @@ def build_meta_parser() -> "argparse.ArgumentParser":
                         "(default: sum of plasmid bin lengths)")
     p.add_argument("--json", action="store_true",
                    help="also write meta_sample_summary.json")
+    p.add_argument("--strict-annotation", action="store_true",
+                   help="exit 3 when abricate was requested but no "
+                        "annotation database was available (prevents "
+                        "silently producing all-zero ARG/VF results)")
     p.add_argument("-q", "--quiet", action="store_true")
     return p
 
@@ -1002,6 +1047,35 @@ def meta_main(argv: Optional[List[str]] = None) -> int:
                 fasta, use_abricate=True, min_id=args.min_id,
                 min_cov=args.min_cov, threads=args.threads,
                 lookup=lookup)
+            for w in annotation.warnings:
+                print("[plasrisk meta][annotation] %s" % w,
+                      file=sys.stderr)
+            if not annotation.databases_used:
+                print("[plasrisk meta] WARNING: no abricate annotation "
+                      "database available; ARG/VF/BMG/replicon columns "
+                      "will be empty for %s (check `which abricate`, "
+                      "`abricate --list` and the BLAST dependency)"
+                      % sid, file=sys.stderr)
+                if args.strict_annotation:
+                    return 3
+            else:
+                n_annotated = sum(
+                    1 for f in annotation.features
+                    if f.arg_names or f.vf_names or f.bm_gene_names
+                    or f.replicon or f.n_is > 0 or f.has_integron
+                    or f.has_relaxase or f.has_t4cp)
+                if n_annotated == 0 and len(annotation.features) > 100:
+                    print("[plasrisk meta] WARNING: databases %s were "
+                          "queried but produced zero hits across %d "
+                          "sequences; abricate likely failed at runtime "
+                          "(check blastn and database installation)"
+                          % (",".join(annotation.databases_used),
+                             len(annotation.features)), file=sys.stderr)
+                elif not args.quiet:
+                    print("[plasrisk meta] annotation dbs: %s | annotated "
+                          "elements: %d/%d"
+                          % (",".join(annotation.databases_used),
+                             n_annotated, len(annotation.features)))
 
         circ_header = circular_map_from_fasta(fasta)
         feats_kept = {f.seq_id: f for f in annotation.features

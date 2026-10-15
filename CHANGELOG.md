@@ -2,6 +2,30 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.7.3] - 2026-10-15
+
+### Fixed
+- `plasrisk meta` no longer runs silently when abricate is unavailable. When
+  abricate was requested but no annotation database could be used (abricate
+  missing, no installed databases, or BLAST dependency missing), annotation
+  failures were previously swallowed and the run produced all-zero
+  ARG/VF/BMG columns with no warning, leaving only length-driven scores.
+  Annotation warnings are now printed to stderr, a prominent warning is
+  emitted when no database is available or when databases return zero hits
+  across more than 100 sequences, and the new `--strict-annotation` flag
+  exits with code 3 instead of writing misleading results.
+- Community sample summaries no longer treat every contig outside the
+  caller's bin map as a plasmid bin. Bins are tagged with `bin_origin`
+  (`predicted` for caller-supplied bins such as geNomad plasmid bins,
+  `unbinned` for singleton contigs outside the bin map), and
+  `aggregate_sample` additionally reports `n_predicted_bins`,
+  `n_unbinned_bins`, and a full set of `pred_*` statistics computed over
+  predicted plasmid bins only. These are the primary plasmid-level
+  statistics; in whole-community assemblies the unbinned set is dominated
+  by chromosome fragments and previously diluted plasmid prevalence by up
+  to two orders of magnitude. Unprefixed columns retain the all-element
+  (community-level) denominator.
+
 ## [1.7.2] - 2026-10-14
 
 ### Fixed

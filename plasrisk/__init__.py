@@ -39,7 +39,7 @@ restricted to curated plasmid sequences.
 Reference: [to be updated upon publication]
 """
 
-__version__ = "1.7.2"
+__version__ = "1.7.3"
 __author__ = "PlasRisk Team"
 
 from .scoring import (PlasRiskScorer, PIPdbScorer, PlasmidFeatures,

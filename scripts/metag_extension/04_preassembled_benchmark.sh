@@ -22,6 +22,12 @@
 # Note: coverage is not available for deposited assemblies, so plasrisk meta
 # runs without --coverage. CPRI then uses per-contig risk scores and the
 # plasmid prevalence statistic only (no abundance weighting).
+#
+# Dependency: abricate (with at least one database, e.g. card/resfinder/
+# plasmidfinder) and blastn must be installed in the same environment as
+# plasrisk. plasrisk meta runs with --strict-annotation and exits 14 on a
+# sample if no annotation database is available, so a missing abricate can
+# never silently produce all-zero ARG results.
 
 set -uo pipefail
 
@@ -48,6 +54,11 @@ FAIL_LOG="$BASEDIR/failed_samples.tsv"
 command -v python3 >/dev/null 2>&1 || { echo "[error] python3 not in PATH"; exit 1; }
 command -v genomad >/dev/null 2>&1   || { echo "[error] genomad not in PATH"; exit 1; }
 command -v plasrisk >/dev/null 2>&1  || { echo "[error] plasrisk not in PATH"; exit 1; }
+command -v abricate >/dev/null 2>&1 || { echo "[error] abricate not in PATH (conda install -c bioconda abricate blast)"; exit 1; }
+if ! abricate --list 2>/dev/null | grep -qE '\\S+\\s+\\S+'; then
+  echo "[error] abricate reports no installed databases (run abricate-get_db --db card, etc.)"
+  exit 1
+fi
 if command -v aria2c >/dev/null 2>&1; then
   DL_BACKEND="aria2c"
 elif command -v curl >/dev/null 2>&1; then
@@ -132,6 +143,7 @@ process_one() {
       echo "  [plasrisk] meta (no coverage)"
       plasrisk meta "$asm_fa" --genomad-bin "$gd" $GE_ARG \
         --min-contig 1000 --complete-length 10000 --threads "$THREADS" \
+        --strict-annotation \
         -o "$pr" || exit 14
     fi
     if [[ ! -s "$pr/meta_sample_summary.tsv" ]]; then
