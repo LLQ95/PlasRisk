@@ -1244,6 +1244,3 @@ def auto_main(argv: Optional[List[str]] = None) -> int:
     if not args.quiet:
         print("[plasrisk auto] status written to %s" % spath)
     return 0
-
-
-# ==== 全文完 ====

@@ -89,6 +89,18 @@ These scripts consume the `tab_*.csv` tables produced by the pipeline above and 
 | `fig10_grade_pie_map.R` | Figure 10 | World map with grade-distribution pies per country (hand-built pie grobs, no scatterpie) |
 | `fig11_conjugative_replicon.R` | Figure 11 | Top conjugative replicons and conjugative rate vs high-risk ARG/BMG cargo bubbles, plus four-outcome heatmap |
 
+### Presubmission benchmark scripts
+
+The `benchmark/` subdirectory holds the external validation scripts used for the
+presubmission checklist on the compute server: `12_longread_truth_plasmidome.sh`
+(long-read plasmidome truth-set analysis, retained as an extension and not used
+in the main results), `13_ablation_genomad_only.py` (geNomad-only versus
+geNomad+PlasRisk ablation across three cohorts), `14a_setup_envs.sh` and
+`14b_run_cross_tool.sh` (environment setup and RFPlasmid/Plasmer cross-tool
+comparison on the 189 isolates), and `15_cef_resume_missing.sh` (resume of
+missing cefprozil samples). Each script is resume-safe, and the subdirectory
+README documents the run order, commands, and expected outputs.
+
 ### Utility
 
 | Script | Language | Description |
