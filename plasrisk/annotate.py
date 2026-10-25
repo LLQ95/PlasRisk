@@ -18,6 +18,13 @@ from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 
+from .conjscan import (
+    CLASS_NONE,
+    PLASRISK_CLASSES,
+    annotate_conjugation,
+    conjscan_available,
+    union_mobility_class,
+)
 from .scoring import (
     AUX_PATTERN,
     CARD_BM_PATTERN,
@@ -174,6 +181,9 @@ def annotate_fasta(
     min_cov: float = 50.0,
     threads: int = 4,
     lookup: Optional[pd.DataFrame] = None,
+    use_conjscan: bool = True,
+    conjscan_topology: str = "linear",
+    conjscan_db_type: str = "auto",
 ) -> AnnotationResult:
     """
     Annotate a plasmid FASTA file and return PlasmidFeatures for each sequence.
@@ -245,6 +255,33 @@ def annotate_fasta(
             "conda install -c bioconda abricate. "
             "Proceeding with replicon-empirical priors."
         )
+
+    # System-level conjugative annotation with CONJScan (MacSyFinder).
+    # Independent of the gene-name evidence below; the two streams are
+    # combined per sequence by union_mobility_class().
+    conjscan_hits = {}
+    if use_conjscan:
+        if conjscan_available():
+            try:
+                conjscan_hits = annotate_conjugation(
+                    fasta_path,
+                    topology=conjscan_topology,
+                    threads=threads,
+                    db_type=conjscan_db_type,
+                )
+                result.databases_used.append("CONJScan/MacSyFinder")
+            except Exception as exc:  # graceful degradation
+                result.warnings.append(
+                    f"CONJScan/MacSyFinder failed ({exc}); "
+                    "falling back to gene-based mobility evidence."
+                )
+        else:
+            result.warnings.append(
+                "macsyfinder/prodigal not found in PATH; CONJScan skipped. "
+                "Install with: conda install -c conda-forge -c bioconda "
+                "macsyfinder prodigal (and the CONJScan models). "
+                "Gene-based mobility evidence is used instead."
+            )
 
     # Build lookup dict for priors
     lookup_dict = {}
@@ -375,6 +412,45 @@ def annotate_fasta(
             # No genes found at all; only claim mobility was annotated if
             # mobility-specific databases (ISfinder/Tn) were actually run.
             feat.mobility_annotated = mobility_dbs_run
+
+        # Gene-based mobility class vocabulary (matches the locked
+        # catalogue endpoint: complete = T4CP + relaxase + oriT,
+        # likely = T4CP + relaxase, mobilizable = relaxase or oriT).
+        if feat.has_t4cp and feat.has_relaxase and feat.has_oriT:
+            gene_class = "conjugative_complete"
+        elif feat.has_t4cp and feat.has_relaxase:
+            gene_class = "conjugative_likely"
+        elif feat.has_relaxase or feat.has_oriT:
+            gene_class = "mobilizable"
+        else:
+            gene_class = "non-mobilizable"
+
+        # System-level CONJScan evidence (MacSyFinder). The final class is
+        # the union of the two independent evidence streams; a system-level
+        # call can upgrade gene-only evidence and also fills in T4CP/relaxase
+        # calls missed by gene-name pattern matching.
+        cs = conjscan_hits.get(seq_id)
+        if cs is not None:
+            feat.conjscan_class = cs.plasrisk_class()
+            feat.conjscan_mpf = cs.mpf_type
+            feat.metadata["conjscan_wholeness"] = cs.wholeness
+            feat.metadata["conjscan_loci"] = cs.n_loci
+            feat.metadata["conjscan_models"] = cs.raw_models
+            if cs.has_t4cp:
+                feat.has_t4cp = True
+            if cs.has_relaxase:
+                feat.has_relaxase = True
+            if cs.has_mpf:
+                feat.has_auxiliary = True
+            feat.mobility_class = union_mobility_class(
+                gene_class, cs.plasrisk_class())
+            feat.mobility_annotated = True
+        elif feat.mobility_annotated or (feat.has_t4cp or
+                                         feat.has_relaxase or
+                                         feat.has_oriT or
+                                         feat.n_is > 0):
+            feat.mobility_class = gene_class
+        # else: mobility_class stays empty and S_MOB uses the replicon prior
 
         # Detect WHO priority pathogen from sequence header or metadata
         header_text = seq_id.upper()

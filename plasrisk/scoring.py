@@ -287,7 +287,11 @@ class PlasmidFeatures:
     has_auxiliary: Optional[bool] = None
     has_integron: Optional[bool] = None
     n_is: int = 0  # insertion sequence count
-    mobility_class: str = ""  # if pre-classified
+    mobility_class: str = ""  # if pre-classified (gene + CONJScan union)
+
+    # CONJScan/MacSyFinder system-level conjugative annotation
+    conjscan_class: str = ""  # conjugative_complete/likely/putative/...
+    conjscan_mpf: str = ""  # MPF type, e.g. T4SS, T4SS_typeG
 
     # Host range (if known; otherwise None -> use replicon lookup)
     n_host_genera: Optional[int] = None
@@ -546,6 +550,10 @@ class PlasRiskScorer:
                 mob_base = 1.0
             elif "likely" in mc:
                 mob_base = 0.85
+            elif "putative" in mc:
+                # CONJScan putative conjugative (pConj): MPF and T4CP
+                # without a detected relaxase
+                mob_base = 0.7
             elif "mobilizable" in mc:
                 mob_base = 0.6
             else:
@@ -846,6 +854,8 @@ class PlasRiskScorer:
             "n_BM": n_bm_total,
             "high_risk_genes": ";".join(feat.high_risk_args) if feat.high_risk_args else "",
             "mobility_class": mob_class,
+            "conjscan_class": feat.conjscan_class,
+            "conjscan_mpf": feat.conjscan_mpf,
             "model_mode": self.mode,
             "imputed_dimensions": ";".join(imputed) if imputed else "",
         }

@@ -13,6 +13,9 @@ Options:
     --min-id FLOAT       Minimum abricate identity % (default: 75)
     --min-cov FLOAT      Minimum abricate coverage % (default: 50)
     --no-abricate        Skip abricate; sequence-only scoring
+    --no-conjscan        Skip CONJScan/MacSyFinder; gene-based mobility only
+    --conjscan-topology  linear (default) or circular
+    --conjscan-db-type   auto (ordered; default) or unordered (fragments)
     --mode MODE          Scoring mode: 'lite' (5-dim FASTA-only core,
                          default), 'full' (10-dim), or 'ordinal'
                          (original PIPdb 8-item ordinal index)
@@ -91,6 +94,19 @@ Examples:
                         help="Minimum abricate coverage %% (default: 50)")
     parser.add_argument("--no-abricate", action="store_true",
                         help="Skip abricate annotation; sequence-only scoring")
+    parser.add_argument("--no-conjscan", action="store_true",
+                        help="Skip CONJScan/MacSyFinder system-level "
+                             "conjugative annotation (gene-based only)")
+    parser.add_argument("--conjscan-topology",
+                        choices=["linear", "circular"], default="linear",
+                        help="Replicon topology for ordered CONJScan "
+                             "(default linear; use circular for closed "
+                             "circular plasmids)")
+    parser.add_argument("--conjscan-db-type",
+                        choices=["auto", "unordered"], default="auto",
+                        help="CONJScan mode: 'auto' (ordered replicon, "
+                             "default) or 'unordered' (content only for "
+                             "fragmented sequences)")
     parser.add_argument("--model", choices=["plasrisk", "pipdb"],
                         default="plasrisk",
                         help="Deprecated alias: 'plasrisk' (default) or "
@@ -279,6 +295,9 @@ def main(argv=None):
                 min_cov=args.min_cov,
                 threads=args.threads,
                 lookup=lookup,
+                use_conjscan=not args.no_conjscan,
+                conjscan_topology=args.conjscan_topology,
+                conjscan_db_type=args.conjscan_db_type,
             )
         except Exception as exc:
             print("    ERROR: %s" % exc, file=sys.stderr)

@@ -133,6 +133,7 @@ optional external tools that are not bundled:
 | Capability | Tool | When needed | Install |
 |---|---|---|---|
 | Gene/replicon annotation | [abricate](https://github.com/tseemann/abricate) with CARD/VFDB/PlasmidFinder/BacMet | ARG, VF, BMG and replicon calling; replicon classifier on long reads | `conda install -c bioconda abricate` |
+| System-level conjugative annotation | [CONJScan](https://github.com/gem-pasteur/ConjScan) in [MacSyFinder v2](https://github.com/gem-pasteur/macsyfinder) + Prodigal | complete/likely/putative conjugative systems from gene content and genetic organisation, independent of gene-name matching | `pip install plasrisk[conj]` then `conda install -c bioconda prodigal` and install the CONJScan models; see below |
 | Short-read plasmid prediction | [geNomad](https://github.com/apcamargo/geNomad) v1.7+ (verified on v1.12) + database | non-plasmid short-read and metagenomic inputs | `pip install genomad` then `genomad download-database genomad_db`; point `--genomad-db` or set `GENOMAD_DB` |
 | Short-read plasmid prediction (alt.) | [PlasFlow](https://github.com/smaegol/PlasFlow) | optional alternative classifier (`--classifier plasflow`, older TensorFlow stack) | its own conda environment; pass `--plasflow-table` |
 | Short-read assembly | MEGAHIT / metaSPAdes | raw short reads | `conda install -c bioconda megahit` / `spades` |
@@ -201,6 +202,34 @@ abricate --list
 
 For BacMet (biocide/metal resistance) database, see:
 https://github.com/tseemann/abricate#making-your-own-database
+
+### Set up CONJScan/MacSyFinder (optional, recommended)
+
+PlasRisk combines gene-level mobility evidence (T4CP, relaxase and oriT
+homologues) with an independent system-level screen. CONJScan
+(Cury et al., 2020) in MacSyFinder v2 (Neron et al., 2023) applies curated
+HMM profiles and genetic-organisation rules to call complete, likely and
+putative conjugative systems. When the tools are missing, PlasRisk still
+runs and falls back to gene-based evidence with a warning.
+
+```bash
+# MacSyFinder v2 and the CONJScan models
+pip install "plasrisk[conj]"
+pip install conjscan-models      # provides the CONJScan/Plasmids models
+# Prodigal protein prediction
+conda install -c bioconda prodigal
+
+# Verify
+macsyfinder --version
+prodigal -v
+```
+
+For closed circular plasmids use `--conjscan-topology circular`; fragmented
+metagenomic contigs are searched content-only with
+`plasrisk meta --conjscan-db-type unordered` (the meta default). Use
+`--no-conjscan` to skip the screen entirely. The output columns
+`conjscan_class` and `conjscan_mpf` report the system call and MPF type, and
+`mobility_class` is the union of the gene and system evidence.
 
 ---
 

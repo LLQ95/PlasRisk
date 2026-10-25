@@ -45,6 +45,7 @@ import numpy as np
 import pandas as pd
 
 from .annotate import AnnotationResult, annotate_fasta, parse_fasta
+from .conjscan import rank_of, union_mobility_class
 from .scoring import (
     GLOBAL_MEDIANS,
     LITE_DIMENSIONS,
@@ -123,6 +124,8 @@ def mob_evidence_score(feat: PlasmidFeatures,
             mob_base = 1.0
         elif "likely" in mc:
             mob_base = 0.85
+        elif "putative" in mc:
+            mob_base = 0.7
         elif "mobilizable" in mc:
             mob_base = 0.6
         else:
@@ -313,6 +316,25 @@ def aggregate_bin(bin_id: str, feats: List[PlasmidFeatures],
                         or n_is > 0)
     any_mob_annotated = any(f.mobility_annotated for f in feats)
 
+    # Bin-level CONJScan class: take the highest-confidence system across
+    # the bin's contigs and combine it with the aggregated gene-based class.
+    conj_classes = [f.conjscan_class for f in feats if f.conjscan_class]
+    conjscan_class = ""
+    if conj_classes:
+        conjscan_class = max(conj_classes, key=rank_of)
+    conj_mpfs = sorted({f.conjscan_mpf for f in feats
+                        if f.conjscan_mpf})
+    if has_t4cp and has_rel and has_oriT:
+        gene_cls = "conjugative_complete"
+    elif has_t4cp and has_rel:
+        gene_cls = "conjugative_likely"
+    elif has_rel or has_oriT:
+        gene_cls = "mobilizable"
+    else:
+        gene_cls = "non-mobilizable"
+    bin_mobility_class = (union_mobility_class(gene_cls, conjscan_class)
+                          if conjscan_class else gene_cls)
+
     circ = (bool(circular) or bool(circ_contigs)
             or any(is_circular_header(f.seq_id) for f in feats))
     # S_SIZE is assessed only when the bin plausibly spans a whole plasmid:
@@ -335,7 +357,13 @@ def aggregate_bin(bin_id: str, feats: List[PlasmidFeatures],
         has_auxiliary=has_aux,
         has_integron=has_int,
         n_is=n_is,
-        mobility_annotated=any_mob_annotated or any_mob_evidence,
+        mobility_class=bin_mobility_class
+        if (any_mob_annotated or any_mob_evidence or conjscan_class)
+        else "",
+        conjscan_class=conjscan_class,
+        conjscan_mpf=";".join(conj_mpfs),
+        mobility_annotated=any_mob_annotated or any_mob_evidence
+        or bool(conjscan_class),
         metadata={"arg_products": arg_products,
                   "arg_resistance": arg_resistance},
     )
@@ -374,16 +402,24 @@ def aggregate_bin(bin_id: str, feats: List[PlasmidFeatures],
     else:
         confidence = "fragmented"
 
-    # Mobility class label (best evidence across contigs)
-    mob_for_label = s_mob if s_mob is not None else 0.0
-    if mob_for_label >= 0.85:
-        mob_class = "conjugative_complete"
-    elif mob_for_label >= 0.60:
-        mob_class = "conjugative_likely"
-    elif mob_for_label >= 0.35:
-        mob_class = "mobilizable"
+    # Mobility class label: prefer the gene + CONJScan union class, fall
+    # back to S_MOB thresholds only when no class was directly assigned.
+    if agg.mobility_class and s_mob is not None:
+        mob_class = agg.mobility_class
+    elif s_mob is not None:
+        mob_for_label = s_mob
+        if mob_for_label >= 0.85:
+            mob_class = "conjugative_complete"
+        elif mob_for_label >= 0.70:
+            mob_class = "conjugative_putative"
+        elif mob_for_label >= 0.60:
+            mob_class = "conjugative_likely"
+        elif mob_for_label >= 0.35:
+            mob_class = "mobilizable"
+        else:
+            mob_class = "non-mobilizable"
     else:
-        mob_class = "non-mobilizable" if s_mob is not None else "unassessed"
+        mob_class = "unassessed"
 
     return {
         "bin_id": bin_id,
@@ -956,6 +992,14 @@ def build_meta_parser() -> "argparse.ArgumentParser":
                    help="abricate database root (default: bundled lookup)")
     p.add_argument("--no-abricate", action="store_true",
                    help="skip annotation (sequence / header evidence only)")
+    p.add_argument("--no-conjscan", action="store_true",
+                   help="skip CONJScan/MacSyFinder system-level conjugative "
+                        "annotation (gene-based evidence only)")
+    p.add_argument("--conjscan-db-type", choices=["auto", "unordered"],
+                   default="unordered",
+                   help="CONJScan mode for fragmented metagenomic contigs "
+                        "(unordered content-only is the default for meta; "
+                        "use 'auto' for ordered-replicon organisation)")
     p.add_argument("--aware-version", choices=["legacy", "2025"],
                    default="legacy",
                    help="WHO AWaRe version used by S_ARG")
@@ -1046,7 +1090,9 @@ def meta_main(argv: Optional[List[str]] = None) -> int:
             annotation = annotate_fasta(
                 fasta, use_abricate=True, min_id=args.min_id,
                 min_cov=args.min_cov, threads=args.threads,
-                lookup=lookup)
+                lookup=lookup,
+                use_conjscan=not args.no_conjscan,
+                conjscan_db_type=args.conjscan_db_type)
             for w in annotation.warnings:
                 print("[plasrisk meta][annotation] %s" % w,
                       file=sys.stderr)

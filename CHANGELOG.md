@@ -2,6 +2,37 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.8.0] - 2026-10-25
+
+### Added
+- System-level conjugative annotation with CONJScan (Cury et al., 2020)
+  running in MacSyFinder v2 (Neron et al., 2023). The new
+  `plasrisk.conjscan` module predicts proteins per replicon with Prodigal,
+  runs the CONJScan/Plasmids models in ordered-replicon mode (gembase batch
+  with a per-replicon topology file; linear by default, circular for closed
+  plasmids) or content-only unordered mode, and reports complete, likely,
+  putative conjugative (pConj) and putative mobilizable (pMob) systems with
+  MPF types. The final mobility class is the union of this independent
+  system-level evidence and the oriTfinder/oriTDB/MOB-typer-style gene
+  evidence, so a system-level call can recover T4CP/relaxase calls missed
+  by gene-name matching. The new `conjugative_putative` class receives an
+  S_MOB base of 0.7, between conjugative_likely (0.85) and mobilizable
+  (0.60).
+- CLI flags `--no-conjscan`, `--conjscan-topology {linear,circular}` and
+  `--conjscan-db-type {auto,unordered}`; `plasrisk meta` defaults to
+  unordered content-only searches for fragmented metagenomic contigs and
+  propagates the CONJScan class into bin-level and sample-level output.
+- Per-sequence output columns `conjscan_class` and `conjscan_mpf`.
+- When macsyfinder/prodigal are absent the tool degrades gracefully to
+  gene-based evidence and emits an install warning; install with
+  `pip install plasrisk[conj]` and `conda install -c bioconda prodigal`.
+
+### Changed
+- The locked training labels and frozen catalogue scores are unchanged;
+  CONJScan operates on new inputs and provides the independent validation
+  and union-label sensitivity analysis described in the supplementary
+  materials.
+
 ## [1.7.3] - 2026-10-15
 
 ### Fixed
