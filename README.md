@@ -152,28 +152,17 @@ The lower-level commands remain available for full control: `plasrisk run`
 
 ## Installation
 
-### Option 1: conda (recommended)
-
-```bash
-# Create a dedicated environment
-conda create -n plasrisk -c bioconda -c conda-forge plasrisk
-conda activate plasrisk
-```
-
-This installs PlasRisk together with `abricate` and `blast` for full
-annotation capability.
-
-### Option 2: pip + manual abricate
+### Option 1: pip (recommended)
 
 ```bash
 pip install plasrisk
 
-# Install abricate separately for annotation
+# Install abricate separately for full annotation capability
 conda install -c bioconda abricate
 # or on Debian/Ubuntu: apt-get install abricate
 ```
 
-### Option 3: from source
+### Option 2: from source
 
 ```bash
 git clone https://github.com/LLQ95/PlasRisk.git
@@ -624,124 +613,6 @@ included:
   critical ARGs and 200 without ARG/VF), deduplicated at 95% ANI over 80%
   coverage, were scored with labels derived only from abricate annotation;
   AUC 0.998 (95% CI 0.994-1.000).
-
----
-
-## Uploading to conda (bioconda)
-
-To make PlasRisk installable via `conda install -c bioconda plasrisk`:
-
-### Step 1: Upload to PyPI
-
-```bash
-# Install build tools
-pip install build twine
-
-# Build distributions
-python -m build
-
-# Upload to PyPI
-twine upload dist/*
-```
-
-### Step 2: Fork and clone bioconda-recipes
-
-```bash
-git clone https://github.com/bioconda/bioconda-recipes.git
-cd bioconda-recipes
-```
-
-### Step 3: Create the recipe
-
-```bash
-# Create recipe directory
-mkdir -p recipes/plasrisk
-```
-
-Create `recipes/plasrisk/meta.yaml`:
-
-```yaml
-{% set version = "1.0.0" %}
-
-package:
-  name: plasrisk
-  version: {{ version }}
-
-source:
-  url: https://pypi.io/packages/source/p/plasrisk/plasrisk-{{ version }}.tar.gz
-  sha256: <SHA256 from PyPI>
-
-build:
-  number: 0
-  noarch: python
-  entry_points:
-    - plasrisk = plasrisk.cli:main
-  script: "{{ PYTHON }} -m pip install . --no-deps --ignore-installed -vv"
-
-requirements:
-  host:
-    - python >=3.9
-    - pip
-    - setuptools >=61.0
-    - wheel
-  run:
-    - python >=3.9
-    - pandas >=1.3
-    - numpy >=1.20
-    # abricate/blast optional; CLI falls back to --no-abricate mode
-
-test:
-  imports:
-    - plasrisk
-  commands:
-    - plasrisk --help
-    - plasrisk --version
-
-about:
-  home: https://github.com/LLQ95/PlasRisk
-  license: MIT
-  license_file: LICENSE
-  summary: "Ten-dimension data-driven weighted risk assessment for bacterial plasmids"
-```
-
-> **Note:** The complete, ready-to-submit recipe is in the `bioconda/` directory.
-> See `UPLOAD_GUIDE.md` for the full step-by-step release process.
-
-### Step 4: Test locally
-
-```bash
-# Install bioconda-utils
-conda install -c bioconda bioconda-utils
-
-# Test the recipe
-bioconda-utils build recipes/plasrisk --docker
-```
-
-### Step 5: Submit a pull request
-
-```bash
-git checkout -b plasrisk
-git add recipes/plasrisk/
-git commit -m "Add plasrisk recipe"
-git push origin plasrisk
-# Open PR at https://github.com/bioconda/bioconda-recipes
-```
-
-Once the PR is merged and CI passes, PlasRisk will be installable via:
-
-```bash
-conda install -c bioconda plasrisk
-```
-
-### Local conda build (without bioconda)
-
-```bash
-# Build from the conda/ directory in this repo
-conda build conda/
-
-# Install locally
-conda install --use-local plasrisk
-```
 
 ---
 
