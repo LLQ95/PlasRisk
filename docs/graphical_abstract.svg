@@ -1,176 +1,2579 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1010" viewBox="0 0 1500 1010">
-<rect x="0" y="0" width="1500" height="1010" fill="#FFFFFF"/>
-<text x="60" y="56" font-family="Arial, Helvetica, sans-serif" font-size="31" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">PlasRisk: data-driven risk grading of bacterial plasmids for One Health surveillance</text>
-<text x="60" y="90" font-family="Arial, Helvetica, sans-serif" font-size="15.5" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">Any FASTA (plasmids, genomes, metagenomes, contigs) is scored on ten bounded sub-scores with data-driven weights, then assigned to five grades and validated in held-out and prospective cohorts.</text>
-<rect x="70" y="122" width="400" height="158" rx="14" ry="14" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1.6" />
-<ellipse cx="104" cy="148" rx="17" ry="7" fill="#EAF1F9" stroke="#2C6FAE" stroke-width="1.6"/>
-<path d="M87,148 L87,178 a17,7 0 0 0 34,0 L121,148" fill="#EAF1F9" stroke="#2C6FAE" stroke-width="1.6"/>
-<path d="M87,160 a17,7 0 0 0 34,0" fill="none" stroke="#2C6FAE" stroke-width="1.4"/>
-<text x="148" y="168" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">PIPdb corpus</text>
-<text x="94" y="214" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">792,964 plasmid sequence clusters</text>
-<text x="94" y="240" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">1,009,571 genomes · 450 species</text>
-<rect x="550" y="122" width="400" height="158" rx="14" ry="14" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1.6" />
-<line x1="566" y1="146" x2="602" y2="146" stroke="#2C6FAE" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="588" cy="146" r="5" fill="#FFFFFF" stroke="#2C6FAE" stroke-width="2.2"/>
-<line x1="566" y1="160" x2="602" y2="160" stroke="#2C6FAE" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="578" cy="160" r="5" fill="#FFFFFF" stroke="#2C6FAE" stroke-width="2.2"/>
-<line x1="566" y1="174" x2="602" y2="174" stroke="#2C6FAE" stroke-width="2.2" stroke-linecap="round"/>
-<circle cx="588" cy="174" r="5" fill="#FFFFFF" stroke="#2C6FAE" stroke-width="2.2"/>
-<text x="628" y="168" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">Ten bounded sub-scores</text>
-<text x="574" y="214" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">ARG · VF · mobility · biocide/metal · size</text>
-<text x="574" y="240" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">host · replicon · geography · habitat · growth</text>
-<text x="574" y="266" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">mobility annotated with CONJScan / MacSyFinder</text>
-<rect x="1030" y="122" width="400" height="158" rx="14" ry="14" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1.6" />
-<path d="M1078,144 L1052,144 L1066,160 L1052,176 L1078,176" fill="none" stroke="#2C6FAE" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="1108" y="168" font-family="Arial, Helvetica, sans-serif" font-size="18" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">Weighted composite</text>
-<text x="1054" y="214" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">S = Σ wᵢ Sᵢ,  S ∈ [0,1]</text>
-<text x="1054" y="240" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">RF · LASSO · grid consensus weights</text>
-<text x="1054" y="266" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">full 10 dims · lite 5 dims · ordinal 8 terms</text>
-<line x1="470" y1="201.0" x2="538" y2="201.0" stroke="#2C6FAE" stroke-width="3" stroke-linecap="round"/>
-<path d="M538,194.0 L550,201.0 L538,208.0 Z" fill="#2C6FAE"/>
-<line x1="950" y1="201.0" x2="1018" y2="201.0" stroke="#2C6FAE" stroke-width="3" stroke-linecap="round"/>
-<path d="M1018,194.0 L1030,201.0 L1018,208.0 Z" fill="#2C6FAE"/>
-<text x="60" y="331" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">Five grades, mutually exclusive phenotype composition, grouped into three action tiers</text>
-<line x1="318" y1="360" x2="318" y2="468" stroke="#E03A3E" stroke-width="3.5" stroke-linecap="round"/>
-<line x1="310" y1="360" x2="318" y2="360" stroke="#E03A3E" stroke-width="3.5" stroke-linecap="round"/>
-<line x1="310" y1="468" x2="318" y2="468" stroke="#E03A3E" stroke-width="3.5" stroke-linecap="round"/>
-<line x1="318" y1="480" x2="318" y2="528" stroke="#E0A02F" stroke-width="3.5" stroke-linecap="round"/>
-<line x1="310" y1="480" x2="318" y2="480" stroke="#E0A02F" stroke-width="3.5" stroke-linecap="round"/>
-<line x1="310" y1="528" x2="318" y2="528" stroke="#E0A02F" stroke-width="3.5" stroke-linecap="round"/>
-<line x1="318" y1="540" x2="318" y2="648" stroke="#3F9E68" stroke-width="3.5" stroke-linecap="round"/>
-<line x1="310" y1="540" x2="318" y2="540" stroke="#3F9E68" stroke-width="3.5" stroke-linecap="round"/>
-<line x1="310" y1="648" x2="318" y2="648" stroke="#3F9E68" stroke-width="3.5" stroke-linecap="round"/>
-<text x="60" y="402" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#E03A3E" text-anchor="start" font-weight="bold" font-style="normal">ALERT</text>
-<text x="60" y="426" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">A · B</text>
-<text x="60" y="448" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">escalate expert review</text>
-<text x="60" y="492" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#E0A02F" text-anchor="start" font-weight="bold" font-style="normal">MONITOR</text>
-<text x="60" y="516" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">C</text>
-<text x="60" y="538" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">routine surveillance</text>
-<text x="60" y="582" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#3F9E68" text-anchor="start" font-weight="bold" font-style="normal">SAFE</text>
-<text x="60" y="606" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">D · E</text>
-<text x="60" y="628" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">deprioritize</text>
-<text x="335" y="390.0" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#1F2A44" text-anchor="end" font-weight="bold" font-style="normal">A</text>
-<clipPath id="clip_A"><rect x="360" y="360" width="970" height="48" rx="9" ry="9"/></clipPath>
-<g clip-path="url(#clip_A)">
-<rect x="360.00" y="360" width="499.28" height="48" fill="#EC3F8C"/>
-<text x="609.34" y="390.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">51%</text>
-<rect x="858.68" y="360" width="285.78" height="48" fill="#F28E2B"/>
-<text x="1001.27" y="390.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">29%</text>
-<rect x="1143.86" y="360" width="108.17" height="48" fill="#2BB3C0"/>
-<text x="1197.64" y="390.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">11%</text>
-<rect x="1251.43" y="360" width="79.17" height="48" fill="#7FBF8A"/>
-<text x="1290.72" y="390.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">8%</text>
-</g>
-<rect x="360" y="360" width="970" height="48" rx="9" ry="9" fill="none" stroke="#E3E8EF" stroke-width="1"/>
-<text x="335" y="450.0" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#1F2A44" text-anchor="end" font-weight="bold" font-style="normal">B</text>
-<clipPath id="clip_B"><rect x="360" y="420" width="970" height="48" rx="9" ry="9"/></clipPath>
-<g clip-path="url(#clip_B)">
-<rect x="360.00" y="420" width="227.00" height="48" fill="#EC3F8C"/>
-<text x="473.20" y="450.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">23%</text>
-<rect x="586.40" y="420" width="223.51" height="48" fill="#F28E2B"/>
-<text x="697.85" y="450.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">23%</text>
-<rect x="809.30" y="420" width="131.26" height="48" fill="#2BB3C0"/>
-<text x="874.63" y="450.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">13%</text>
-<rect x="939.96" y="420" width="387.63" height="48" fill="#7FBF8A"/>
-<text x="1133.48" y="450.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">40%</text>
-<rect x="1326.99" y="420" width="3.61" height="48" fill="#9AA0A9"/>
-</g>
-<rect x="360" y="420" width="970" height="48" rx="9" ry="9" fill="none" stroke="#E3E8EF" stroke-width="1"/>
-<text x="335" y="510.0" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#1F2A44" text-anchor="end" font-weight="bold" font-style="normal">C</text>
-<clipPath id="clip_C"><rect x="360" y="480" width="970" height="48" rx="9" ry="9"/></clipPath>
-<g clip-path="url(#clip_C)">
-<rect x="360.00" y="480" width="75.58" height="48" fill="#EC3F8C"/>
-<text x="397.49" y="510.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">8%</text>
-<rect x="434.98" y="480" width="29.21" height="48" fill="#F28E2B"/>
-<rect x="463.60" y="480" width="115.25" height="48" fill="#2BB3C0"/>
-<text x="520.92" y="510.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">12%</text>
-<rect x="578.25" y="480" width="527.99" height="48" fill="#7FBF8A"/>
-<text x="841.94" y="510.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">54%</text>
-<rect x="1105.64" y="480" width="225.06" height="48" fill="#9AA0A9"/>
-<text x="1217.87" y="510.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">23%</text>
-</g>
-<rect x="360" y="480" width="970" height="48" rx="9" ry="9" fill="none" stroke="#E3E8EF" stroke-width="1"/>
-<text x="335" y="570.0" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#1F2A44" text-anchor="end" font-weight="bold" font-style="normal">D</text>
-<clipPath id="clip_D"><rect x="360" y="540" width="970" height="48" rx="9" ry="9"/></clipPath>
-<g clip-path="url(#clip_D)">
-<rect x="360.00" y="540" width="2.25" height="48" fill="#EC3F8C"/>
-<rect x="361.65" y="540" width="1.76" height="48" fill="#F28E2B"/>
-<rect x="362.81" y="540" width="50.75" height="48" fill="#2BB3C0"/>
-<rect x="412.96" y="540" width="474.06" height="48" fill="#7FBF8A"/>
-<text x="649.69" y="570.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">49%</text>
-<rect x="886.42" y="540" width="444.18" height="48" fill="#9AA0A9"/>
-<text x="1108.21" y="570.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">46%</text>
-</g>
-<rect x="360" y="540" width="970" height="48" rx="9" ry="9" fill="none" stroke="#E3E8EF" stroke-width="1"/>
-<text x="335" y="630.0" font-family="Arial, Helvetica, sans-serif" font-size="19" fill="#1F2A44" text-anchor="end" font-weight="bold" font-style="normal">E</text>
-<clipPath id="clip_E"><rect x="360" y="600" width="970" height="48" rx="9" ry="9"/></clipPath>
-<g clip-path="url(#clip_E)">
-<rect x="360.00" y="600" width="970.60" height="48" fill="#9AA0A9"/>
-<text x="845.00" y="630.0" font-family="Arial, Helvetica, sans-serif" font-size="15" fill="#FFFFFF" text-anchor="middle" font-weight="bold">100%</text>
-</g>
-<rect x="360" y="600" width="970" height="48" rx="9" ry="9" fill="none" stroke="#E3E8EF" stroke-width="1"/>
-<line x1="360" y1="674" x2="1330" y2="674" stroke="#1F2A44" stroke-width="1.6"/>
-<line x1="360.0" y1="674" x2="360.0" y2="680" stroke="#1F2A44" stroke-width="1.4"/>
-<text x="360.0" y="698" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#5A6577" text-anchor="middle" font-weight="normal" font-style="normal">0%</text>
-<line x1="602.5" y1="674" x2="602.5" y2="680" stroke="#1F2A44" stroke-width="1.4"/>
-<text x="602.5" y="698" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#5A6577" text-anchor="middle" font-weight="normal" font-style="normal">25%</text>
-<line x1="845.0" y1="674" x2="845.0" y2="680" stroke="#1F2A44" stroke-width="1.4"/>
-<text x="845.0" y="698" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#5A6577" text-anchor="middle" font-weight="normal" font-style="normal">50%</text>
-<line x1="1087.5" y1="674" x2="1087.5" y2="680" stroke="#1F2A44" stroke-width="1.4"/>
-<text x="1087.5" y="698" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#5A6577" text-anchor="middle" font-weight="normal" font-style="normal">75%</text>
-<line x1="1330.0" y1="674" x2="1330.0" y2="680" stroke="#1F2A44" stroke-width="1.4"/>
-<text x="1330.0" y="698" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#5A6577" text-anchor="middle" font-weight="normal" font-style="normal">100%</text>
-<text x="845" y="724" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#5A6577" text-anchor="middle" font-weight="normal" font-style="normal">Mutually exclusive phenotype share within grade</text>
-<rect x="150" y="743" width="18" height="18" rx="4" fill="#EC3F8C"/>
-<text x="176" y="758" font-family="Arial, Helvetica, sans-serif" font-size="13.5" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">Critical-ARG carrier</text>
-<rect x="400" y="743" width="18" height="18" rx="4" fill="#F28E2B"/>
-<text x="426" y="758" font-family="Arial, Helvetica, sans-serif" font-size="13.5" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">ARG-VF co-carriage</text>
-<rect x="650" y="743" width="18" height="18" rx="4" fill="#2BB3C0"/>
-<text x="676" y="758" font-family="Arial, Helvetica, sans-serif" font-size="13.5" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">Conjugative mobility</text>
-<rect x="900" y="743" width="18" height="18" rx="4" fill="#7FBF8A"/>
-<text x="926" y="758" font-family="Arial, Helvetica, sans-serif" font-size="13.5" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">Biocide/metal only</text>
-<rect x="1150" y="743" width="18" height="18" rx="4" fill="#9AA0A9"/>
-<text x="1176" y="758" font-family="Arial, Helvetica, sans-serif" font-size="13.5" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">No endpoint</text>
-<rect x="60" y="770" width="700" height="150" rx="14" ry="14" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1.6" />
-<text x="82" y="802" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">Locked test discrimination</text>
-<text x="82" y="837" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">critical</text>
-<rect x="200" y="823" width="380" height="15" rx="7.5" fill="#EEF1F5"/>
-<rect x="200" y="823" width="359.6" height="15" rx="7.5" fill="#EC3F8C"/>
-<text x="594" y="836" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">0.946</text>
-<text x="82" y="861" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">fusion</text>
-<rect x="200" y="847" width="380" height="15" rx="7.5" fill="#EEF1F5"/>
-<rect x="200" y="847" width="367.4" height="15" rx="7.5" fill="#F28E2B"/>
-<text x="594" y="860" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">0.967</text>
-<text x="82" y="885" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">conjugative</text>
-<rect x="200" y="871" width="380" height="15" rx="7.5" fill="#EEF1F5"/>
-<rect x="200" y="871" width="321.6" height="15" rx="7.5" fill="#2BB3C0"/>
-<text x="594" y="884" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">0.846</text>
-<text x="82" y="909" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">biocide/metal</text>
-<rect x="200" y="895" width="380" height="15" rx="7.5" fill="#EEF1F5"/>
-<rect x="200" y="895" width="345.6" height="15" rx="7.5" fill="#7FBF8A"/>
-<text x="594" y="908" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">0.909</text>
-<rect x="800" y="770" width="640" height="150" rx="14" ry="14" fill="#FFFFFF" stroke="#D7DEE8" stroke-width="1.6" />
-<text x="822" y="802" font-family="Arial, Helvetica, sans-serif" font-size="17" fill="#1F2A44" text-anchor="start" font-weight="bold" font-style="normal">Real-world validation</text>
-<circle cx="822" cy="831" r="6" fill="#E03A3E"/>
-<text x="838" y="836" font-family="Arial, Helvetica, sans-serif" font-size="13.5" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">Cultured traveller E. coli isolates</text>
-<text x="838" y="858" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#E03A3E" text-anchor="start" font-weight="bold" font-style="normal">high-risk vehicles found in grades A/B</text>
-<circle cx="822" cy="881" r="6" fill="#3F9E68"/>
-<text x="838" y="886" font-family="Arial, Helvetica, sans-serif" font-size="13.5" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">Healthy-gut longitudinal metagenomes</text>
-<text x="838" y="908" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#3F9E68" text-anchor="start" font-weight="bold" font-style="normal">no high-risk vehicles detected</text>
-<text x="1180" y="836" font-family="Arial, Helvetica, sans-serif" font-size="13.5" fill="#1F2A44" text-anchor="start" font-weight="normal" font-style="normal">External plasmids</text>
-<text x="1180" y="858" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#2C6FAE" text-anchor="start" font-weight="bold" font-style="normal">AUC 0.998; agreement</text>
-<text x="1180" y="876" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#2C6FAE" text-anchor="start" font-weight="bold" font-style="normal">across pre/post-2020</text>
-<text x="1180" y="894" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#2C6FAE" text-anchor="start" font-weight="bold" font-style="normal">temporal transport</text>
-<rect x="60" y="948" width="329" height="46" rx="10" fill="#EAF1F9"/>
-<text x="78" y="968" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#2C6FAE" text-anchor="start" font-weight="bold" font-style="normal">Ten sub-scores</text>
-<text x="78" y="986" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">consensus weights</text>
-<rect x="405" y="948" width="329" height="46" rx="10" fill="#EAF1F9"/>
-<text x="423" y="968" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#2C6FAE" text-anchor="start" font-weight="bold" font-style="normal">Five grades</text>
-<text x="423" y="986" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">monotonic hazard gradient</text>
-<rect x="750" y="948" width="329" height="46" rx="10" fill="#EAF1F9"/>
-<text x="768" y="968" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#2C6FAE" text-anchor="start" font-weight="bold" font-style="normal">Three tiers</text>
-<text x="768" y="986" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">alert / monitor / safe</text>
-<rect x="1095" y="948" width="329" height="46" rx="10" fill="#EAF1F9"/>
-<text x="1113" y="968" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#2C6FAE" text-anchor="start" font-weight="bold" font-style="normal">Validated</text>
-<text x="1113" y="986" font-family="Arial, Helvetica, sans-serif" font-size="12.5" fill="#5A6577" text-anchor="start" font-weight="normal" font-style="normal">held-out and prospective cohorts</text>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="_图层_1" xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 407.77 291.87">
+  <!-- Generator: Adobe Illustrator 29.6.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 9)  -->
+  <defs>
+    <style>
+      .st0, .st1, .st2, .st3, .st4 {
+        stroke: #fff;
+        stroke-width: .18px;
+      }
+
+      .st0, .st5 {
+        fill: #3f9bd6;
+      }
+
+      .st6, .st7, .st8, .st9, .st10, .st11, .st12, .st13, .st14, .st15, .st16, .st17, .st18, .st19, .st20, .st21, .st22, .st23, .st24, .st25, .st26, .st27, .st28, .st29, .st30, .st31, .st32 {
+        stroke-miterlimit: 1.21;
+      }
+
+      .st6, .st33, .st14, .st27, .st30 {
+        stroke-width: .3px;
+      }
+
+      .st6, .st17 {
+        fill: #e8f6ee;
+        stroke: #bfe3cd;
+      }
+
+      .st34 {
+        fill: #5b479c;
+      }
+
+      .st34, .st35, .st36, .st37, .st38, .st39, .st40, .st41, .st42, .st43, .st44, .st45, .st46, .st47, .st48, .st49, .st50, .st51, .st52, .st53, .st54, .st55, .st56, .st57, .st58, .st59, .st60, .st61, .st62, .st63, .st64, .st65, .st66, .st67, .st68, .st69, .st70, .st71, .st72, .st73, .st74, .st75, .st76, .st77, .st78, .st79, .st80 {
+        isolation: isolate;
+      }
+
+      .st34, .st37, .st40, .st42, .st43, .st45, .st46, .st48, .st50, .st53, .st58, .st62, .st70, .st71, .st74, .st79, .st80 {
+        font-family: ArialMT, Arial;
+      }
+
+      .st34, .st55 {
+        font-size: 3.5px;
+      }
+
+      .st35 {
+        fill: #6d4fc0;
+      }
+
+      .st35, .st36, .st39, .st41, .st44, .st47, .st49, .st51, .st52, .st54, .st55, .st56, .st57, .st59, .st61, .st63, .st64, .st65, .st66, .st67, .st68, .st69, .st72, .st73, .st75, .st76, .st77, .st78 {
+        font-family: Arial-BoldMT, Arial;
+        font-weight: 700;
+      }
+
+      .st35, .st36, .st39, .st42, .st45, .st49, .st51, .st52, .st59, .st61, .st63, .st69, .st72, .st77, .st78, .st79, .st80 {
+        font-size: 4px;
+      }
+
+      .st36, .st81 {
+        fill: #8b6fd6;
+      }
+
+      .st36, .st61, .st69, .st77 {
+        letter-spacing: .05em;
+      }
+
+      .st82 {
+        fill: #8fc36b;
+      }
+
+      .st83, .st7, .st8, .st84, .st10, .st85, .st86, .st87, .st88, .st33, .st89, .st90, .st11, .st91, .st13, .st15, .st18, .st92, .st93, .st94, .st20, .st22, .st23, .st25, .st95, .st96, .st27, .st28, .st97, .st98, .st99, .st100, .st32, .st101 {
+        fill: none;
+      }
+
+      .st83, .st84, .st92, .st93, .st23, .st100 {
+        stroke: #3faf6a;
+      }
+
+      .st83, .st10, .st23, .st100 {
+        stroke-width: .55px;
+      }
+
+      .st83, .st85, .st86, .st87, .st88, .st89, .st90, .st11, .st15, .st92, .st102, .st94, .st103, .st95, .st96, .st97, .st99, .st100, .st101 {
+        stroke-linecap: round;
+      }
+
+      .st7, .st86, .st87, .st88, .st89, .st92, .st94, .st22, .st99, .st101 {
+        stroke-width: .61px;
+      }
+
+      .st7, .st88 {
+        stroke: #3f9bd6;
+      }
+
+      .st104, .st105, .st106, .st102, .st93, .st103, .st95 {
+        stroke-width: .5px;
+      }
+
+      .st104, .st102 {
+        fill: #eef4ec;
+        stroke: #5fa975;
+      }
+
+      .st8 {
+        stroke-width: .49px;
+      }
+
+      .st8, .st105, .st89, .st103 {
+        stroke: #e05b6c;
+      }
+
+      .st37 {
+        font-size: 3.19px;
+      }
+
+      .st37, .st48 {
+        fill: #8a98ab;
+      }
+
+      .st84 {
+        stroke-width: .35px;
+      }
+
+      .st107 {
+        clip-path: url(#clippath-4);
+      }
+
+      .st9, .st15, .st97, .st29 {
+        stroke: #ef9b43;
+      }
+
+      .st9, .st29 {
+        stroke-width: .48px;
+      }
+
+      .st9, .st31 {
+        fill: #fdf2e4;
+      }
+
+      .st38 {
+        font-family: AdobeSongStd-Light-GBpc-EUC-H, 'Adobe Song Std';
+        font-weight: 300;
+      }
+
+      .st38, .st44, .st76 {
+        fill: #b06a1f;
+      }
+
+      .st38, .st76 {
+        font-size: 8px;
+      }
+
+      .st108, .st3 {
+        fill: #ef8f4b;
+      }
+
+      .st39, .st41, .st109, .st57, .st66 {
+        fill: #233247;
+      }
+
+      .st10, .st85, .st86, .st13, .st106, .st95, .st96, .st26, .st98 {
+        stroke: #4c8bf5;
+      }
+
+      .st40, .st42, .st43 {
+        fill: #74849a;
+      }
+
+      .st40, .st46, .st48, .st50, .st66 {
+        font-size: 3.64px;
+      }
+
+      .st85 {
+        stroke-width: 1.35px;
+      }
+
+      .st86, .st87, .st88, .st89, .st92, .st94, .st99, .st100, .st101 {
+        stroke-linejoin: round;
+      }
+
+      .st87 {
+        stroke: #b05cc4;
+      }
+
+      .st41, .st56, .st67 {
+        font-size: 6px;
+      }
+
+      .st33 {
+        stroke: #9aa5b1;
+      }
+
+      .st105, .st110, .st12, .st55, .st16, .st63, .st73, .st29 {
+        fill: #fff;
+      }
+
+      .st43 {
+        font-size: 2.4px;
+      }
+
+      .st44 {
+        font-size: 5.2px;
+      }
+
+      .st1, .st111 {
+        fill: #e05b6c;
+      }
+
+      .st45, .st70, .st71 {
+        fill: #5d6e84;
+      }
+
+      .st112, .st4 {
+        fill: #b05cc4;
+      }
+
+      .st46 {
+        fill: #7ee2a8;
+      }
+
+      .st47 {
+        font-size: 3.6px;
+      }
+
+      .st47, .st50, .st52, .st53, .st58, .st74, .st79 {
+        fill: #3a4a60;
+      }
+
+      .st90 {
+        stroke: #8a97a8;
+        stroke-width: .45px;
+      }
+
+      .st11 {
+        stroke: #eee2d2;
+      }
+
+      .st11, .st15 {
+        stroke-width: 3.95px;
+      }
+
+      .st49, .st80 {
+        fill: #2f7d4f;
+      }
+
+      .st113 {
+        fill: #33b8a4;
+      }
+
+      .st51 {
+        fill: #d64545;
+      }
+
+      .st114 {
+        fill: #9aabc2;
+      }
+
+      .st12 {
+        stroke-width: .29px;
+      }
+
+      .st12, .st16 {
+        stroke: #dde7f2;
+      }
+
+      .st115 {
+        clip-path: url(#clippath-1);
+      }
+
+      .st13, .st26 {
+        stroke-width: .91px;
+      }
+
+      .st53 {
+        font-size: 3.95px;
+      }
+
+      .st54 {
+        fill: #1d2c40;
+        font-size: 9px;
+      }
+
+      .st14 {
+        fill: #f7fafd;
+        stroke: #e4ebf4;
+      }
+
+      .st56, .st59, .st65, .st75 {
+        fill: #33455c;
+      }
+
+      .st57, .st64 {
+        font-size: 7px;
+      }
+
+      .st58 {
+        font-size: 4.5px;
+      }
+
+      .st16, .st17, .st31 {
+        stroke-width: .28px;
+      }
+
+      .st61, .st116 {
+        fill: #4c8bf5;
+      }
+
+      .st62 {
+        fill: #aebccf;
+        font-size: 3.34px;
+      }
+
+      .st64 {
+        letter-spacing: .08em;
+      }
+
+      .st64, .st68 {
+        fill: #2f6fd0;
+      }
+
+      .st65 {
+        font-size: 4.1px;
+      }
+
+      .st106, .st26 {
+        fill: #eaf2fe;
+      }
+
+      .st117 {
+        clip-path: url(#clippath-3);
+      }
+
+      .st18, .st27 {
+        stroke: #e9eef6;
+      }
+
+      .st18, .st32 {
+        stroke-width: .43px;
+      }
+
+      .st19 {
+        fill: #e6f7f4;
+        stroke: #bfe8e1;
+      }
+
+      .st19, .st21 {
+        stroke-width: .27px;
+      }
+
+      .st118 {
+        fill: #ef9b43;
+      }
+
+      .st67 {
+        fill: #2c3d54;
+      }
+
+      .st68 {
+        font-size: 3.8px;
+      }
+
+      .st69 {
+        fill: #2f9157;
+      }
+
+      .st94 {
+        stroke: #1fb6a3;
+      }
+
+      .st20 {
+        stroke: #c3b1ea;
+        stroke-width: .73px;
+      }
+
+      .st119, .st2 {
+        fill: #b0b7c0;
+      }
+
+      .st21, .st30 {
+        fill: #f6f2fd;
+        stroke: #ddcff7;
+      }
+
+      .st70, .st73, .st75 {
+        font-size: 5px;
+      }
+
+      .st22 {
+        stroke: #cfdae8;
+      }
+
+      .st120 {
+        fill: #b9c5d4;
+      }
+
+      .st71 {
+        font-size: 3px;
+      }
+
+      .st24 {
+        fill: #eef3fa;
+        stroke: #d6e1ef;
+        stroke-width: .26px;
+      }
+
+      .st25 {
+        stroke: #e1e8f2;
+      }
+
+      .st25, .st98 {
+        stroke-width: .4px;
+      }
+
+      .st121 {
+        fill: #3faf6a;
+      }
+
+      .st96 {
+        stroke-width: .65px;
+      }
+
+      .st72 {
+        fill: #7a8699;
+      }
+
+      .st122 {
+        fill: #edf1f6;
+      }
+
+      .st28 {
+        stroke: #9aa7b8;
+        stroke-width: .36px;
+      }
+
+      .st97 {
+        stroke-width: 1.05px;
+      }
+
+      .st74 {
+        font-size: 2.9px;
+      }
+
+      .st123 {
+        clip-path: url(#clippath-2);
+      }
+
+      .st124 {
+        fill: #7fb6d6;
+      }
+
+      .st125 {
+        fill: #e8c34a;
+      }
+
+      .st99, .st32 {
+        stroke: #8b6fd6;
+      }
+
+      .st77 {
+        fill: #e0832a;
+      }
+
+      .st31 {
+        stroke: #f6d9b4;
+      }
+
+      .st126 {
+        clip-path: url(#clippath);
+      }
+
+      .st78 {
+        fill: #128376;
+      }
+
+      .st127 {
+        fill: #f5f8fc;
+      }
+
+      .st101 {
+        stroke: #ef8f4b;
+      }
+    </style>
+    <clipPath id="clippath">
+      <rect class="st91" x="224.5" y="78.9" width="67.86" height="4.6" rx=".85" ry=".85"/>
+    </clipPath>
+    <clipPath id="clippath-1">
+      <rect class="st91" x="224.5" y="85.1" width="67.86" height="4.6" rx=".85" ry=".85"/>
+    </clipPath>
+    <clipPath id="clippath-2">
+      <rect class="st91" x="224.5" y="91.3" width="67.86" height="4.6" rx=".85" ry=".85"/>
+    </clipPath>
+    <clipPath id="clippath-3">
+      <rect class="st91" x="224.5" y="97.5" width="67.86" height="4.6" rx=".85" ry=".85"/>
+    </clipPath>
+    <clipPath id="clippath-4">
+      <rect class="st91" x="224.5" y="103.7" width="67.86" height="4.6" rx=".85" ry=".85"/>
+    </clipPath>
+  </defs>
+  <rect class="st127" x="-.05" y=".51" width="407.82" height="291.36"/>
+  <g id="header">
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st54" transform="translate(11.38 17.39)"><tspan x="0" y="0">PlasRisk: a data-driven risk assessment of bacterial plasmids for One Health surveillance</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <text class="st70" transform="translate(25.8 27.52)"><tspan x="0" y="0">Any FASTA — plasmids, draft genomes, metagenomes, contigs — ten biology-driven sub-scores with consensus weights, validated in held-out real-world cohorts</tspan></text>
+          </g>
+        </g>
+      </g>
+    </g>
+    <line class="st22" x1="149.56" y1="33.71" x2="258.22" y2="33.71"/>
+  </g>
+  <g id="card1-input">
+    <g>
+      <rect class="st110" x="6.87" y="35.86" width="91.11" height="217.89" rx="4.62" ry="4.62"/>
+      <rect class="st25" x="6.87" y="35.86" width="91.11" height="217.89" rx="4.62" ry="4.62"/>
+    </g>
+    <path class="st116" d="M7.78,41.36h0c.5,0,.91.37.91.83v205.24c0,.46-.41.83-.91.83h0c-.5,0-.91-.37-.91-.83V42.19c0-.46.41-.83.91-.83Z"/>
+    <circle class="st116" cx="16.59" cy="46.19" r="4.56"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st73" transform="translate(14.4 47.71)"><tspan x="0" y="0">A</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st57" transform="translate(23.88 48.01)"><tspan x="0" y="0">Input cohort</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st61" transform="translate(24.24 53.78)"><tspan x="0" y="0">PIPdb · PSC BUILD</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g>
+      <ellipse class="st26" cx="52.43" cy="65.02" rx="9.11" ry="2.73"/>
+      <path class="st13" d="M43.31,65.02v9.72c0,1.51,4.08,2.73,9.11,2.73s9.11-1.22,9.11-2.73v-9.72"/>
+      <path class="st13" d="M43.31,69.88c0,1.51,4.08,2.73,9.11,2.73s9.11-1.22,9.11-2.73"/>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st41" transform="translate(35.63 86.88)"><tspan x="0" y="0">792,964 PSCs</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st45" transform="translate(30.06 92.96)"><tspan x="0" y="0">plasmid sequence clusters</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <line class="st18" x1="13.55" y1="98.42" x2="91.3" y2="98.42"/>
+    <g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st53" transform="translate(13.66 103.59)"><tspan x="0" y="0">1,009,571 pathogen genomes</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st53" transform="translate(13.8 109.36)"><tspan x="0" y="0">450 species · 110 genera</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st53" transform="translate(13.55 115.18)"><tspan x="0" y="0">unified annotation (CARD/RGI, VFDB,</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st53" transform="translate(13.99 121.22)"><tspan x="0" y="0">BacMet, PlasmidFinder, MOB-typer, ISfinder,</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st53" transform="translate(13.66 127.05)"><tspan x="0" y="0">CONJScan/MacSyFinder)</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st68" transform="translate(12.96 133.66)"><tspan x="0" y="0">FASTA of plasmids / isolates / metagenomes</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g id="input-types">
+        <g>
+          <g>
+            <circle class="st96" cx="23.27" cy="141.1" r="2.75"/>
+            <path class="st85" d="M23.27,143.85c.51-.49,1.2-.77,1.91-.77"/>
+            <path class="st85" d="M25.85,140.16c-.64-.31-1.13-.86-1.37-1.53"/>
+            <path class="st85" d="M20.63,141.86c.61.36,1.06.94,1.26,1.62"/>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st37" transform="translate(17.6 147.1)"><tspan x="0" y="0">Plasmid</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g>
+          <rect class="st113" x="36.8" y="140.1" width="3" height="1.7" rx=".4" ry=".4"/>
+          <rect class="st113" x="40.1" y="140.1" width="3" height="1.7" rx=".4" ry=".4"/>
+          <rect class="st113" x="43.4" y="140.1" width="3" height="1.7" rx=".4" ry=".4"/>
+          <rect class="st113" x="46.7" y="140.1" width="2.7" height="1.7" rx=".4" ry=".4"/>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st37" transform="translate(36.58 147.1)"><tspan x="0" y="0">Genome</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g>
+          <g>
+            <rect class="st112" x="57" y="138.25" width="5" height="1.25" rx=".3" ry=".3"/>
+            <polygon class="st112" points="62 137.95 63.8 138.87 62 139.8 62 137.95"/>
+            <rect class="st112" x="58.2" y="139.95" width="4" height="1.25" rx=".3" ry=".3"/>
+            <polygon class="st112" points="62.2 139.65 64 140.57 62.2 141.5 62.2 139.65"/>
+            <rect class="st112" x="57" y="141.65" width="3" height="1.25" rx=".3" ry=".3"/>
+            <polygon class="st112" points="60 141.35 61.8 142.27 60 143.2 60 141.35"/>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st37" transform="translate(55.23 147.1)"><tspan x="0" y="0">Assembly</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g>
+          <g>
+            <line class="st97" x1="76.8" y1="139.5" x2="79.8" y2="139.5"/>
+            <line class="st97" x1="81" y1="139.5" x2="84.2" y2="139.5"/>
+            <line class="st97" x1="78.6" y1="142.2" x2="81.2" y2="142.2"/>
+            <line class="st97" x1="82.4" y1="142.2" x2="85.4" y2="142.2"/>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st37" transform="translate(76.16 147.1)"><tspan x="0" y="0">Contigs</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st56" transform="translate(13.55 156.1)"><tspan x="0" y="0">Four independent endpoints</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g id="labels">
+        <g>
+          <rect class="st14" x="13.55" y="160.11" width="77.75" height="13.97" rx="2.73" ry="2.73"/>
+          <g>
+            <path class="st89" d="M17.5,168h3.04c.67,0,1.21.54,1.21,1.21h0c0,.67-.54,1.21-1.21,1.21h-3.04c-.67,0-1.21-.54-1.21-1.21h0c0-.67.54-1.21,1.21-1.21Z"/>
+            <line class="st8" x1="19.02" y1="168" x2="19.02" y2="170.43"/>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <g class="st60">
+                    <text class="st52" transform="translate(23.27 166.18)"><tspan x="0" y="0">High-risk ARG carriage</tspan></text>
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <g class="st60">
+                    <text class="st40" transform="translate(23.27 171.04)"><tspan x="0" y="0">critically important ARGs · 3.1%</tspan></text>
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g>
+          <rect class="st14" x="13.55" y="176.51" width="77.75" height="13.97" rx="2.73" ry="2.73"/>
+          <g>
+            <circle class="st87" cx="18.41" cy="185.92" r="2.13"/>
+            <circle class="st87" cx="20.54" cy="185.92" r="2.13"/>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <g class="st60">
+                    <text class="st52" transform="translate(24.27 182.58)"><tspan x="0" y="0">ARG–VF fusion</tspan></text>
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <g class="st60">
+                    <text class="st40" transform="translate(24.27 187.44)"><tspan x="0" y="0">≥1 ARG and ≥1 VF · 1.8%</tspan></text>
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g>
+          <rect class="st14" x="13.55" y="192.91" width="77.75" height="13.97" rx="2.73" ry="2.73"/>
+          <g>
+            <circle class="st88" cx="16.59" cy="202.63" r="1.37"/>
+            <circle class="st88" cx="20.84" cy="202.63" r="1.37"/>
+            <line class="st7" x1="17.95" y1="202.63" x2="19.47" y2="202.63"/>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <g class="st60">
+                    <text class="st52" transform="translate(23.27 198.98)"><tspan x="0" y="0">Conjugative mobility</tspan></text>
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <g class="st60">
+                    <text class="st40" transform="translate(23.27 203.84)"><tspan x="0" y="0">dissemination potential · 5.1%</tspan></text>
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g>
+          <rect class="st14" x="13.55" y="209.31" width="77.75" height="13.97" rx="2.73" ry="2.73"/>
+          <path class="st101" d="M18.11,216.9h1.82M19.02,216.9v1.52l-1.67,2.73h3.34l-1.67-2.73v-1.52"/>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <g class="st60">
+                    <text class="st52" transform="translate(23.27 215.38)"><tspan x="0" y="0">Biocide / metal resistance</tspan></text>
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <g class="st60">
+                    <text class="st40" transform="translate(23.27 220.24)"><tspan x="0" y="0">co-selection pressure · 34.0%</tspan></text>
+                  </g>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st42" transform="translate(12.96 248.74)"><tspan x="0" y="0">Features exclude label information.</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g>
+    <rect class="st19" x="12.96" y="226.77" width="81.39" height="14.03" rx="2.71" ry="2.71"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st78" transform="translate(13.37 232.36)"><tspan x="0" y="0">Each PSC → vector of 10 bounded scores</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(19.75 237.85)"><tspan x="0" y="0">identical for train, test and external sets</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g id="card3-weights">
+    <g>
+      <rect class="st110" x="107.09" y="35.86" width="91.11" height="218.06" rx="4.63" ry="4.63"/>
+      <rect class="st25" x="107.09" y="35.86" width="91.11" height="218.06" rx="4.63" ry="4.63"/>
+    </g>
+    <path class="st81" d="M108,41.37h0c.5,0,.91.37.91.83v205.4c0,.46-.41.83-.91.83h0c-.5,0-.91-.37-.91-.83V42.19c0-.46.41-.83.91-.83h0Z"/>
+    <circle class="st81" cx="116.81" cy="46.19" r="4.56"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st73" transform="translate(114.63 47.71)"><tspan x="0" y="0">B</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st57" transform="translate(124.1 48.01)"><tspan x="0" y="0">Consensus weights</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st36" transform="translate(119.24 53.84)"><tspan x="0" y="0">DATA-DRIVEN, NOT EXPERT-PICKED</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st65" transform="translate(111.95 62.59)"><tspan x="0" y="0">Three independent inference methods</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g id="methods">
+      <g>
+        <rect class="st30" x="111.95" y="65.62" width="81.39" height="11.54" rx="2.73" ry="2.73"/>
+        <g>
+          <path class="st99" d="M119.85,75.95v-3.64M119.85,72.31l-2.73-2.43M119.85,72.31l2.73-2.43M117.12,69.88v-1.21M122.58,69.88v-1.21"/>
+          <circle class="st81" cx="117.12" cy="68.66" r=".61"/>
+          <circle class="st81" cx="122.58" cy="68.66" r=".61"/>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st52" transform="translate(125.32 70.79)"><tspan x="0" y="0">Random-forest</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st42" transform="translate(125.32 75.34)"><tspan x="0" y="0">mean decrease in Gini impurity</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <rect class="st30" x="111.95" y="78.99" width="81.39" height="11.54" rx="2.73" ry="2.73"/>
+        <path class="st99" d="M114.99,87.49l2.43-3.64,2.43,2.43,4.25-4.86"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st52" transform="translate(127.75 84.15)"><tspan x="0" y="0">LASSO</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st42" transform="translate(127.75 88.71)"><tspan x="0" y="0">sparse logistic coefficients</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <rect class="st30" x="111.95" y="92.35" width="81.39" height="11.54" rx="2.73" ry="2.73"/>
+        <g>
+          <rect class="st99" x="116.2" y="95.39" width="6.07" height="6.07" rx=".61" ry=".61"/>
+          <line class="st32" x1="118.24" y1="95.39" x2="118.24" y2="101.46"/>
+          <line class="st32" x1="120.24" y1="95.39" x2="120.24" y2="101.46"/>
+          <line class="st32" x1="116.2" y1="97.42" x2="122.28" y2="97.42"/>
+          <line class="st32" x1="116.2" y1="99.43" x2="122.28" y2="99.43"/>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st52" transform="translate(125.32 97.51)"><tspan x="0" y="0">Grid search</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st42" transform="translate(125.32 102.07)"><tspan x="0" y="0">coordinate descent on mean AUC</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <path class="st20" d="M152.65,105.11v4.25M135.03,105.11v2.43l17.62,3.04M170.27,105.11v2.43l-17.62,3.04"/>
+    <path class="st81" d="M129.87,111.18h45.56c2.52,0,4.56,2.04,4.56,4.56h0c0,2.52-2.04,4.56-4.56,4.56h-45.56c-2.52,0-4.56-2.04-4.56-4.56h0c0-2.52,2.04-4.56,4.56-4.56Z"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st63" transform="translate(131.92 117.26)"><tspan x="0" y="0">equal-vote consensus</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st65" transform="translate(111.95 128.8)"><tspan x="0" y="0">Consensus feature weights</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g id="weight-bars">
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st50" transform="translate(114.16 135.17)"><tspan x="0" y="0">S_ARG</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <rect class="st111" x="127.75" y="131.83" width="50.69" height="3.95" rx=".91" ry=".91"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(179.74 135.17)"><tspan x="0" y="0">.237</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st50" transform="translate(113.76 142.16)"><tspan x="0" y="0">S_BMG</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <rect class="st108" x="127.75" y="138.82" width="47.5" height="3.95" rx=".91" ry=".91"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(176.55 142.16)"><tspan x="0" y="0">.222</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st50" transform="translate(113.76 149.14)"><tspan x="0" y="0">S_MOB</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <rect class="st5" x="127.75" y="145.8" width="40.28" height="3.95" rx=".91" ry=".91"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(169.33 149.14)"><tspan x="0" y="0">.189</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st50" transform="translate(113.96 156.13)"><tspan x="0" y="0">S_SIZE</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <rect class="st113" x="127.75" y="152.79" width="35.07" height="3.95" rx=".91" ry=".91"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(164.12 156.13)"><tspan x="0" y="0">.164</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st50" transform="translate(117.4 163.12)"><tspan x="0" y="0">S_VF</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <rect class="st112" x="127.75" y="159.77" width="26.97" height="3.95" rx=".91" ry=".91"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(156.02 163.12)"><tspan x="0" y="0">.126</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st48" transform="translate(111.94 170.1)"><tspan x="0" y="0">S_HOST</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <rect class="st120" x="127.75" y="166.76" width="6.41" height="3.95" rx=".91" ry=".91"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(135.46 170.1)"><tspan x="0" y="0">.030</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st48" transform="translate(114.56 177.09)"><tspan x="0" y="0">S_HAB</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <rect class="st120" x="127.75" y="173.75" width="4.12" height="3.95" rx=".91" ry=".91"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(133.17 177.09)"><tspan x="0" y="0">.019</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st48" transform="translate(113.96 184.07)"><tspan x="0" y="0">S_GEO</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <rect class="st120" x="127.75" y="180.73" width="1.03" height="3.95" rx=".3" ry=".3"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(130.08 184.07)"><tspan x="0" y="0">.005</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st48" transform="translate(114.56 191.06)"><tspan x="0" y="0">S_REP</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <rect class="st120" x="127.75" y="187.72" width=".92" height="3.94" rx=".3" ry=".3"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(129.97 191.06)"><tspan x="0" y="0">.004</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st48" transform="translate(110.32 198.04)"><tspan x="0" y="0">S_GROW</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+        <path class="st120" d="M128.01,194.7h0c.14,0,.26.41.26.91v2.12c0,.5-.12.91-.26.91h0c-.14,0-.26-.41-.26-.91v-2.12c0-.5.12-.91.26-.91Z"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st66" transform="translate(129.57 198.04)"><tspan x="0" y="0">.002</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <line class="st28" x1="127.75" y1="200.47" x2="179.98" y2="200.47"/>
+      <line class="st28" x1="127.75" y1="200.47" x2="127.75" y2="201.69"/>
+      <line class="st28" x1="149.1" y1="200.47" x2="149.1" y2="201.69"/>
+      <line class="st28" x1="170.42" y1="200.47" x2="170.42" y2="201.69"/>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st37" transform="translate(126.86 205.64)"><tspan x="0" y="0">0</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st37" transform="translate(146.88 205.64)"><tspan x="0" y="0">0.1</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st37" transform="translate(168.2 205.64)"><tspan x="0" y="0">0.2</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <rect class="st21" x="111.95" y="212.62" width="81.99" height="16.15" rx="2.74" ry="2.74"/>
+    <g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st35" transform="translate(113.17 219.3)"><tspan x="0" y="0">Departs from expert intuition</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st34" transform="translate(113.17 225.7)"><tspan x="0" y="0">S_BMG ≈ 3× expert; S_GEO/S_REP/S_GROW ≈ 0</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(110.27 235.99)"><tspan x="0" y="0">• No single method dominates (pairwise DeLong)</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(108.91 241.62)"><tspan x="0" y="0" xml:space="preserve"> • Weights fixed on train only</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g id="card4-model">
+    <g>
+      <rect class="st110" x="207.32" y="35.86" width="91.11" height="218.06" rx="4.63" ry="4.63"/>
+      <rect class="st25" x="207.32" y="35.86" width="91.11" height="218.06" rx="4.63" ry="4.63"/>
+    </g>
+    <path class="st118" d="M208.23,41.37h0c.5,0,.91.37.91.83v205.4c0,.46-.41.83-.91.83h0c-.5,0-.91-.37-.91-.83V42.19c0-.46.41-.83.91-.83h0Z"/>
+    <circle class="st118" cx="217.04" cy="46.19" r="4.56"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st73" transform="translate(214.85 47.71)"><tspan x="0" y="0">C</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st57" transform="translate(224.33 48.01)"><tspan x="0" y="0">Composite model</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st77" transform="translate(221.29 53.84)"><tspan x="0" y="0">SCORE · GRADES · THREE MODES</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <path class="st31" d="M215.98,61.98h73.78c1.43,0,2.59,1.16,2.59,2.59v7.42c0,1.43-1.16,2.59-2.59,2.59h-73.78c-1.43,0-2.59-1.16-2.59-2.59v-7.42c0-1.43,1.16-2.59,2.59-2.59h0Z"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st76" transform="translate(219.24 70.79)"><tspan x="0" y="0">S = Σ w</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st44" transform="translate(246.94 72.99)"><tspan x="0" y="0">i</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st76" transform="translate(248.38 70.79)"><tspan x="0" y="0" xml:space="preserve"> S</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st44" transform="translate(255.94 72.99)"><tspan x="0" y="0">i</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st38" transform="translate(259.61 70.79)"><tspan x="0" y="0">∈</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st76" transform="translate(265.61 70.79)"><tspan x="0" y="0" xml:space="preserve"> [0, 1]</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g id="gauge">
+      <path class="st11" d="M271.7,105.11"/>
+      <path class="st11" d="M234.04,105.11"/>
+      <path class="st15" d="M271.7,105.11"/>
+      <path class="st15" d="M261.71,88.48"/>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st75" transform="translate(210.89 130.38)"><tspan x="0" y="0">Calibrated A–E grades &amp; percentiles</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g id="grades">
+      <rect class="st111" x="213.39" y="133.66" width="13.97" height="10.33" rx="2.13" ry="2.13"/>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st63" transform="translate(218.84 140.64)"><tspan x="0" y="0">A</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <rect class="st108" x="229.79" y="133.66" width="13.97" height="10.33" rx="2.13" ry="2.13"/>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st63" transform="translate(235.24 140.64)"><tspan x="0" y="0">B</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <rect class="st125" x="246.19" y="133.66" width="13.97" height="10.33" rx="2.13" ry="2.13"/>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st63" transform="translate(251.64 140.64)"><tspan x="0" y="0">C</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <rect class="st82" x="262.59" y="133.66" width="13.97" height="10.33" rx="2.13" ry="2.13"/>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st63" transform="translate(268.04 140.64)"><tspan x="0" y="0">D</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <rect class="st124" x="278.99" y="133.66" width="13.97" height="10.33" rx="2.13" ry="2.13"/>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st63" transform="translate(284.56 140.64)"><tspan x="0" y="0">E</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g id="triage">
+      <rect class="st111" x="213.39" y="145.35" width="30.37" height="1.45" rx=".6" ry=".6"/>
+      <rect class="st125" x="246.19" y="145.35" width="13.97" height="1.45" rx=".6" ry=".6"/>
+      <rect class="st82" x="262.59" y="145.35" width="30.37" height="1.45" rx=".6" ry=".6"/>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st52" transform="translate(225.14 151.1)"><tspan x="0" y="0">A/B</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st52" transform="translate(251.74 151.1)"><tspan x="0" y="0">C</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st52" transform="translate(274.45 151.1)"><tspan x="0" y="0">D/E</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st58" transform="translate(224.33 154.95)"><tspan x="0" y="0">alarm</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st58" transform="translate(246.92 154.95)"><tspan x="0" y="0">monitor</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st58" transform="translate(271.7 154.76)"><tspan x="0" y="0">low-risk</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st75" transform="translate(213.39 159.95)"><tspan x="0" y="0">Three deployable modes</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g id="modes">
+      <path class="st29" d="M215.99,162.38h19.13c2.18-.06,2.95,3.6,2.6,2.46v9.84c0,1.36-1.16,2.46-2.6,2.46h-19.13c-1.44,0-2.6-1.1-2.6-2.46v-9.84c0-1.36,1.16-2.46,2.6-2.46Z"/>
+      <g>
+        <circle class="st118" cx="216.9" cy="164.8" r=".55"/>
+        <circle class="st118" cx="218.25" cy="164.8" r=".55"/>
+        <circle class="st118" cx="219.6" cy="164.8" r=".55"/>
+        <circle class="st118" cx="220.95" cy="164.8" r=".55"/>
+        <circle class="st118" cx="222.3" cy="164.8" r=".55"/>
+        <circle class="st118" cx="216.9" cy="166.3" r=".55"/>
+        <circle class="st118" cx="218.25" cy="166.3" r=".55"/>
+        <circle class="st118" cx="219.6" cy="166.3" r=".55"/>
+        <circle class="st118" cx="220.95" cy="166.3" r=".55"/>
+        <circle class="st118" cx="222.3" cy="166.3" r=".55"/>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st47" transform="translate(222.36 172.1)"><tspan x="0" y="0">Full</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st74" transform="translate(221.21 175.6)"><tspan x="0" y="0">10 dim</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <path class="st9" d="M243.31,162.38h19.13c1.44,0,2.6,1.1,2.6,3.41v9.84c0,.41-1.16,1.51-2.6,1.51h-19.13c-1.44,0-2.6-1.1-2.6-2.46v-9.84c0-1.36,1.16-2.46,2.6-2.46h0Z"/>
+      <g>
+        <circle class="st118" cx="249.15" cy="164.9" r=".72"/>
+        <circle class="st118" cx="252.4" cy="164.9" r=".72"/>
+        <circle class="st118" cx="255.65" cy="164.9" r=".72"/>
+        <circle class="st118" cx="250.78" cy="167.4" r=".72"/>
+        <circle class="st118" cx="254.03" cy="167.4" r=".72"/>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st47" transform="translate(249.68 172.1)"><tspan x="0" y="0">Lite</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st74" transform="translate(248.85 175.6)"><tspan x="0" y="0">5 core</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <path class="st29" d="M270.63,162.38h19.13c1.44,0,2.6,1.1,2.6,3.41v9.84c0,.41-1.16,1.51-2.6,1.51h-19.13c-1.44,0-2.6-1.1-2.6-2.46v-9.84c0-1.36,1.16-2.46,2.6-2.46h0Z"/>
+      <g>
+        <circle class="st118" cx="278.18" cy="164.8" r=".55"/>
+        <circle class="st118" cx="279.53" cy="164.8" r=".55"/>
+        <circle class="st118" cx="280.88" cy="164.8" r=".55"/>
+        <circle class="st118" cx="282.23" cy="164.8" r=".55"/>
+        <circle class="st118" cx="278.18" cy="166.3" r=".55"/>
+        <circle class="st118" cx="279.53" cy="166.3" r=".55"/>
+        <circle class="st118" cx="280.88" cy="166.3" r=".55"/>
+        <circle class="st118" cx="282.23" cy="166.3" r=".55"/>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st47" transform="translate(273.9 172.1)"><tspan x="0" y="0">Ordinal</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st74" transform="translate(275.53 175.6)"><tspan x="0" y="0">8 items</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(214.6 218.84)"><tspan x="0" y="0">• Full adds epidemiological context</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(214.39 225.2)"><tspan x="0" y="0">• Lite needs only ARG/VF/MOB/length/BMG</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(214.6 231.14)"><tspan x="0" y="0">• Ordinal mode returns the PIPdb index</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g id="card5-validation">
+    <g>
+      <rect class="st110" x="307.54" y="35.86" width="91.11" height="218.22" rx="4.63" ry="4.63"/>
+      <rect class="st25" x="307.54" y="35.86" width="91.11" height="218.22" rx="4.63" ry="4.63"/>
+    </g>
+    <path class="st121" d="M308.45,41.37h0c.5,0,.91.37.91.83v205.55c0,.46-.41.83-.91.83h0c-.5,0-.91-.37-.91-.83V42.2c0-.46.41-.83.91-.83Z"/>
+    <circle class="st121" cx="317.26" cy="46.19" r="4.56"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st73" transform="translate(316.08 47.71)"><tspan x="0" y="0">D</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st57" transform="translate(324.55 47.71)"><tspan x="0" y="0">Validation &amp; use</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st69" transform="translate(313.5 54.59)"><tspan x="0" y="0">HELD-OUT REAL-WORLD VALIDATION</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st56" transform="translate(312.4 61.5)"><tspan x="0" y="0">Locked test AUC (full model)</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g id="auc-bars">
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(312.4 69)"><tspan x="0" y="0">High-risk ARG</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <path class="st122" d="M343.68,65.36h34.02c1.17,0,2.13.95,2.13,2.13h0c0,1.17-.95,2.13-2.13,2.13h-34.02c-1.17,0-2.13-.95-2.13-2.13h0c0-1.17.95-2.13,2.13-2.13Z"/>
+        <path class="st111" d="M343.62,65.36h29.64c1.13,0,2.07.95,2.07,2.13h0c0,1.17-.92,2.13-2.07,2.13h-29.56c-1.13,0-2.07-.95-2.07-2.13h0c0-1.17.92-2.13,2.07-2.13h-.08Z"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st39" transform="translate(382.26 69)"><tspan x="0" y="0">.946</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(312.4 77.5)"><tspan x="0" y="0">ARG–VF fusion</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <path class="st122" d="M343.68,73.86h34.02c1.17,0,2.13.95,2.13,2.13h0c0,1.17-.95,2.13-2.13,2.13h-34.02c-1.17,0-2.13-.95-2.13-2.13h0c0-1.17.95-2.13,2.13-2.13Z"/>
+        <path class="st112" d="M343.68,73.86h31.48c1.17,0,2.13.95,2.13,2.13h0c0,1.17-.95,2.13-2.13,2.13h-31.34c-1.17,0-2.13-.95-2.13-2.13h0c0-1.17.95-2.13,2.13-2.13h-.14Z"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st39" transform="translate(382.26 77.5)"><tspan x="0" y="0">.967</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(312.4 86)"><tspan x="0" y="0">Conjugative</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <path class="st122" d="M343.68,82.36h34.02c1.17,0,2.13.95,2.13,2.13h0c0,1.17-.95,2.13-2.13,2.13h-34.02c-1.17,0-2.13-.95-2.13-2.13h0c0-1.17.95-2.13,2.13-2.13Z"/>
+        <path class="st5" d="M343.68,82.36h22.24c1.17,0,2.13.95,2.13,2.13h0c0,1.17-.95,2.13-2.13,2.13h-22.93c-1.17,0-2.13-.95-2.13-2.13h0c0-1.17.95-2.13,2.13-2.13h.69Z"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st39" transform="translate(382.26 86)"><tspan x="0" y="0">.846</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(312.4 94.5)"><tspan x="0" y="0">Biocide/metal</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+        <path class="st122" d="M343.68,90.86h34.02c1.17,0,2.13.95,2.13,2.13h0c0,1.17-.95,2.13-2.13,2.13h-34.02c-1.17,0-2.13-.95-2.13-2.13h0c0-1.17.95-2.13,2.13-2.13Z"/>
+        <path class="st108" d="M343.68,90.86h27.13c1.17,0,2.13.95,2.13,2.13h0c0,1.17-.95,2.13-2.13,2.13h-26.82c-1.17,0-2.13-.95-2.13-2.13h0c0-1.17.95-2.13,2.13-2.13h-.31Z"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st39" transform="translate(382.26 94.5)"><tspan x="0" y="0">.910</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <rect class="st6" x="312.4" y="100.5" width="81.39" height="18.5" rx="3.04" ry="3.04"/>
+    <g>
+      <path class="st92" d="M317.26,108.4l3.04,3.04,5.47-7.9"/>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st49" transform="translate(327.85 107.53)"><tspan x="0" y="0">Independent complete plasmids</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st80" transform="translate(327.85 113.63)"><tspan x="0" y="0">external AUC 0.998 (0.994–1.000)</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st56" transform="translate(312.4 126)"><tspan x="0" y="0">Robustness hierarchy</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g>
+      <g>
+        <circle class="st92" cx="314.53" cy="131.3" r="1.97"/>
+        <line class="st92" x1="314.53" y1="131.3" x2="314.53" y2="130.08"/>
+        <line class="st92" x1="314.53" y1="131.3" x2="315.44" y2="131.91"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(319.08 132.6)"><tspan x="0" y="0">temporal pre-/post-2020 split</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g>
+          <circle class="st121" cx="312.9" cy="135.8" r=".5"/>
+          <circle class="st121" cx="315" cy="135.8" r=".5"/>
+          <circle class="st121" cx="317.1" cy="135.8" r=".5"/>
+          <circle class="st121" cx="312.9" cy="138.2" r=".5"/>
+          <circle class="st121" cx="315" cy="138.2" r=".5"/>
+          <circle class="st121" cx="317.1" cy="138.2" r=".5"/>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(319.08 138.6)"><tspan x="0" y="0">species-cluster bootstrap, B = 1,000</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g>
+          <circle class="st121" cx="313.2" cy="142.3" r=".62"/>
+          <circle class="st121" cx="315.4" cy="144.6" r=".62"/>
+          <circle class="st121" cx="313.2" cy="144.6" r=".62"/>
+          <circle class="st105" cx="315.4" cy="142.3" r=".62"/>
+          <path class="st103" d="M314.96,141.86l.88.88M315.84,141.86l-.88.88"/>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(319.08 144.6)"><tspan x="0" y="0">leave-one-replicon-out × 40</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <g>
+          <path class="st83" d="M312.8,149.6h4.3v-4.2"/>
+          <path class="st83" d="M313.2,149.4l3.3-3.4"/>
+        </g>
+        <g>
+          <circle class="st121" cx="313.5" cy="148.9" r=".5"/>
+          <circle class="st121" cx="314.7" cy="147.8" r=".5"/>
+          <circle class="st121" cx="315.9" cy="146.6" r=".5"/>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(319.08 150.6)"><tspan x="0" y="0">Firth regression · VIF collinearity</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <line class="st27" x1="312.4" y1="153.5" x2="393.8" y2="153.5"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st75" transform="translate(312.4 160.5)"><tspan x="0" y="0">Real-world scenarios cohorts</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g id="prospective-cohorts">
+      <g>
+        <rect class="st14" x="312.4" y="162.38" width="39.4" height="26.4" rx="2.5" ry="2.5"/>
+        <g>
+          <path class="st95" d="M328.3,166.1v-1c0-.83.67-1.5,1.5-1.5s1.5.67,1.5,1.5v1"/>
+          <rect class="st106" x="327" y="165.9" width="5.6" height="4.2" rx=".8" ry=".8"/>
+          <line class="st98" x1="327" y1="167.5" x2="332.6" y2="167.5"/>
+          <circle class="st116" cx="328.2" cy="170.4" r=".35"/>
+          <circle class="st116" cx="331.4" cy="170.4" r=".35"/>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st79" transform="translate(316.4 177.14)"><tspan x="0" y="0">travel-associated</tspan></text>
+            </g>
+          </g>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st79" transform="translate(319.34 181.42)"><tspan x="0" y="0">DEC cultures</tspan></text>
+            </g>
+          </g>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st51" transform="translate(314.47 186.66)"><tspan x="0" y="0">A/B vehicles found</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <rect class="st14" x="354.8" y="162.38" width="39.4" height="26.4" rx="2.5" ry="2.5"/>
+        <g>
+          <circle class="st104" cx="371.6" cy="166.5" r="1.05"/>
+          <path class="st102" d="M368.7,171.2c0-1.6,1.3-2.9,2.91-2.89,1.6,0,2.89,1.3,2.89,2.89"/>
+          <path class="st90" d="M373.9,165.5"/>
+          <path class="st90" d="M375.3,164.1"/>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st79" transform="translate(364.04 177.14)"><tspan x="0" y="0">healthy-gut</tspan></text>
+            </g>
+          </g>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st79" transform="translate(358.82 181.47)"><tspan x="0" y="0">trial metagenomes</tspan></text>
+            </g>
+          </g>
+        </g>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <text class="st72" transform="translate(356.02 186.71)"><tspan x="0" y="0">A/B vehicles absent</tspan></text>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <line class="st27" x1="312.4" y1="192.4" x2="393.8" y2="192.4"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st59" transform="translate(312.4 199.5)"><tspan x="0" y="0">Deployment</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <rect class="st109" x="312.4" y="202.5" width="81.39" height="12.5" rx="2.5" ry="2.5"/>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st46" transform="translate(316.65 207.5)"><tspan x="0" y="0">$ plasrisk run *.fasta</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st62" transform="translate(316.65 212.2)"><tspan x="0" y="0"># plasrisk meta metagenome.fasta</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g>
+      <g>
+        <circle class="st86" cx="315.44" cy="219.2" r=".97"/>
+        <path class="st86" d="M313.31,222.54c0-1.17.95-2.13,2.13-2.13s2.13.95,2.13,2.13"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(320.3 221.7)"><tspan x="0" y="0">human</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <ellipse class="st111" cx="337.31" cy="221.34" rx="1.21" ry=".97"/>
+        <circle class="st111" cx="335.79" cy="219.21" r=".52"/>
+        <circle class="st111" cx="337.31" cy="218.75" r=".52"/>
+        <circle class="st111" cx="338.83" cy="219.21" r=".52"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(342.17 221.7)"><tspan x="0" y="0">animal</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g>
+        <circle class="st94" cx="358.57" cy="220.42" r="2.43"/>
+        <ellipse class="st94" cx="358.57" cy="220.42" rx="2.43" ry="1"/>
+        <ellipse class="st94" cx="358.57" cy="220.42" rx="1" ry="2.43"/>
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <g class="st60">
+                <g class="st60">
+                  <text class="st79" transform="translate(363.43 221.7)"><tspan x="0" y="0">environment</tspan></text>
+                </g>
+              </g>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(312.4 229)"><tspan x="0" y="0" xml:space="preserve">• Validation on plasmids, isolates, and  </tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(312.4 234)"><tspan x="0" y="0">metagenomes held-out cohorts</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(110.23 246.66)"><tspan x="0" y="0">• Weights reflect One Health framework</tspan></text>
+            </g>
+          </g>
+          <g class="st60">
+            <g class="st60">
+              <text class="st42" transform="translate(312.69 238.86)"><tspan x="0" y="0">• Open-source, runs locally</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g id="flow-arrows">
+    <path class="st114" d="M98.44,151.57l8.2,4.56-8.2,4.56v-9.11h0Z"/>
+    <path class="st114" d="M198.66,151.57l8.2,4.56-8.2,4.56v-9.11h0Z"/>
+    <path class="st114" d="M298.89,151.57l8.2,4.56-8.2,4.56v-9.11h0Z"/>
+  </g>
+  <rect class="st24" x="4.8" y="255.93" width="399.28" height="33.9" rx="4.19" ry="4.19"/>
+  <g class="st60">
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <text class="st64" transform="translate(9.76 265.24)"><tspan x="0" y="0">CORE MESSAGES</tspan></text>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g>
+    <rect class="st12" x="5.03" y="269.5" width="97" height="16.5" rx="2.86" ry="2.86"/>
+    <g>
+      <rect class="st10" x="9.28" y="274.98" width="2.43" height="2.43" rx=".46" ry=".46"/>
+      <rect class="st10" x="12.62" y="274.98" width="2.43" height="2.43" rx=".46" ry=".46"/>
+      <rect class="st10" x="9.28" y="278.32" width="2.43" height="2.43" rx=".46" ry=".46"/>
+      <rect class="st10" x="12.62" y="278.32" width="2.43" height="2.43" rx=".46" ry=".46"/>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st67" transform="translate(18.39 276.2)"><tspan x="0" y="0">Multi-outcome scoring</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st70" transform="translate(18.39 282.3)"><tspan x="0" y="0">surveillance for all four endpoints</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g>
+    <rect class="st12" x="104.03" y="269.5" width="97" height="16.5" rx="2.86" ry="2.86"/>
+    <g>
+      <circle class="st118" cx="108.29" cy="275.42" r=".79"/>
+      <circle class="st118" cx="111.02" cy="275.42" r=".79"/>
+      <circle class="st118" cx="113.75" cy="275.42" r=".79"/>
+      <circle class="st118" cx="109.65" cy="277.85" r=".79"/>
+      <circle class="st118" cx="112.39" cy="277.85" r=".79"/>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st67" transform="translate(117.4 276.2)"><tspan x="0" y="0">Parsimonious &amp; non-overfit</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st70" transform="translate(117.4 282.3)"><tspan x="0" y="0">lite ≈ full, |ΔAUC| ≤ .001</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g>
+    <rect class="st16" x="203.03" y="269.5" width="97" height="16.5" rx="2.86" ry="2.86"/>
+    <g>
+      <circle class="st23" cx="207.28" cy="276.5" r="1.82"/>
+      <circle class="st23" cx="210.93" cy="276.5" r="1.82"/>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st67" transform="translate(214.57 276.2)"><tspan x="0" y="0">Co-selection measurable</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st70" transform="translate(214.57 282.3)"><tspan x="0" y="0">BMG load adds signal beyond ARGs</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g>
+    <rect class="st12" x="302.03" y="269.5" width="97" height="16.5" rx="2.86" ry="2.86"/>
+    <g>
+      <circle class="st93" cx="308.2" cy="276.5" r="2.4"/>
+      <ellipse class="st84" cx="308.2" cy="276.5" rx="2.4" ry="1.05"/>
+      <line class="st84" x1="305.8" y1="276.5" x2="310.6" y2="276.5"/>
+      <path class="st100" d="M306.55,276.55l1.05,1.05,2.2-2.5"/>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st67" transform="translate(314.57 276.2)"><tspan x="0" y="0">Real-world validated</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st70" transform="translate(314.57 282.3)"><tspan x="0" y="0">A/B only in travel-associated cases</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
+  <g id="grade-composition">
+    <g class="st60">
+      <g class="st60">
+        <text class="st39" transform="translate(213.39 82.65)"><tspan x="0" y="0">A</tspan></text>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <text class="st39" transform="translate(213.39 88.85)"><tspan x="0" y="0">B</tspan></text>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <text class="st39" transform="translate(213.39 95.05)"><tspan x="0" y="0">C</tspan></text>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <text class="st39" transform="translate(213.39 101.25)"><tspan x="0" y="0">D</tspan></text>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <text class="st39" transform="translate(213.39 107.45)"><tspan x="0" y="0">E</tspan></text>
+      </g>
+    </g>
+    <g class="st126">
+      <g>
+        <rect class="st1" x="224.5" y="78.9" width="34.89" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(238.34 82.25)"><tspan x="0" y="0">51%</tspan></text>
+        </g>
+        <rect class="st4" x="259.39" y="78.9" width="19.95" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(265.76 82.25)"><tspan x="0" y="0">29%</tspan></text>
+        </g>
+        <rect class="st0" x="279.34" y="78.9" width="7.53" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(279.57 82.25)"><tspan x="0" y="0">11%</tspan></text>
+        </g>
+        <rect class="st3" x="286.86" y="78.9" width="5.5" height="4.6"/>
+      </g>
+    </g>
+    <g class="st115">
+      <g>
+        <rect class="st1" x="224.5" y="85.1" width="15.84" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(228.82 88.45)"><tspan x="0" y="0">23%</tspan></text>
+        </g>
+        <rect class="st4" x="240.34" y="85.1" width="15.59" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(244.54 88.45)"><tspan x="0" y="0">23%</tspan></text>
+        </g>
+        <rect class="st0" x="255.93" y="85.1" width="9.14" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(256.9 88.45)"><tspan x="0" y="0">13%</tspan></text>
+        </g>
+        <rect class="st3" x="265.07" y="85.1" width="27.08" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(275.01 88.45)"><tspan x="0" y="0">40%</tspan></text>
+        </g>
+        <rect class="st2" x="292.15" y="85.1" width=".21" height="4.6"/>
+      </g>
+    </g>
+    <g class="st123">
+      <g>
+        <rect class="st1" x="224.5" y="91.3" width="5.25" height="4.6"/>
+        <rect class="st4" x="229.75" y="91.3" width="2" height="4.6"/>
+        <rect class="st0" x="231.75" y="91.3" width="8.02" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(232.16 94.65)"><tspan x="0" y="0">12%</tspan></text>
+        </g>
+        <rect class="st3" x="239.77" y="91.3" width="36.9" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(254.62 94.65)"><tspan x="0" y="0">54%</tspan></text>
+        </g>
+        <rect class="st2" x="276.66" y="91.3" width="15.7" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(280.92 94.65)"><tspan x="0" y="0">23%</tspan></text>
+        </g>
+      </g>
+    </g>
+    <g class="st117">
+      <g>
+        <rect class="st1" x="224.5" y="97.5" width=".12" height="4.6"/>
+        <rect class="st4" x="224.62" y="97.5" width=".08" height="4.6"/>
+        <rect class="st0" x="224.7" y="97.5" width="3.51" height="4.6"/>
+        <rect class="st3" x="228.21" y="97.5" width="33.12" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(241.17 100.85)"><tspan x="0" y="0">49%</tspan></text>
+        </g>
+        <rect class="st2" x="261.33" y="97.5" width="31.03" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(273.24 100.85)"><tspan x="0" y="0">46%</tspan></text>
+        </g>
+      </g>
+    </g>
+    <g class="st107">
+      <g>
+        <rect class="st2" x="224.5" y="103.7" width="67.86" height="4.6"/>
+        <g class="st60">
+          <text class="st55" transform="translate(254.11 107.05)"><tspan x="0" y="0">100%</tspan></text>
+        </g>
+      </g>
+    </g>
+    <line class="st33" x1="224.5" y1="110.1" x2="292.36" y2="110.1"/>
+    <line class="st33" x1="224.5" y1="110.1" x2="224.5" y2="110.9"/>
+    <g class="st60">
+      <text class="st43" transform="translate(222.77 112.7)"><tspan x="0" y="0">0%</tspan></text>
+    </g>
+    <line class="st33" x1="241.47" y1="110.1" x2="241.47" y2="110.9"/>
+    <g class="st60">
+      <text class="st43" transform="translate(239.06 112.7)"><tspan x="0" y="0">25%</tspan></text>
+    </g>
+    <line class="st33" x1="258.43" y1="110.1" x2="258.43" y2="110.9"/>
+    <g class="st60">
+      <text class="st43" transform="translate(256.03 112.7)"><tspan x="0" y="0">50%</tspan></text>
+    </g>
+    <line class="st33" x1="275.4" y1="110.1" x2="275.4" y2="110.9"/>
+    <g class="st60">
+      <text class="st43" transform="translate(272.99 112.7)"><tspan x="0" y="0">75%</tspan></text>
+    </g>
+    <line class="st33" x1="292.36" y1="110.1" x2="292.36" y2="110.9"/>
+    <g class="st60">
+      <text class="st43" transform="translate(289.29 112.7)"><tspan x="0" y="0">100%</tspan></text>
+    </g>
+    <rect class="st111" x="218.84" y="115.84" width="2.2" height="2.2" rx=".3" ry=".3"/>
+    <g class="st60">
+      <text class="st71" transform="translate(221.84 117.64)"><tspan x="0" y="0">Critical ARG</tspan></text>
+    </g>
+    <rect class="st112" x="244.84" y="115.84" width="2.2" height="2.2" rx=".3" ry=".3"/>
+    <g class="st60">
+      <text class="st71" transform="translate(247.84 117.64)"><tspan x="0" y="0">ARG-VF fusion, no critical ARG</tspan></text>
+    </g>
+    <rect class="st5" x="218.71" y="120.52" width="2.2" height="2.2" rx=".3" ry=".3"/>
+    <g class="st60">
+      <text class="st71" transform="translate(221.71 122.32)"><tspan x="0" y="0">Conjugative mobility only</tspan></text>
+    </g>
+    <rect class="st108" x="258.64" y="120.35" width="2.2" height="2.2" rx=".3" ry=".3"/>
+    <g class="st60">
+      <text class="st71" transform="translate(261.64 122.15)"><tspan x="0" y="0">BMG only</tspan></text>
+    </g>
+    <rect class="st119" x="278.58" y="120.35" width="2.2" height="2.2" rx=".3" ry=".3"/>
+    <g class="st60">
+      <text class="st71" transform="translate(281.58 122.15)"><tspan x="0" y="0">None</tspan></text>
+    </g>
+  </g>
+  <rect class="st17" x="212.05" y="182.75" width="78.97" height="26" rx="2.81" ry="2.81"/>
+  <g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st49" transform="translate(217.28 187.83)"><tspan x="0" y="0">Lite ≈ Full</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st80" transform="translate(217.28 194.43)"><tspan x="0" y="0">|ΔAUC| ≤ 0.001 on all outcomes</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st80" transform="translate(217.28 199.93)"><tspan x="0" y="0">92.7% grade agreement</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+    <g class="st60">
+      <g class="st60">
+        <g class="st60">
+          <g class="st60">
+            <g class="st60">
+              <text class="st80" transform="translate(217.28 205.43)"><tspan x="0" y="0">plateau at k = 5 of 1,023 subsets</tspan></text>
+            </g>
+          </g>
+        </g>
+      </g>
+    </g>
+  </g>
 </svg>
