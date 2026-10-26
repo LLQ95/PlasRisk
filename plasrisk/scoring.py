@@ -165,6 +165,7 @@ HIGH_RISK_ARG_PATTERNS = {
     "blaIMP":    re.compile(r"\bIMP", re.I),
     "blaVIM":    re.compile(r"\bVIM", re.I),
     "rmt":       re.compile(r"rmt[A-H]", re.I),
+    "armA":      re.compile(r"\barmA\b", re.I),
 }
 
 # WHO-priority ARG indicator (broad set of clinically important families)

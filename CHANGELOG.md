@@ -2,6 +2,22 @@
 
 All notable changes to PlasRisk are documented in this file.
 
+## [1.9.0] - 2026-10-26
+
+### Added
+- `armA` to the high-risk (critical) ARG family list. ArmA is a 16S rRNA
+  methyltransferase that confers high-level resistance to nearly all
+  clinically important aminoglycosides, matching the `rmt` family already
+  in the list and the AWaRe 2025 Reserve mapping.
+
+### Changed
+- The critical-ARG label is now evaluated against the 14-family critical
+  list on the full PIPdb catalogue, removing elements that carried only
+  non-critical determinants (e.g. FosA, TEM, non-48-like OXA,
+  AAC(6')-Ib-cr, DHA). Corrected critical prevalence is 2.52% of the
+  catalogue; downstream discrimination and grade statistics are updated
+  in the documentation.
+
 ## [1.8.0] - 2026-10-25
 
 ### Added

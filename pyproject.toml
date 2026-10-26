@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plasrisk"
-version = "1.8.0"
+version = "1.9.0"
 description = "PlasRisk: data-driven weighted risk assessment for bacterial plasmids. A unified auto entry point scores ready plasmid FASTAs and also mines plasmids from raw short-read WGS, long-read WGS, and metagenomic assemblies (geNomad for short-read fragments, PlasmidFinder replicon/circularity for long-read contigs), with isolate and metagenomic scoring layers, an explicit unscorable status, lite 5-dim FASTA-only core by default, full 10-dim model, and the original PIPdb ordinal index."
 readme = "README.md"
 license = {text = "MIT"}
