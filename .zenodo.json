@@ -1,0 +1,57 @@
+{
+  "title": "PlasRisk: annotation-based multifeature prioritization of bacterial plasmid sequence clusters",
+  "description": "PlasRisk is an annotation-based framework that scores bacterial plasmid sequence clusters using ten normalized components with weights derived from random forest, LASSO, and grid search, and assigns frozen A-E priority bands. It supports full, lite, and ordinal scoring modes, accepts isolated plasmids and whole-genome and metagenomic assemblies, and is intended for One Health surveillance prioritization rather than prediction of plasmid transfer or health outcomes.",
+  "upload_type": "software",
+  "license": "MIT",
+  "version": "1.9.0",
+  "keywords": [
+    "plasmids",
+    "antimicrobial resistance",
+    "One Health",
+    "biocide and metal resistance",
+    "sequence prioritization",
+    "bioinformatics"
+  ],
+  "creators": [
+    {
+      "name": "Li, Lanqi",
+      "orcid": "0000-0002-1518-6480"
+    },
+    {
+      "name": "Wang, Yuping"
+    },
+    {
+      "name": "Zhang, Tong",
+      "orcid": "0000-0003-1148-4322"
+    },
+    {
+      "name": "Zhou, Zhemin",
+      "orcid": "0000-0001-9783-0366"
+    },
+    {
+      "name": "Hu, Baolan",
+      "orcid": "0000-0003-4700-3498"
+    },
+    {
+      "name": "Li, Xiangdong",
+      "orcid": "0000-0002-4044-2888"
+    },
+    {
+      "name": "Wu, Yongning",
+      "orcid": "0000-0001-6430-1302"
+    }
+  ],
+  "access_right": "open",
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/LLQ95/PlasRisk",
+      "relation": "isSupplementTo",
+      "resource_type": "software"
+    },
+    {
+      "identifier": "10.1093/nar/gkae952",
+      "relation": "uses",
+      "resource_type": "publication-article"
+    }
+  ]
+}

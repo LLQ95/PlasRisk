@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "PlasRisk"
+version: 1.9.0
+date-released: 2026-10-26
+license: MIT
+repository-code: "https://github.com/LLQ95/PlasRisk"
+url: "https://github.com/LLQ95/PlasRisk"
+abstract: "An annotation-based multifeature score that prioritizes bacterial plasmid sequence clusters for One Health surveillance, with full, lite, and ordinal scoring modes."
+keywords:
+  - plasmids
+  - antimicrobial resistance
+  - One Health
+  - risk prioritization
+  - biocide and metal resistance
+  - bioinformatics
+authors:
+  - family-names: Li
+    given-names: Lanqi
+    orcid: "https://orcid.org/0000-0002-1518-6480"
+  - family-names: Wang
+    given-names: Yuping
+  - family-names: Zhang
+    given-names: Tong
+    orcid: "https://orcid.org/0000-0003-1148-4322"
+  - family-names: Zhou
+    given-names: Zhemin
+    orcid: "https://orcid.org/0000-0001-9783-0366"
+  - family-names: Hu
+    given-names: Baolan
+    orcid: "https://orcid.org/0000-0003-4700-3498"
+  - family-names: Li
+    given-names: Xiangdong
+    orcid: "https://orcid.org/0000-0002-4044-2888"
+  - family-names: Wu
+    given-names: Yongning
+    orcid: "https://orcid.org/0000-0001-6430-1302"

@@ -631,8 +631,11 @@ python tests/test_scoring.py
 
 If you use PlasRisk, please cite:
 
-> [Authors]. PlasRisk: a ten-dimension weighted risk assessment framework for
-> bacterial plasmids. *Journal*, 2025. doi: [to be added]
+> Li L, Wang Y, Zhang T, Zhou Z, Hu B, Li X, Wu Y. An annotation-based
+> multifeature score prioritizes bacterial plasmid sequence clusters for One
+> Health surveillance. *mSystems* (resubmitted). The persistent archive DOI
+> will be added after the Zenodo release; see CITATION.cff for the software
+> citation.
 
 The model is based on data from:
 > Zhu Q, Chen Q, Lu X, et al. PIPdb: a comprehensive plasmid sequence resource
