@@ -5,6 +5,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://python.org)
+[![Zenodo](https://zenodo.org/badge/doi/10.5281%2Fzenodo.23881893.svg)](https://doi.org/10.5281/zenodo.23881894)
 
 ![PlasRisk graphical abstract](docs/graphical_abstract.svg)
 
@@ -633,9 +634,9 @@ If you use PlasRisk, please cite:
 
 > Li L, Wang Y, Zhang T, Zhou Z, Hu B, Li X, Wu Y. An annotation-based
 > multifeature score prioritizes bacterial plasmid sequence clusters for One
-> Health surveillance. *mSystems* (resubmitted). The persistent archive DOI
-> will be added after the Zenodo release; see CITATION.cff for the software
-> citation.
+> Health surveillance. *mSystems* (resubmitted). Software archive: PlasRisk
+> v1.9.0, doi:10.5281/zenodo.23881894 (concept DOI:
+> doi:10.5281/zenodo.23881893). See CITATION.cff for the software citation.
 
 The model is based on data from:
 > Zhu Q, Chen Q, Lu X, et al. PIPdb: a comprehensive plasmid sequence resource

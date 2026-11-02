@@ -6,6 +6,13 @@ date-released: 2026-10-26
 license: MIT
 repository-code: "https://github.com/LLQ95/PlasRisk"
 url: "https://github.com/LLQ95/PlasRisk"
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.23881894
+    description: PlasRisk v1.9.0 archived release
+  - type: doi
+    value: 10.5281/zenodo.23881893
+    description: Persistent concept DOI for all PlasRisk releases
 abstract: "An annotation-based multifeature score that prioritizes bacterial plasmid sequence clusters for One Health surveillance, with full, lite, and ordinal scoring modes."
 keywords:
   - plasmids
